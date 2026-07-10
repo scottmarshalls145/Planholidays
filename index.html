@@ -12732,9 +12732,395 @@
                 }, 6000);
             })();
 
+            // --------------------------------------------------------------
+            // MuleRun SDP-safe voice call patch
+            // Fixes: "Failed to parse SessionDescription" and missed calls.
+            // This final layer replaces the active signaling listener with
+            // strict SDP normalization, stale-signal cleanup, deterministic
+            // offer ownership, and automatic peer rebuilds.
+            // --------------------------------------------------------------
+            (function _mrInstallSdpSafeVoicePatch() {
+                if (window._mrSdpSafeVoicePatchInstalled) return;
+                window._mrSdpSafeVoicePatchInstalled = true;
+
+                var _mrSdpRetryTimers = {};
+                var _mrSdpToastAt = {};
+
+                function _mrSafeKeyFinal(v) {
+                    if (typeof _mrFirebaseKey === 'function') return _mrFirebaseKey(v);
+                    return encodeURIComponent(String(v || '')).replace(/[.#$\[\]\/%]/g, function(ch) {
+                        return '%' + ch.charCodeAt(0).toString(16).toUpperCase();
+                    });
+                }
+                function _mrDecodeKeyFinal(v) {
+                    try { return decodeURIComponent(String(v || '')); } catch (_) { return String(v || ''); }
+                }
+                function _mrVoicePairKeyFinal(a, b) {
+                    return [_mrSafeKeyFinal(a), _mrSafeKeyFinal(b)].sort().join('__');
+                }
+                function _mrVoiceSignalPathFinal(callId, a, b) {
+                    return 'voiceSignals/' + callId + '/' + _mrVoicePairKeyFinal(a, b);
+                }
+                function _mrDeterministicOfferOwner(a, b) {
+                    return _mrSafeKeyFinal(a) < _mrSafeKeyFinal(b) ? a : b;
+                }
+                function _mrSerializableDescFinal(desc) {
+                    if (!desc) return null;
+                    return { type: String(desc.type || '').toLowerCase(), sdp: String(desc.sdp || '') };
+                }
+                function _mrNormalizeSdpFinal(input, expectedType) {
+                    if (!input) return null;
+                    var raw = input;
+                    if (typeof raw === 'string') {
+                        try { raw = JSON.parse(raw); } catch (_) { raw = { type: expectedType, sdp: raw }; }
+                    }
+                    if (raw && raw.sdp && typeof raw.sdp === 'object') {
+                        raw = { type: raw.type || raw.sdp.type || expectedType, sdp: raw.sdp.sdp || '' };
+                    }
+                    var type = String((raw && raw.type) || expectedType || '').toLowerCase();
+                    var sdp = String((raw && raw.sdp) || '');
+                    if (sdp.indexOf('\\r\\n') !== -1 || sdp.indexOf('\\n') !== -1) {
+                        sdp = sdp.replace(/\\r\\n/g, '\r\n').replace(/\\n/g, '\n');
+                    }
+                    sdp = sdp.replace(/\u0000/g, '').replace(/\r?\n/g, '\r\n').trim();
+                    if (sdp) sdp += '\r\n';
+                    if ((type !== 'offer' && type !== 'answer') || (expectedType && type !== expectedType)) return null;
+                    if (!sdp || sdp.indexOf('v=0') !== 0 || sdp.indexOf('\r\nm=') === -1) return null;
+                    return { type: type, sdp: sdp };
+                }
+                function _mrIcePayloadFinal(candidate) {
+                    if (!candidate) return null;
+                    if (candidate.toJSON) return candidate.toJSON();
+                    return {
+                        candidate: candidate.candidate,
+                        sdpMid: candidate.sdpMid,
+                        sdpMLineIndex: candidate.sdpMLineIndex,
+                        usernameFragment: candidate.usernameFragment
+                    };
+                }
+                function _mrIceFinal(cand) {
+                    if (!cand || !cand.candidate) return null;
+                    try {
+                        var C = window.RTCIceCandidate || window.webkitRTCIceCandidate || window.mozRTCIceCandidate;
+                        return C ? new C(cand) : cand;
+                    } catch (_) { return null; }
+                }
+                function _mrRtcCtorFinal() {
+                    return window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection || null;
+                }
+                function _mrPeerAliveFinal(pc) {
+                    if (!pc) return false;
+                    var cs = pc.connectionState || '';
+                    var ice = pc.iceConnectionState || '';
+                    return pc.signalingState !== 'closed' && cs !== 'closed' && cs !== 'failed' && ice !== 'closed' && ice !== 'failed';
+                }
+                function _mrSetVoiceStatusFinal(text) {
+                    var s = document.getElementById('voiceStatus');
+                    if (s && text) s.textContent = text;
+                }
+                function _mrToastOnceFinal(key, message, type) {
+                    var now = Date.now();
+                    if (_mrSdpToastAt[key] && now - _mrSdpToastAt[key] < 7000) return;
+                    _mrSdpToastAt[key] = now;
+                    try { showToast(message, type || 'warning', 4500); } catch (_) {}
+                }
+                function _mrAttachRemoteAudioFinal(peer, stream) {
+                    if (!stream) return;
+                    var key = _mrSafeKeyFinal(peer || 'agent');
+                    var audio = document.getElementById('voiceAudio_' + key);
+                    if (!audio) {
+                        audio = document.createElement('audio');
+                        audio.id = 'voiceAudio_' + key;
+                        audio.autoplay = true;
+                        audio.controls = true;
+                        audio.playsInline = true;
+                        audio.setAttribute('playsinline', '');
+                        audio.dataset.peer = peer || '';
+                        audio.style.cssText = 'display:block;width:100%;margin-top:8px;';
+                        var box = document.getElementById('voiceAudios');
+                        if (box) box.appendChild(audio);
+                    }
+                    audio.muted = false;
+                    audio.volume = 1;
+                    try { audio.srcObject = stream; }
+                    catch (_) { try { audio.src = URL.createObjectURL(stream); } catch (__) {} }
+                    if (_mrVoice) {
+                        _mrVoice.remoteAudio = _mrVoice.remoteAudio || {};
+                        _mrVoice.remoteAudio[peer] = audio;
+                    }
+                    try {
+                        var p = audio.play && audio.play();
+                        if (p && p.catch) p.catch(function() {
+                            var btn = document.getElementById('mrEnableVoiceAudioBtn');
+                            if (btn) btn.style.display = '';
+                        });
+                    } catch (_) {}
+                }
+                async function _mrSetRemoteDescriptionSafeFinal(pc, payload, expectedType) {
+                    var desc = _mrNormalizeSdpFinal(payload, expectedType);
+                    if (!desc) {
+                        var err = new Error('Invalid or stale ' + expectedType + ' SDP.');
+                        err.code = 'MR_INVALID_SDP';
+                        throw err;
+                    }
+                    if (!pc || pc.signalingState === 'closed') return false;
+                    pc._mrRemoteSdp = pc._mrRemoteSdp || {};
+                    if (pc._mrRemoteSdp[expectedType] === desc.sdp) return true;
+                    if (expectedType === 'offer' && pc.signalingState === 'have-local-offer') {
+                        try { await pc.setLocalDescription({ type: 'rollback' }); } catch (_) {}
+                    }
+                    if (expectedType === 'answer' && pc.signalingState !== 'have-local-offer') return false;
+                    await pc.setRemoteDescription(desc);
+                    pc._mrRemoteSdp[expectedType] = desc.sdp;
+                    return true;
+                }
+                async function _mrClearVoiceSignalFinal(callId, peer) {
+                    if (!firebaseConnected || !db || !STATE.currentUser || !peer) return;
+                    try { await db.ref(_mrVoiceSignalPathFinal(callId, STATE.currentUser.username, peer)).remove(); } catch (_) {}
+                }
+                function _mrScheduleVoiceRebuildFinal(callId, peer, delay) {
+                    if (!STATE.currentUser || !peer || peer === STATE.currentUser.username) return;
+                    var key = callId + ':' + peer;
+                    if (_mrSdpRetryTimers[key]) return;
+                    _mrSdpRetryTimers[key] = setTimeout(async function() {
+                        delete _mrSdpRetryTimers[key];
+                        try {
+                            if (!_mrVoice || _mrVoice.callId !== callId || !(_mrVoice.members || []).includes(peer)) return;
+                            if (_mrVoice.peers && _mrVoice.peers[peer]) {
+                                try { _mrVoice.peers[peer].close(); } catch (_) {}
+                                delete _mrVoice.peers[peer];
+                            }
+                            if (_mrVoice.remoteAudio && _mrVoice.remoteAudio[peer]) {
+                                try { _mrVoice.remoteAudio[peer].remove(); } catch (_) {}
+                                delete _mrVoice.remoteAudio[peer];
+                            }
+                            await _mrClearVoiceSignalFinal(callId, peer);
+                            await _createPeer(callId, peer, true);
+                            _mrSetVoiceStatusFinal('Rebuilding voice link with ' + peer + '.');
+                        } catch (_) {
+                            _mrSdpRetryTimers[key] = null;
+                            _mrScheduleVoiceRebuildFinal(callId, peer, 1800);
+                        }
+                    }, delay || 600);
+                }
+
+                _createPeer = async function(callId, peer, initiator) {
+                    var Ctor = _mrRtcCtorFinal();
+                    if (!Ctor) throw new Error('WebRTC is not supported in this browser.');
+                    if (!STATE.currentUser || !STATE.currentUser.username) throw new Error('Login is required for voice calls.');
+                    var me = STATE.currentUser.username;
+                    var old = _mrVoice && _mrVoice.peers && _mrVoice.peers[peer];
+                    if (old && _mrPeerAliveFinal(old) && !initiator) return old;
+                    if (old && (!_mrPeerAliveFinal(old) || initiator)) {
+                        try { old.close(); } catch (_) {}
+                    }
+                    var pc = new Ctor(typeof _pcConfig === 'function' ? _pcConfig() : { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+                    _mrVoice.peers = _mrVoice.peers || {};
+                    _mrVoice.remoteAudio = _mrVoice.remoteAudio || {};
+                    _mrVoice.peers[peer] = pc;
+
+                    try {
+                        if (_mrVoice.localStream && pc.addTrack) {
+                            _mrVoice.localStream.getAudioTracks().forEach(function(t) { pc.addTrack(t, _mrVoice.localStream); });
+                        } else if (_mrVoice.localStream && pc.addStream) {
+                            pc.addStream(_mrVoice.localStream);
+                        }
+                        if (pc.addTransceiver) pc.addTransceiver('audio', { direction: _mrVoice.localStream ? 'sendrecv' : 'recvonly' });
+                    } catch (_) {}
+                    pc.ontrack = function(ev) {
+                        _mrAttachRemoteAudioFinal(peer, (ev.streams && ev.streams[0]) || (ev.track ? new MediaStream([ev.track]) : null));
+                    };
+                    pc.onaddstream = function(ev) { _mrAttachRemoteAudioFinal(peer, ev.stream); };
+                    pc.onicecandidate = function(ev) {
+                        var payload = _mrIcePayloadFinal(ev && ev.candidate);
+                        if (payload && firebaseConnected && db) {
+                            db.ref(_mrVoiceSignalPathFinal(callId, me, peer) + '/candidates/' + _mrSafeKeyFinal(me)).push(payload);
+                        }
+                    };
+                    pc.onconnectionstatechange = pc.oniceconnectionstatechange = function() {
+                        var cs = pc.connectionState || '';
+                        var ice = pc.iceConnectionState || '';
+                        if (cs === 'connected' || cs === 'completed' || ice === 'connected' || ice === 'completed') {
+                            _mrSetVoiceStatusFinal('Voice meeting active. Connected with ' + peer + '.');
+                        }
+                        if (cs === 'failed' || ice === 'failed') _mrScheduleVoiceRebuildFinal(callId, peer, 900);
+                    };
+
+                    if (initiator) {
+                        var existing = {};
+                        try { existing = await readData(_mrVoiceSignalPathFinal(callId, me, peer), null, true) || {}; } catch (_) {}
+                        if (existing.offer && existing.offer.to === me && existing.offer.from === peer) {
+                            try {
+                                await _mrSetRemoteDescriptionSafeFinal(pc, existing.offer.sdp, 'offer');
+                                var existingAnswer = await pc.createAnswer();
+                                await pc.setLocalDescription(existingAnswer);
+                                await writeData(_mrVoiceSignalPathFinal(callId, me, peer) + '/answer', {
+                                    from: me,
+                                    to: peer,
+                                    sdp: _mrSerializableDescFinal(pc.localDescription || existingAnswer),
+                                    at: getNowISO()
+                                }, null);
+                                return pc;
+                            } catch (_) {
+                                await _mrClearVoiceSignalFinal(callId, peer);
+                            }
+                        }
+                        if (_mrDeterministicOfferOwner(me, peer) !== me) {
+                            _mrSetVoiceStatusFinal('Waiting for ' + peer + ' to complete voice link.');
+                            return pc;
+                        }
+                        var offer = await pc.createOffer({ offerToReceiveAudio: true });
+                        await pc.setLocalDescription(offer);
+                        await writeData(_mrVoiceSignalPathFinal(callId, me, peer), {
+                            offer: {
+                                from: me,
+                                to: peer,
+                                fromKey: _mrSafeKeyFinal(me),
+                                toKey: _mrSafeKeyFinal(peer),
+                                sdp: _mrSerializableDescFinal(pc.localDescription || offer),
+                                at: getNowISO(),
+                                nonce: (typeof genId === 'function') ? genId() : String(Date.now())
+                            },
+                            candidates: {}
+                        }, null);
+                    }
+                    return pc;
+                };
+                window._createPeer = _createPeer;
+
+                listenVoiceSignals = function(callId) {
+                    if (!firebaseConnected || !db) return showToast('Voice signaling needs Firebase connection.', 'warning');
+                    if (!STATE.currentUser || !STATE.currentUser.username) return;
+                    if (_mrVoice.signalListener) try { _mrVoice.signalListener.off(); } catch (_) {}
+                    var me = STATE.currentUser.username;
+                    _mrVoice._seenIce = {};
+                    _mrVoice.signalListener = db.ref('voiceSignals/' + callId);
+                    _mrVoice.signalListener.on('value', async function(snap) {
+                        var all = snap.val() || {};
+                        for (var key in all) {
+                            var sig = all[key] || {};
+                            var peer = null;
+                            if (sig.offer && (sig.offer.to === me || sig.offer.from === me)) peer = sig.offer.to === me ? sig.offer.from : sig.offer.to;
+                            if (!peer && sig.answer && (sig.answer.to === me || sig.answer.from === me)) peer = sig.answer.to === me ? sig.answer.from : sig.answer.to;
+                            if (!peer && key.indexOf('__') !== -1) {
+                                var parts = key.split('__');
+                                if (parts[0] === _mrSafeKeyFinal(me)) peer = _mrDecodeKeyFinal(parts[1]);
+                                if (parts[1] === _mrSafeKeyFinal(me)) peer = _mrDecodeKeyFinal(parts[0]);
+                            }
+                            if (!peer || peer === me) continue;
+                            if (_mrVoice.members && _mrVoice.members.length && _mrVoice.members.indexOf(peer) === -1) continue;
+
+                            var pc = _mrVoice.peers && _mrVoice.peers[peer];
+                            try {
+                                if (sig.offer && sig.offer.to === me) {
+                                    pc = pc || await _createPeer(callId, peer, false);
+                                    await _mrSetRemoteDescriptionSafeFinal(pc, sig.offer.sdp, 'offer');
+                                    if (pc._mrAnsweredOffer !== (_mrNormalizeSdpFinal(sig.offer.sdp, 'offer') || {}).sdp) {
+                                        var ans = await pc.createAnswer();
+                                        await pc.setLocalDescription(ans);
+                                        pc._mrAnsweredOffer = (_mrNormalizeSdpFinal(sig.offer.sdp, 'offer') || {}).sdp;
+                                        await writeData(_mrVoiceSignalPathFinal(callId, me, peer) + '/answer', {
+                                            from: me,
+                                            to: peer,
+                                            fromKey: _mrSafeKeyFinal(me),
+                                            toKey: _mrSafeKeyFinal(peer),
+                                            sdp: _mrSerializableDescFinal(pc.localDescription || ans),
+                                            at: getNowISO()
+                                        }, null);
+                                    }
+                                }
+                                if (sig.answer && sig.answer.to === me) {
+                                    pc = pc || (_mrVoice.peers && _mrVoice.peers[peer]);
+                                    if (pc) await _mrSetRemoteDescriptionSafeFinal(pc, sig.answer.sdp, 'answer');
+                                }
+                                var cands = sig.candidates || {};
+                                Object.keys(cands).forEach(function(owner) {
+                                    if (owner === me || owner === _mrSafeKeyFinal(me)) return;
+                                    Object.keys(cands[owner] || {}).forEach(function(k) {
+                                        var seenKey = callId + '/' + key + '/' + owner + '/' + k;
+                                        if (_mrVoice._seenIce[seenKey]) return;
+                                        _mrVoice._seenIce[seenKey] = true;
+                                        var ice = _mrIceFinal(cands[owner][k]);
+                                        if (pc && ice && pc.addIceCandidate && pc.remoteDescription && pc.remoteDescription.type) {
+                                            pc.addIceCandidate(ice).catch(function() {});
+                                        }
+                                    });
+                                });
+                            } catch (e) {
+                                try { await _mrClearVoiceSignalFinal(callId, peer); } catch (_) {}
+                                _mrToastOnceFinal(callId + ':' + peer, 'Rebuilding voice connection with ' + peer + '.', 'warning');
+                                _mrScheduleVoiceRebuildFinal(callId, peer, 450);
+                            }
+                        }
+                    });
+                };
+                window.listenVoiceSignals = listenVoiceSignals;
+
+                async function _mrEnsureVoiceMeshFinal(callId, force) {
+                    if (!_mrVoice || _mrVoice.callId !== callId || !_mrVoice.localStream || !STATE.currentUser) return;
+                    var me = STATE.currentUser.username;
+                    var members = [];
+                    try {
+                        var call = await readData('voiceCalls/' + callId, null, true) || {};
+                        members = call.members || _mrVoice.members || [];
+                    } catch (_) { members = _mrVoice.members || []; }
+                    members = members.filter(function(x, i, a) { return x && a.indexOf(x) === i; });
+                    _mrVoice.members = members;
+                    for (var i = 0; i < members.length; i++) {
+                        var peer = members[i];
+                        if (peer === me) continue;
+                        var pc = _mrVoice.peers && _mrVoice.peers[peer];
+                        if (!force && _mrPeerAliveFinal(pc)) continue;
+                        try { await _createPeer(callId, peer, true); } catch (_) {}
+                    }
+                }
+                window._mrEnsureVoiceMesh = _mrEnsureVoiceMeshFinal;
+                window._mrSyncEveryActivePeer = _mrEnsureVoiceMeshFinal;
+
+                var _mrPrevStartSdpSafe = window.startVoiceCall || startVoiceCall;
+                startVoiceCall = async function() {
+                    var r = await _mrPrevStartSdpSafe.apply(this, arguments);
+                    setTimeout(function() {
+                        try {
+                            if (_mrVoice && _mrVoice.callId) {
+                                listenVoiceSignals(_mrVoice.callId);
+                                _mrEnsureVoiceMeshFinal(_mrVoice.callId, true);
+                            }
+                        } catch (_) {}
+                    }, 350);
+                    setTimeout(function() { try { if (_mrVoice && _mrVoice.callId) _mrEnsureVoiceMeshFinal(_mrVoice.callId, false); } catch (_) {} }, 2200);
+                    return r;
+                };
+                window.startVoiceCall = startVoiceCall;
+
+                var _mrPrevAcceptSdpSafe = window.acceptVoiceCall || acceptVoiceCall;
+                acceptVoiceCall = async function(callId) {
+                    var r = await _mrPrevAcceptSdpSafe.apply(this, arguments);
+                    setTimeout(function() {
+                        try {
+                            listenVoiceSignals(callId);
+                            _mrEnsureVoiceMeshFinal(callId, true);
+                        } catch (_) {}
+                    }, 350);
+                    setTimeout(function() { try { _mrEnsureVoiceMeshFinal(callId, false); } catch (_) {} }, 2200);
+                    return r;
+                };
+                window.acceptVoiceCall = acceptVoiceCall;
+
+                setInterval(function() {
+                    try {
+                        if (_mrVoice && _mrVoice.callId && _mrVoice.localStream) {
+                            listenVoiceSignals(_mrVoice.callId);
+                            _mrEnsureVoiceMeshFinal(_mrVoice.callId, false);
+                        }
+                    } catch (_) {}
+                }, 9000);
+            })();
+
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
