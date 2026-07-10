@@ -1970,6 +1970,17 @@
         #chatMessagesContainer,.messenger-messages{min-height:0!important;overflow-y:scroll!important;overscroll-behavior:contain;scrollbar-width:thin}.chat-history-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.chat-admin-actions{display:flex;gap:4px;margin-left:auto}.chat-admin-actions button{width:26px;height:26px;border-radius:8px;border:1px solid var(--card-border);background:var(--input-bg);color:var(--text);cursor:pointer}.messenger.chat-bg-custom{background-image:var(--chat-user-bg)!important;background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important}.messenger.chat-bg-custom:before{content:'';position:absolute;inset:0;background:var(--chat-bg-overlay,rgba(0,0,0,.32));pointer-events:none}.messenger{position:relative}.messenger>*{position:relative;z-index:1}.chat-bg-custom .bubble{color:var(--chat-readable,#fff)!important;background:var(--chat-bubble-bg,rgba(0,0,0,.48))!important;border-color:var(--chat-bubble-border,rgba(255,255,255,.22))!important}.chat-bg-custom .chat-empty,.chat-bg-custom .chat-contact-sub{color:var(--chat-readable-soft,rgba(255,255,255,.78))!important}.chat-layout-whatsapp .messenger-head{background:#075e54!important}.chat-layout-whatsapp .bubble-row.mine .bubble{background:#128c7e!important}.chat-layout-whatsapp .bubble{border-radius:12px!important}.chat-layout-skype .messenger-head{background:#0078d4!important}.chat-layout-skype .bubble-row.mine .bubble{background:#0078d4!important}.chat-layout-skype .chat-avatar{border-radius:50%!important}.chat-layout-slack .messenger-head{background:#4a154b!important}.chat-layout-slack .bubble-row,.chat-layout-slack .bubble-row.mine{max-width:96%;align-self:stretch;flex-direction:row}.chat-layout-slack .bubble{background:transparent!important;box-shadow:none!important;border:0!important}.voice-panel{position:fixed;left:22px;bottom:22px;z-index:999999;background:var(--toast-bg);color:var(--toast-text);border:1px solid rgba(255,255,255,.14);border-radius:20px;padding:16px;width:min(420px,calc(100vw - 44px));box-shadow:0 24px 70px rgba(0,0,0,.35)}.voice-panel h4{margin:0 0 8px}.voice-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.voice-actions button{border-radius:999px}.group-member-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:12px 0}.group-member-grid label{padding:9px 10px;border:1px solid var(--card-border);border-radius:10px;background:var(--input-bg)}
 
 
+
+        /* MuleRun call log menu */
+        .call-log-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0}
+        .call-log-toolbar input,.call-log-toolbar select{padding:9px 12px;border-radius:999px;border:1px solid var(--card-border);background:var(--input-bg);color:var(--text)}
+        .call-log-status{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;font-size:.72rem;font-weight:800;text-transform:uppercase;background:rgba(41,128,185,.13);color:var(--info)}
+        .call-log-status.ended{background:rgba(39,174,96,.14);color:var(--success)}
+        .call-log-status.ringing{background:rgba(243,156,18,.16);color:var(--warning)}
+        .call-log-status.missed{background:rgba(192,57,43,.14);color:var(--danger)}
+        .call-members-wrap{display:flex;gap:5px;flex-wrap:wrap;max-width:360px}
+        .call-member-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;background:var(--input-bg);border:1px solid var(--card-border);font-size:.74rem;white-space:nowrap}
+
         /* MuleRun call picker: separate chat-tab call flow */
         .call-picker-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0}
         .call-picker-toolbar input{flex:1;min-width:220px;padding:10px 13px;border-radius:999px;border:1px solid var(--card-border);background:var(--input-bg);color:var(--text)}
@@ -1982,6 +1993,12 @@
         .call-agent-name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .call-agent-sub{font-size:.75rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .call-selection-summary{padding:9px 12px;border:1px solid rgba(184,134,11,.22);border-radius:999px;background:rgba(184,134,11,.10);color:var(--text);font-size:.82rem;font-weight:700}
+
+
+        .call-compat-notice{margin:10px 0 12px;padding:12px 14px;border-radius:14px;border:1px solid rgba(243,156,18,.35);background:rgba(243,156,18,.12);color:var(--text);font-size:.84rem;line-height:1.45}
+        .call-compat-notice strong{display:block;margin-bottom:4px;color:var(--warning)}
+        .call-compat-notice.ok{border-color:rgba(39,174,96,.28);background:rgba(39,174,96,.10)}
+        .call-compat-notice.ok strong{color:var(--success)}
 
         /* ATOL certificate: fixed layout matching uploaded reference */
         .atol-cert-wrap{font-family:Arial,Helvetica,sans-serif!important;background:#fff8cf!important;color:#000!important;width:184mm;min-height:262mm;margin:0 auto;padding:7mm 10mm 8mm!important;border:0!important;box-shadow:none!important;position:relative;overflow:hidden;font-size:10px;line-height:1.26;box-sizing:border-box}.atol-cert-wrap:before{display:none!important}.atol-watermark{position:absolute;z-index:0;left:53mm;top:3mm;width:142mm;height:142mm;border-radius:50%;border:18mm solid rgba(115,110,72,.09);transform:rotate(-28deg);pointer-events:none}.atol-watermark:before{content:'ATOL';position:absolute;left:18mm;top:31mm;font-size:31mm;font-weight:800;color:rgba(115,110,72,.10);letter-spacing:2mm}.atol-watermark:after{content:'CERTIFICATE';position:absolute;left:-6mm;top:72mm;font-size:17mm;font-weight:800;color:rgba(115,110,72,.09);letter-spacing:1mm}.atol-top-notice{border:2px solid #111;height:7mm;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-bottom:6mm;position:relative;z-index:1}.atol-cert-title{text-align:center;font-size:35px;font-weight:800;line-height:1;margin:0 0 5mm;letter-spacing:.5px;position:relative;z-index:1}.atol-confirm{text-align:center;font-size:12px;font-weight:800;margin:0 0 4mm;position:relative;z-index:1}.atol-desc{text-align:center;font-size:10px;margin:0 0 2mm;position:relative;z-index:1}.atol-main-box{border:2px solid #111;min-height:126mm;padding:4mm 3.5mm 2mm;position:relative;z-index:1;box-sizing:border-box}.atol-main-head{display:grid;grid-template-columns:1fr 1fr;gap:8mm;margin-bottom:5mm}.atol-field-title{font-weight:800;font-size:10.5px;margin-bottom:4mm}.atol-field-title.center{text-align:center}.atol-pre{white-space:pre-wrap;font-size:10px;line-height:1.28;margin:0}.atol-section-label{font-weight:800;font-size:10.5px;margin:5mm 0 4mm}.atol-flight-lines{min-height:25mm}.atol-hotel-lines{min-height:10mm}.atol-protection-title{text-align:center;font-size:18px;font-weight:400;margin:13mm 0 2mm}.atol-protection-text{font-size:10px;line-height:1.25}.atol-reg-box{border:2px solid #111;margin-top:4mm;padding:3mm;font-size:10px;line-height:1.24;position:relative;z-index:1}.atol-bottom-grid{display:grid;grid-template-columns:25mm 32mm 37mm 29mm 1fr;border-top:2px solid #111;border-left:2px solid #111;margin-top:4mm;position:relative;z-index:1}.atol-bottom-cell{border-right:2px solid #111;border-bottom:2px solid #111;text-align:center;min-height:10mm;display:flex;flex-direction:column;justify-content:center;padding:1mm;font-size:9px;box-sizing:border-box}.atol-bottom-cell strong{font-size:8.5px;line-height:1.05}.atol-bottom-cell span{display:block;margin-top:1mm}.atol-package{font-weight:800}.atol-page-bg{background:#fff8cf!important;padding:0!important}
@@ -11297,9 +11314,1428 @@
                 }
             })();
 
+
+
+            // --------------------------------------------------------------
+            // MuleRun call logs: visible to every agent and admin
+            // --------------------------------------------------------------
+            (function _mrInstallCallLogs() {
+                function _mrCallVals(o) {
+                    if (!o) return [];
+                    if (Array.isArray(o)) return o.filter(Boolean);
+                    return Object.keys(o).map(function(k) { var v = o[k] || {}; if (!v.id) v.id = k; return v; });
+                }
+                function _mrCallFmtDate(v) {
+                    if (!v) return '';
+                    try { return formatDateTime ? formatDateTime(v) : new Date(v).toLocaleString('en-GB'); }
+                    catch (_) { try { return new Date(v).toLocaleString('en-GB'); } catch (__) { return String(v || ''); } }
+                }
+                function _mrCallDurationMs(call) {
+                    var start = call.startedAt || call.createdAt || '';
+                    var end = call.endedAt || call.updatedAt || '';
+                    if (!start) return 0;
+                    var a = new Date(start).getTime();
+                    var b = end ? new Date(end).getTime() : (call.status === 'ended' ? a : Date.now());
+                    if (!a || !b || b < a) return 0;
+                    return b - a;
+                }
+                function _mrFmtDuration(ms) {
+                    ms = Math.max(0, parseInt(ms || 0, 10));
+                    var total = Math.floor(ms / 1000);
+                    var h = Math.floor(total / 3600);
+                    var m = Math.floor((total % 3600) / 60);
+                    var sec = total % 60;
+                    if (h) return h + 'h ' + String(m).padStart(2, '0') + 'm ' + String(sec).padStart(2, '0') + 's';
+                    if (m) return m + 'm ' + String(sec).padStart(2, '0') + 's';
+                    return sec + 's';
+                }
+                function _mrCallStatus(call) {
+                    if (call.status === 'ended') return 'ended';
+                    if (call.status === 'ringing') return 'ringing';
+                    return call.status || 'active';
+                }
+                function _mrMemberName(username, users) {
+                    var u = users && users[username];
+                    return (u && (u.name || u.username)) || username || '';
+                }
+                function _mrCallVisible(call, me) {
+                    if (isAdmin()) return true;
+                    return (call.members || []).indexOf(me) !== -1 || call.from === me || call.to === me;
+                }
+                function _mrCallDirection(call, me) {
+                    if (call.from === me) return 'Dialed';
+                    if ((call.members || []).indexOf(me) !== -1) return 'Received';
+                    return 'Observed';
+                }
+                function _mrCallRows(calls, users) {
+                    var me = STATE.currentUser && STATE.currentUser.username;
+                    if (!calls.length) return '<tr><td colspan="8" class="text-center text-muted">No call logs found.</td></tr>';
+                    return calls.map(function(call) {
+                        var members = (call.members || call.selectedTargets || []).filter(Boolean);
+                        var accepted = call.accepted || call.acceptedUsers || {};
+                        var acceptedKeys = Object.keys(accepted || {});
+                        var status = _mrCallStatus(call);
+                        var missed = status === 'ended' && !acceptedKeys.length && call.from !== me;
+                        if (missed) status = 'missed';
+                        var memberHtml = members.map(function(m) {
+                            var acceptedMark = accepted[m] || accepted[_mrFirebaseKey(m)] ? ' ✓' : '';
+                            return '<span class="call-member-pill">' + escapeHTML(_mrMemberName(m, users)) + '<span class="text-muted text-xs">@' + escapeHTML(m) + acceptedMark + '</span></span>';
+                        }).join('');
+                        return '<tr data-call-search="' + escapeHTML([call.from, members.join(' '), status, _mrCallDirection(call, me)].join(' ').toLowerCase()) + '" data-call-status="' + escapeHTML(status) + '">' +
+                            '<td><strong>' + escapeHTML(_mrCallDirection(call, me)) + '</strong></td>' +
+                            '<td>' + escapeHTML(_mrMemberName(call.from, users)) + '<div class="text-muted text-xs">@' + escapeHTML(call.from || '') + '</div></td>' +
+                            '<td><div class="call-members-wrap">' + (memberHtml || '<span class="text-muted text-sm">No members saved</span>') + '</div></td>' +
+                            '<td>' + escapeHTML(_mrCallFmtDate(call.createdAt || call.startedAt)) + '</td>' +
+                            '<td>' + escapeHTML(call.endedAt ? _mrCallFmtDate(call.endedAt) : (status === 'ended' ? 'Ended' : '—')) + '</td>' +
+                            '<td><strong>' + escapeHTML(_mrFmtDuration(call.durationMs || _mrCallDurationMs(call))) + '</strong></td>' +
+                            '<td><span class="call-log-status ' + escapeHTML(status) + '">' + escapeHTML(status) + '</span></td>' +
+                            '<td class="text-muted text-xs">' + escapeHTML((call.source || (call.groupId ? 'group' : 'direct')) || '') + '</td>' +
+                        '</tr>';
+                    }).join('');
+                }
+                async function showCallLogs() {
+                    if (!STATE.currentUser) { showToast('Please login first.', 'warning'); return; }
+                    var users = await readData('users', 'ph_users', true) || STATE.users || {};
+                    var raw = await readData('voiceCalls', null, true) || {};
+                    var me = STATE.currentUser.username;
+                    var calls = _mrCallVals(raw).filter(function(c) { return c && _mrCallVisible(c, me); });
+                    calls.sort(function(a, b) { return new Date(b.createdAt || b.startedAt || 0) - new Date(a.createdAt || a.startedAt || 0); });
+                    var rows = _mrCallRows(calls, users);
+                    showModal('<h3><i class="fas fa-phone-volume"></i> Call Logs</h3>' +
+                        '<p class="text-muted text-sm">' + (isAdmin() ? 'Admin view shows all dialed calls.' : 'Your view shows calls where you were a caller or member.') + ' Time, duration, status and members are shown for each call.</p>' +
+                        '<div class="call-log-toolbar"><input id="callLogSearch" placeholder="Search caller, member, status..." oninput="window._filterCallLogs()" />' +
+                        '<select id="callLogStatusFilter" onchange="window._filterCallLogs()"><option value="">All Status</option><option value="ringing">Ringing / Active</option><option value="ended">Ended</option><option value="missed">Missed</option></select>' +
+                        '<button class="btn btn-sm btn-outline" onclick="window.showCallLogs()"><i class="fas fa-rotate"></i> Refresh</button></div>' +
+                        '<div class="history-table-wrap"><table><thead><tr><th>Type</th><th>Caller</th><th>Members</th><th>Start Time</th><th>End Time</th><th>Duration</th><th>Status</th><th>Source</th></tr></thead><tbody id="callLogTableBody">' + rows + '</tbody></table></div>' +
+                        '<div class="modal-actions"><button class="btn btn-outline" onclick="showChatUI()"><i class="fas fa-comments"></i> Back to Chat</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');
+                    window._allCallLogRowsReady = true;
+                }
+                window.showCallLogs = showCallLogs;
+                window._filterCallLogs = function() {
+                    var q = ((document.getElementById('callLogSearch') || {}).value || '').toLowerCase();
+                    var st = ((document.getElementById('callLogStatusFilter') || {}).value || '').toLowerCase();
+                    document.querySelectorAll('#callLogTableBody tr').forEach(function(row) {
+                        var status = (row.dataset.callStatus || '').toLowerCase();
+                        var hay = (row.dataset.callSearch || row.textContent || '').toLowerCase();
+                        var ok = (!q || hay.indexOf(q) !== -1) && (!st || status === st || (st === 'ringing' && status === 'active'));
+                        row.style.display = ok ? '' : 'none';
+                    });
+                };
+
+                function _mrAddCallLogCard() {
+                    try {
+                        var grid = document.getElementById('dashGrid');
+                        if (!grid || document.getElementById('dashCallLogs')) return;
+                        var c = document.createElement('div');
+                        c.className = 'dash-card';
+                        c.id = 'dashCallLogs';
+                        c.dataset.action = 'callLogs';
+                        c.innerHTML = '<i class="fas fa-phone-volume"></i><h4>Call Logs</h4><p>View dialed calls, duration and members</p>';
+                        c.addEventListener('click', function() { showCallLogs(); });
+                        var chat = grid.querySelector('.dash-card[data-action="chat"]');
+                        if (chat && chat.nextSibling) grid.insertBefore(c, chat.nextSibling);
+                        else grid.appendChild(c);
+                    } catch (_) {}
+                }
+                var _mrPrevEnsureCards = window.ensureMuleDashboardCards || ensureMuleDashboardCards;
+                ensureMuleDashboardCards = function() {
+                    try { if (_mrPrevEnsureCards) _mrPrevEnsureCards.apply(this, arguments); } catch (_) {}
+                    _mrAddCallLogCard();
+                };
+                window.ensureMuleDashboardCards = ensureMuleDashboardCards;
+                setTimeout(_mrAddCallLogCard, 1000);
+                setTimeout(_mrAddCallLogCard, 2500);
+
+                var _mrPrevShowChatForLogs = window.showChatUI || showChatUI;
+                if (typeof _mrPrevShowChatForLogs === 'function') {
+                    showChatUI = function() {
+                        var r = _mrPrevShowChatForLogs.apply(this, arguments);
+                        setTimeout(function() {
+                            var actions = document.querySelector('#modalBox.chat-modal .modal-actions') || document.querySelector('.modal-actions');
+                            if (actions && !document.getElementById('btnChatCallLogs')) {
+                                var b = document.createElement('button');
+                                b.id = 'btnChatCallLogs';
+                                b.className = 'btn btn-sm btn-outline';
+                                b.innerHTML = '<i class="fas fa-phone-volume"></i> Call Logs';
+                                b.onclick = function() { showCallLogs(); };
+                                actions.insertBefore(b, actions.firstChild);
+                            }
+                        }, 60);
+                        return r;
+                    };
+                    window.showChatUI = showChatUI;
+                }
+
+                var _mrPrevEndVoiceForLogs = window.endVoiceCall || endVoiceCall;
+                endVoiceCall = function() {
+                    try {
+                        if (_mrVoice && _mrVoice.callId && STATE.currentUser) {
+                            var callId = _mrVoice.callId;
+                            var now = getNowISO();
+                            var started = Date.now();
+                            try {
+                                var p = document.getElementById('voicePanel');
+                                started = parseInt((p && p.dataset && p.dataset.startedMs) || '', 10) || started;
+                            } catch (_) {}
+                            writeData('voiceCalls/' + callId + '/status', 'ended', null);
+                            writeData('voiceCalls/' + callId + '/endedAt', now, null);
+                            writeData('voiceCalls/' + callId + '/endedBy', STATE.currentUser.username, null);
+                            try {
+                                readData('voiceCalls/' + callId, null, true).then(function(call) {
+                                    call = call || {};
+                                    var base = new Date(call.createdAt || call.startedAt || 0).getTime() || started;
+                                    writeData('voiceCalls/' + callId + '/durationMs', Math.max(0, Date.now() - base), null);
+                                }).catch(function() {
+                                    writeData('voiceCalls/' + callId + '/durationMs', Math.max(0, Date.now() - started), null);
+                                });
+                            } catch (_) {
+                                writeData('voiceCalls/' + callId + '/durationMs', Math.max(0, Date.now() - started), null);
+                            }
+                        }
+                    } catch (_) {}
+                    return _mrPrevEndVoiceForLogs.apply(this, arguments);
+                };
+                window.endVoiceCall = endVoiceCall;
+
+                var _mrPrevShowVoicePanelForLogs = window.showVoicePanel || showVoicePanel;
+                showVoicePanel = function(title, incoming, callId) {
+                    var r = _mrPrevShowVoicePanelForLogs.apply(this, arguments);
+                    try {
+                        var p = document.getElementById('voicePanel');
+                        if (p && !p.dataset.startedMs) p.dataset.startedMs = String(Date.now());
+                    } catch (_) {}
+                    return r;
+                };
+                window.showVoicePanel = showVoicePanel;
+            })();
+
+            // --------------------------------------------------------------
+            // MuleRun browser compatibility layer for voice calls
+            // --------------------------------------------------------------
+            (function _mrInstallVoiceCompatibilityLayer() {
+                function legacyGetUserMedia() {
+                    return (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || null);
+                }
+                try {
+                    if (!navigator.mediaDevices) navigator.mediaDevices = {};
+                    if (!navigator.mediaDevices.getUserMedia && legacyGetUserMedia()) {
+                        navigator.mediaDevices.getUserMedia = function(constraints) {
+                            return new Promise(function(resolve, reject) {
+                                legacyGetUserMedia().call(navigator, constraints, resolve, reject);
+                            });
+                        };
+                    }
+                } catch (_) {}
+                try { window.RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection; } catch (_) {}
+                try { window.RTCSessionDescription = window.RTCSessionDescription || window.webkitRTCSessionDescription || window.mozRTCSessionDescription; } catch (_) {}
+                try { window.RTCIceCandidate = window.RTCIceCandidate || window.webkitRTCIceCandidate || window.mozRTCIceCandidate; } catch (_) {}
+
+                function _mrIsLocalHost() {
+                    var h = (location && location.hostname) || '';
+                    return h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '::1';
+                }
+                function _mrSecureEnough() {
+                    return !!(window.isSecureContext || (location && location.protocol === 'https:') || _mrIsLocalHost());
+                }
+                function _mrRtcCtor() {
+                    return window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection || null;
+                }
+                function _mrSessionDescription(desc) {
+                    var C = window.RTCSessionDescription || window.webkitRTCSessionDescription || window.mozRTCSessionDescription;
+                    try { return C ? new C(desc) : desc; } catch (_) { return desc; }
+                }
+                function _mrIceCandidate(cand) {
+                    var C = window.RTCIceCandidate || window.webkitRTCIceCandidate || window.mozRTCIceCandidate;
+                    try { return C ? new C(cand) : cand; } catch (_) { return cand; }
+                }
+                function _mrCandidatePayload(candidate) {
+                    if (!candidate) return null;
+                    if (candidate.toJSON) return candidate.toJSON();
+                    return {
+                        candidate: candidate.candidate,
+                        sdpMid: candidate.sdpMid,
+                        sdpMLineIndex: candidate.sdpMLineIndex,
+                        usernameFragment: candidate.usernameFragment
+                    };
+                }
+                function _mrPromiseMethod(obj, name, arg) {
+                    return new Promise(function(resolve, reject) {
+                        try {
+                            var result;
+                            if (typeof arg === 'undefined') result = obj[name](resolve, reject);
+                            else result = obj[name](arg, resolve, reject);
+                            if (result && typeof result.then === 'function') result.then(resolve).catch(reject);
+                            else if (typeof result !== 'undefined' && name.indexOf('create') === 0) resolve(result);
+                        } catch (e) { reject(e); }
+                    });
+                }
+                function _mrAttachRemoteAudio(peer, stream) {
+                    if (!stream) return;
+                    var a = _mrVoice.remoteAudio[peer];
+                    if (!a) {
+                        a = document.createElement('audio');
+                        a.autoplay = true;
+                        a.controls = true;
+                        a.setAttribute('playsinline', '');
+                        a.dataset.peer = peer;
+                        var box = document.getElementById('voiceAudios');
+                        if (box) box.appendChild(a);
+                        _mrVoice.remoteAudio[peer] = a;
+                    }
+                    try { a.srcObject = stream; }
+                    catch (_) {
+                        try { a.src = URL.createObjectURL(stream); } catch (__) {}
+                    }
+                    try {
+                        var p = a.play && a.play();
+                        if (p && p.catch) p.catch(function() {});
+                    } catch (_) {}
+                }
+                async function _mrGetMicrophoneStream() {
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('This browser does not expose a microphone API.');
+                    return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false }).catch(function() {
+                        return navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    });
+                }
+                function _mrVoiceCompatibilityProblem() {
+                    if (!_mrRtcCtor()) return 'This browser does not support WebRTC voice calls. Please use a current version of Chrome, Edge, Firefox, or Safari.';
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return 'This browser does not support microphone access for web calls.';
+                    if (!_mrSecureEnough()) return 'Microphone calls must run on HTTPS or localhost. Publish/open this page over HTTPS for browser microphone access.';
+                    return '';
+                }
+                window._mrVoiceCompatibilityProblem = _mrVoiceCompatibilityProblem;
+                window._mrGetMicrophoneStream = _mrGetMicrophoneStream;
+
+                _pcConfig = function() {
+                    return { iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ] };
+                };
+                window._pcConfig = _pcConfig;
+
+                _createPeer = async function(callId, peer, initiator) {
+                    var Ctor = _mrRtcCtor();
+                    if (!Ctor) throw new Error('WebRTC is not supported in this browser.');
+                    var me = STATE.currentUser.username;
+                    var pc = new Ctor(_pcConfig());
+                    _mrVoice.peers[peer] = pc;
+                    if (_mrVoice.localStream) {
+                        try {
+                            if (pc.addTrack) _mrVoice.localStream.getTracks().forEach(function(t) { pc.addTrack(t, _mrVoice.localStream); });
+                            else if (pc.addStream) pc.addStream(_mrVoice.localStream);
+                        } catch (_) {}
+                    }
+                    pc.ontrack = function(ev) { _mrAttachRemoteAudio(peer, (ev.streams && ev.streams[0]) || null); };
+                    pc.onaddstream = function(ev) { _mrAttachRemoteAudio(peer, ev.stream); };
+                    pc.onicecandidate = function(ev) {
+                        var payload = _mrCandidatePayload(ev && ev.candidate);
+                        if (payload && firebaseConnected && db) db.ref('voiceSignals/' + callId + '/' + _pair(me, peer) + '/candidates/' + _mrFirebaseKey(me)).push(payload);
+                    };
+                    if (initiator) {
+                        var off = await _mrPromiseMethod(pc, 'createOffer');
+                        await _mrPromiseMethod(pc, 'setLocalDescription', off);
+                        await writeData('voiceSignals/' + callId + '/' + _pair(me, peer) + '/offer', { from: me, to: peer, sdp: pc.localDescription || off }, null);
+                    }
+                    return pc;
+                };
+                window._createPeer = _createPeer;
+
+                listenVoiceSignals = function(callId) {
+                    if (!firebaseConnected || !db) return showToast('Voice signaling needs Firebase connection.', 'warning');
+                    if (_mrVoice.signalListener) try { _mrVoice.signalListener.off(); } catch (_) {}
+                    var me = STATE.currentUser.username;
+                    _mrVoice.signalListener = db.ref('voiceSignals/' + callId);
+                    _mrVoice.signalListener.on('value', async function(snap) {
+                        var all = snap.val() || {};
+                        for (var pair in all) {
+                            var sig = all[pair] || {}, names = pair.split('__');
+                            if (names.indexOf(me) === -1) continue;
+                            var peer = names[0] === me ? names[1] : names[0], pc = _mrVoice.peers[peer];
+                            try {
+                                if (sig.offer && sig.offer.to === me && !sig.answer) {
+                                    pc = pc || await _createPeer(callId, peer, false);
+                                    if (!pc.remoteDescription || !pc.remoteDescription.type) await _mrPromiseMethod(pc, 'setRemoteDescription', _mrSessionDescription(sig.offer.sdp));
+                                    var ans = await _mrPromiseMethod(pc, 'createAnswer');
+                                    await _mrPromiseMethod(pc, 'setLocalDescription', ans);
+                                    await writeData('voiceSignals/' + callId + '/' + pair + '/answer', { from: me, to: peer, sdp: pc.localDescription || ans }, null);
+                                }
+                                if (sig.answer && sig.answer.to === me) {
+                                    pc = pc || await _createPeer(callId, peer, false);
+                                    if (!pc.remoteDescription || !pc.remoteDescription.type) await _mrPromiseMethod(pc, 'setRemoteDescription', _mrSessionDescription(sig.answer.sdp));
+                                }
+                                var cands = sig.candidates || {};
+                                Object.keys(cands).forEach(function(sender) {
+                                    if (sender === me || sender === _mrFirebaseKey(me)) return;
+                                    Object.keys(cands[sender] || {}).forEach(function(k) {
+                                        var cand = cands[sender][k];
+                                        if (pc && cand && pc.addIceCandidate) pc.addIceCandidate(_mrIceCandidate(cand)).catch(function() {});
+                                    });
+                                });
+                            } catch (e) { showToast('Voice connection issue with ' + peer + ': ' + (e.message || e), 'warning'); }
+                        }
+                    });
+                };
+                window.listenVoiceSignals = listenVoiceSignals;
+
+                async function _mrBeginVoiceCall(targets, meta) {
+                    if (!STATE.currentUser) { showToast('Please login first.', 'warning'); return; }
+                    targets = (targets || []).filter(function(x, i, arr) { return x && x !== STATE.currentUser.username && arr.indexOf(x) === i; });
+                    if (!targets.length) { showToast('Select at least one agent to call.', 'warning'); return; }
+                    if (_mrVoice && _mrVoice.callId) { showToast('A voice meeting is already active. Use Add / Remove Agents.', 'warning'); return; }
+                    var problem = _mrVoiceCompatibilityProblem();
+                    if (problem) { showToast(problem, 'error', 9000); return; }
+                    if (!firebaseConnected || !db) { showToast('Voice calls need Firebase connection for live signaling.', 'error'); return; }
+                    try { _mrVoice.localStream = await _mrGetMicrophoneStream(); }
+                    catch (e) { showToast('Microphone permission was blocked or unavailable.', 'error'); return; }
+                    var callId = genId(), members = [STATE.currentUser.username].concat(targets);
+                    _mrVoice.callId = callId;
+                    _mrVoice.members = members;
+                    try {
+                        await writeData('voiceCalls/' + callId, Object.assign({
+                            id: callId,
+                            from: STATE.currentUser.username,
+                            to: targets.length === 1 ? targets[0] : null,
+                            groupId: null,
+                            members: members,
+                            status: 'ringing',
+                            createdAt: getNowISO(),
+                            browserInfo: (navigator.userAgent || '').slice(0, 180)
+                        }, meta || {}), null);
+                        showVoicePanel('Calling ' + targets.join(', '));
+                        listenVoiceSignals(callId);
+                        for (var i = 0; i < targets.length; i++) await _createPeer(callId, targets[i], true);
+                        showToast('Voice call started. Waiting for selected agent(s) to accept.', 'success');
+                    } catch (e) { showToast('Could not start voice call: ' + (e.message || e), 'error'); endVoiceCall(); }
+                }
+
+                _mrStartVoiceCallWithTargets = function(targets, sourceLabel) {
+                    return _mrBeginVoiceCall(targets, { selectedTargets: targets || [], source: sourceLabel || 'chat-call-picker' });
+                };
+                window._mrStartVoiceCallWithTargets = _mrStartVoiceCallWithTargets;
+
+                startVoiceCall = async function() {
+                    var targets = [];
+                    try { targets = await mrGetVoiceTargets(); } catch (_) { targets = []; }
+                    if (!targets.length) { showToast('Select an agent or group before starting a voice call.', 'warning'); return; }
+                    return _mrBeginVoiceCall(targets, { to: STATE.activeChatUser || null, groupId: STATE.activeChatGroup || null, source: 'chat-selected-contact' });
+                };
+                window.startVoiceCall = startVoiceCall;
+
+                acceptVoiceCall = async function(callId) {
+                    var problem = _mrVoiceCompatibilityProblem();
+                    if (problem) { showToast(problem, 'error', 9000); return; }
+                    if (!firebaseConnected || !db) { showToast('Voice calls need Firebase connection.', 'error'); return; }
+                    try { _mrVoice.localStream = await _mrGetMicrophoneStream(); }
+                    catch (e) { showToast('Microphone permission was blocked or unavailable.', 'error'); return; }
+                    _mrVoice.callId = callId;
+                    var call = await readData('voiceCalls/' + callId, null, true) || {};
+                    _mrVoice.members = call.members || [];
+                    showVoicePanel('Connected voice meeting');
+                    listenVoiceSignals(callId);
+                    await writeData('voiceCalls/' + callId + '/accepted/' + _mrFirebaseKey(STATE.currentUser.username), true, null);
+                    await writeData('voiceCalls/' + callId + '/acceptedUsers/' + STATE.currentUser.username, true, null);
+                    try {
+                        var me = STATE.currentUser.username, sigs = await readData('voiceSignals/' + callId, null, true) || {};
+                        for (var i = 0; i < (_mrVoice.members || []).length; i++) {
+                            var peer = _mrVoice.members[i];
+                            if (peer === me) continue;
+                            var pair = _pair(me, peer);
+                            if (!sigs[pair] && me < peer) await _createPeer(callId, peer, true);
+                        }
+                    } catch (_) {}
+                    showToast('Voice meeting connected.', 'success');
+                };
+                window.acceptVoiceCall = acceptVoiceCall;
+
+                var _origShowCallAgentPickerCompat = window.showCallAgentPicker;
+                if (typeof _origShowCallAgentPickerCompat === 'function') {
+                    showCallAgentPicker = async function() {
+                        await _origShowCallAgentPickerCompat.apply(this, arguments);
+                        var problem = _mrVoiceCompatibilityProblem();
+                        var toolbar = document.querySelector('.call-picker-toolbar');
+                        if (!toolbar) return;
+                        var notice = document.createElement('div');
+                        notice.className = 'call-compat-notice' + (problem ? '' : ' ok');
+                        notice.innerHTML = problem ? '<strong>Voice call compatibility notice</strong>' + escapeHTML(problem) : '<strong>Voice calls supported</strong>Your browser supports WebRTC microphone calls.';
+                        toolbar.parentNode.insertBefore(notice, toolbar);
+                        if (problem) {
+                            var btn = document.getElementById('btnStartSelectedCall');
+                            if (btn) { btn.disabled = true; btn.title = problem; }
+                        }
+                    };
+                    window.showCallAgentPicker = showCallAgentPicker;
+                }
+            })();
+
+
+            // --------------------------------------------------------------
+            // MuleRun stable voice conference membership sync
+            // Fixes add/remove without ending or freezing the whole meeting.
+            // --------------------------------------------------------------
+            (function _mrInstallStableConferenceSync() {
+                function _mrUniqueMembers(list) {
+                    var out = [];
+                    (list || []).forEach(function(x) { if (x && out.indexOf(x) === -1) out.push(x); });
+                    return out;
+                }
+                function _mrCloseVoicePeer(peer) {
+                    try { if (_mrVoice.peers && _mrVoice.peers[peer]) { _mrVoice.peers[peer].close(); delete _mrVoice.peers[peer]; } } catch (_) {}
+                    try { if (_mrVoice.remoteAudio && _mrVoice.remoteAudio[peer]) { _mrVoice.remoteAudio[peer].remove(); delete _mrVoice.remoteAudio[peer]; } } catch (_) {}
+                }
+                function _mrLocalVoiceCleanup(reason, keepListener) {
+                    var listener = keepListener ? (_mrVoice && _mrVoice.listener) : null;
+                    try { Object.keys((_mrVoice && _mrVoice.peers) || {}).forEach(_mrCloseVoicePeer); } catch (_) {}
+                    try { if (_mrVoice && _mrVoice.signalListener && _mrVoice.signalListener.off) _mrVoice.signalListener.off(); } catch (_) {}
+                    try { if (_mrVoice && _mrVoice.localStream) _mrVoice.localStream.getTracks().forEach(function(t) { try { t.stop(); } catch (__) {} }); } catch (_) {}
+                    try { if (typeof _mrStopScreenShare === 'function') _mrStopScreenShare(); } catch (_) {}
+                    var panel = document.getElementById('voicePanel');
+                    if (panel) panel.remove();
+                    _mrVoice = { callId: null, localStream: null, peers: {}, remoteAudio: {}, listener: listener, signalListener: null, members: [] };
+                    if (reason) showToast(reason, 'info', 5000);
+                }
+                window._mrLocalVoiceCleanup = _mrLocalVoiceCleanup;
+
+                async function _mrSyncActiveCallMembers(callId, call) {
+                    if (!_mrVoice || _mrVoice.callId !== callId || !STATE.currentUser) return;
+                    var me = STATE.currentUser.username;
+                    var newMembers = _mrUniqueMembers(call.members || []);
+                    var oldMembers = _mrUniqueMembers(_mrVoice.members || []);
+                    if (newMembers.indexOf(me) === -1) {
+                        _mrLocalVoiceCleanup('You were removed from the voice meeting.', true);
+                        return;
+                    }
+                    var added = newMembers.filter(function(m) { return m !== me && oldMembers.indexOf(m) === -1; });
+                    var removed = oldMembers.filter(function(m) { return m !== me && newMembers.indexOf(m) === -1; });
+                    _mrVoice.members = newMembers;
+                    removed.forEach(_mrCloseVoicePeer);
+                    if (!_mrVoice.localStream) return;
+                    for (var i = 0; i < added.length; i++) {
+                        try { if (!_mrVoice.peers[added[i]]) await _createPeer(callId, added[i], true); }
+                        catch (e) { showToast('Could not connect to added agent ' + added[i] + ': ' + (e.message || e), 'warning'); }
+                    }
+                    if (added.length) showToast('Added to this voice meeting: ' + added.join(', '), 'info', 5000);
+                    if (removed.length) showToast('Removed from this voice meeting: ' + removed.join(', '), 'info', 5000);
+                }
+
+                function _mrNotifyIncomingCall(callId, call) {
+                    var from = call.from || 'an agent';
+                    showToast('Incoming voice meeting from ' + from, 'info', 9000);
+                    try {
+                        if ('Notification' in window) {
+                            if (Notification.permission === 'default') Notification.requestPermission();
+                            if (Notification.permission === 'granted') new Notification('Incoming voice meeting', { body: 'Call from ' + from });
+                        }
+                    } catch (_) {}
+                    showVoicePanel('Incoming meeting from ' + from, true, callId);
+                }
+
+                attachVoiceCallListener = function() {
+                    if (!firebaseConnected || !db || !STATE.currentUser) return;
+                    if (_mrVoice.listener) try { _mrVoice.listener.off(); } catch (_) {}
+                    _mrVoice.listener = db.ref('voiceCalls');
+                    _mrVoice.listener.on('value', function(snap) {
+                        var calls = snap.val() || {}, me = STATE.currentUser.username;
+                        Object.keys(calls).forEach(function(id) {
+                            var c = calls[id] || {};
+                            var members = c.members || [];
+                            var inCall = members.indexOf(me) !== -1;
+                            if (_mrVoice.callId === id) {
+                                if (c.status === 'ended') {
+                                    _mrLocalVoiceCleanup('Voice meeting ended.', true);
+                                    return;
+                                }
+                                _mrSyncActiveCallMembers(id, c);
+                                return;
+                            }
+                            if (c.status === 'ringing' && c.from !== me && inCall && !_mrVoice.callId && !document.getElementById('voicePanel')) {
+                                _mrNotifyIncomingCall(id, c);
+                            }
+                        });
+                    });
+                };
+                window.attachVoiceCallListener = attachVoiceCallListener;
+                try { attachVoiceCallListener(); } catch (_) {}
+
+                var _mrPrevEndVoiceStable = window.endVoiceCall || endVoiceCall;
+                endVoiceCall = function() {
+                    // Explicit End still ends the meeting for everyone; membership removal uses local cleanup only.
+                    return _mrPrevEndVoiceStable.apply(this, arguments);
+                };
+                window.endVoiceCall = endVoiceCall;
+
+                showVoicePeopleManager = async function(callId) {
+                    callId = callId || (_mrVoice && _mrVoice.callId);
+                    if (!callId) return showToast('Start or accept a call first.', 'warning');
+                    if (!firebaseConnected || !db) return showToast('Managing live call members needs Firebase connection.', 'error');
+                    var call = await readData('voiceCalls/' + callId, null, true) || {};
+                    var users = await readData('users', 'ph_users', true) || {};
+                    var members = _mrUniqueMembers(call.members || _mrVoice.members || []);
+                    if (members.indexOf(STATE.currentUser.username) === -1) members.push(STATE.currentUser.username);
+                    var html = Object.keys(users).filter(function(k) {
+                        return users[k] && users[k].role !== 'readonly' && users[k].disabled !== true && users[k].active !== false;
+                    }).map(function(k) {
+                        return '<label><input type="checkbox" class="voice-member-check" value="' + escapeHTML(k) + '" ' + (members.indexOf(k) !== -1 ? 'checked' : '') + ' /> ' +
+                            escapeHTML(users[k].name || k) + ' <span class="text-muted text-xs">@' + escapeHTML(k) + '</span></label>';
+                    }).join('');
+                    showModal('<h3><i class="fas fa-users"></i> Manage Voice Meeting</h3>' +
+                        '<p class="text-muted text-sm">Add or remove agents without disconnecting the conference. Newly selected agents receive an incoming call notification immediately.</p>' +
+                        '<div class="group-member-grid">' + html + '</div>' +
+                        '<div class="modal-actions"><button class="btn btn-primary" id="btnSaveVoicePeople"><i class="fas fa-save"></i> Update Call Members</button>' +
+                        '<button class="btn btn-close-modal" data-close-modal>Close</button></div>');
+                    document.getElementById('btnSaveVoicePeople').onclick = async function() {
+                        var selected = Array.from(document.querySelectorAll('.voice-member-check:checked')).map(function(c) { return c.value; });
+                        selected = _mrUniqueMembers(selected);
+                        if (selected.indexOf(STATE.currentUser.username) === -1) selected.push(STATE.currentUser.username);
+                        if (selected.length < 2) return showToast('Select at least one other agent for a call.', 'warning');
+                        var oldMembers = _mrUniqueMembers(call.members || []);
+                        var added = selected.filter(function(x) { return oldMembers.indexOf(x) === -1; });
+                        var removed = oldMembers.filter(function(x) { return selected.indexOf(x) === -1; });
+                        var now = getNowISO();
+                        await writeData('voiceCalls/' + callId + '/members', selected, null);
+                        await writeData('voiceCalls/' + callId + '/status', 'ringing', null);
+                        await writeData('voiceCalls/' + callId + '/updatedAt', now, null);
+                        await writeData('voiceCalls/' + callId + '/updatedBy', STATE.currentUser.username, null);
+                        await writeData('voiceCalls/' + callId + '/inviteVersion', Date.now(), null);
+                        for (var a = 0; a < added.length; a++) {
+                            await writeData('voiceCalls/' + callId + '/invitedAt/' + _mrFirebaseKey(added[a]), now, null);
+                        }
+                        for (var r = 0; r < removed.length; r++) {
+                            await writeData('voiceCalls/' + callId + '/removedAt/' + _mrFirebaseKey(removed[r]), now, null);
+                            _mrCloseVoicePeer(removed[r]);
+                        }
+                        _mrVoice.members = selected;
+                        for (var i = 0; i < added.length; i++) {
+                            if (added[i] !== STATE.currentUser.username && _mrVoice.localStream) {
+                                try { if (!_mrVoice.peers[added[i]]) await _createPeer(callId, added[i], true); }
+                                catch (e) { showToast('Invite sent, but peer setup for ' + added[i] + ' will retry when they accept.', 'warning'); }
+                            }
+                        }
+                        window.closeModal();
+                        showToast('Call members updated. New agents are being notified now.', 'success');
+                        try {
+                            var vs = document.getElementById('voiceStatus');
+                            if (vs) vs.textContent = 'Voice meeting active. Members updated without reconnecting existing audio.';
+                        } catch (_) {}
+                    };
+                };
+                window.showVoicePeopleManager = showVoicePeopleManager;
+            })();
+
+
+            // --------------------------------------------------------------
+            // MuleRun stable margins permissions + Accounts role in user management
+            // --------------------------------------------------------------
+            (function _mrInstallStableMarginUserPermissions() {
+                var MARGIN_PERMS = [
+                    ['canViewAgentMargins', 'View Agent Margins'],
+                    ['canAddAgentMargins', 'Add Agent Margins'],
+                    ['canEditAgentMargins', 'Edit Agent Margins'],
+                    ['canDeleteAgentMargins', 'Delete Agent Margins'],
+                    ['canManageAgents', 'Manage Agents'],
+                    ['canManageMonths', 'Manage Months']
+                ];
+                window.MR_MARGIN_PERMS = MARGIN_PERMS;
+
+                function _mrEnsureDefaultMarginPerms() {
+                    DEFAULT_ADMIN.permissions = DEFAULT_ADMIN.permissions || {};
+                    MARGIN_PERMS.forEach(function(p) { DEFAULT_ADMIN.permissions[p[0]] = true; });
+                }
+                _mrEnsureDefaultMarginPerms();
+
+                function _mrPermissionGridByClass(cls) {
+                    var input = document.querySelector('input.' + cls);
+                    if (!input) return null;
+                    var node = input.parentElement;
+                    while (node && node !== document.body) {
+                        if (node.tagName === 'DIV' && node.querySelectorAll('input.' + cls).length > 1) return node;
+                        node = node.parentElement;
+                    }
+                    return input.parentElement ? input.parentElement.parentElement : null;
+                }
+
+                function _mrAddAccountsRole(selectId, selectedRole) {
+                    var sel = document.getElementById(selectId);
+                    if (!sel) return;
+                    if (!sel.querySelector('option[value="accounts"]')) {
+                        var opt = document.createElement('option');
+                        opt.value = 'accounts';
+                        opt.textContent = 'Accounts';
+                        sel.appendChild(opt);
+                    }
+                    if (selectedRole === 'accounts') sel.value = 'accounts';
+                }
+
+                function _mrInjectMarginPermissionCheckboxes(cls, userObj) {
+                    var grid = _mrPermissionGridByClass(cls);
+                    if (!grid) return;
+                    var perms = (userObj && userObj.permissions) || {};
+                    var isAdminUser = !!(userObj && userObj.username === 'Plan');
+                    MARGIN_PERMS.forEach(function(p) {
+                        if (grid.querySelector('input.' + cls + '[value="' + p[0] + '"]')) return;
+                        var label = document.createElement('label');
+                        label.className = 'mr-margin-perm-label';
+                        var checked = (isAdminUser || !!perms[p[0]]) ? 'checked' : '';
+                        var disabled = isAdminUser ? 'disabled' : '';
+                        label.innerHTML = '<input type="checkbox" class="' + cls + '" value="' + p[0] + '" ' + checked + ' ' + disabled + ' /> ' + p[1];
+                        grid.appendChild(label);
+                    });
+                }
+
+                function _mrPatchVisibleUserModal(username, userObj) {
+                    if (document.getElementById('newRole')) {
+                        _mrAddAccountsRole('newRole', null);
+                        _mrInjectMarginPermissionCheckboxes('perm-check', null);
+                    }
+                    if (document.getElementById('editRole')) {
+                        _mrAddAccountsRole('editRole', userObj && userObj.role);
+                        _mrInjectMarginPermissionCheckboxes('edit-perm', userObj || {});
+                    }
+                }
+
+                async function _mrBackfillMarginPermissionSchema() {
+                    _mrEnsureDefaultMarginPerms();
+                    var users = await readData('users', 'ph_users', true) || {};
+                    var changed = false;
+                    Object.keys(users).forEach(function(username) {
+                        var u = users[username] || {};
+                        u.permissions = u.permissions || {};
+                        if (username === 'Plan' || u.role === 'admin') {
+                            MARGIN_PERMS.forEach(function(p) {
+                                if (u.permissions[p[0]] !== true) { u.permissions[p[0]] = true; changed = true; }
+                            });
+                        } else {
+                            MARGIN_PERMS.forEach(function(p) {
+                                if (typeof u.permissions[p[0]] === 'undefined') { u.permissions[p[0]] = false; changed = true; }
+                            });
+                        }
+                        users[username] = u;
+                    });
+                    if (changed) {
+                        await writeData('users', users, 'ph_users');
+                        for (var k in users) {
+                            try { await writeData('users/' + k, users[k], k === 'Plan' ? 'ph_users_Plan' : 'ph_user_' + k); } catch (_) {}
+                        }
+                        STATE.users = users;
+                    }
+                    return users;
+                }
+                window._mrBackfillMarginPermissionSchema = _mrBackfillMarginPermissionSchema;
+
+                var _mrPrevCreateUser = createUser;
+                createUser = async function(username, password, role, name, email, permissions) {
+                    permissions = permissions || {};
+                    MARGIN_PERMS.forEach(function(p) { if (typeof permissions[p[0]] === 'undefined') permissions[p[0]] = false; });
+                    return _mrPrevCreateUser.call(this, username, password, role, name, email, permissions);
+                };
+                window.createUser = createUser;
+
+                var _mrPrevUpdateUser = updateUser;
+                updateUser = async function(username, data) {
+                    data = data || {};
+                    if (data.permissions) {
+                        MARGIN_PERMS.forEach(function(p) { if (typeof data.permissions[p[0]] === 'undefined') data.permissions[p[0]] = false; });
+                        if (username === 'Plan' || data.role === 'admin') MARGIN_PERMS.forEach(function(p) { data.permissions[p[0]] = true; });
+                    }
+                    return _mrPrevUpdateUser.call(this, username, data);
+                };
+                window.updateUser = updateUser;
+
+                var _mrPrevShowAddUserStable = showAddUser;
+                showAddUser = function() {
+                    var result = _mrPrevShowAddUserStable.apply(this, arguments);
+                    setTimeout(function() { _mrPatchVisibleUserModal(null, null); }, 30);
+                    setTimeout(function() { _mrPatchVisibleUserModal(null, null); }, 160);
+                    return result;
+                };
+                window.showAddUser = showAddUser;
+
+                var _mrPrevShowEditUserStable = showEditUser;
+                showEditUser = function(username) {
+                    var result = _mrPrevShowEditUserStable.apply(this, arguments);
+                    setTimeout(async function() {
+                        var users = await readData('users', 'ph_users', true) || {};
+                        var u = users[username] || {};
+                        u.username = username;
+                        _mrPatchVisibleUserModal(username, u);
+                    }, 80);
+                    setTimeout(async function() {
+                        var users = await readData('users', 'ph_users', true) || {};
+                        var u = users[username] || {};
+                        u.username = username;
+                        _mrPatchVisibleUserModal(username, u);
+                    }, 260);
+                    return result;
+                };
+                window.showEditUser = showEditUser;
+
+                var _mrPrevRenderUserManagement = renderUserManagement;
+                renderUserManagement = async function() {
+                    try { await _mrBackfillMarginPermissionSchema(); } catch (_) {}
+                    return _mrPrevRenderUserManagement.apply(this, arguments);
+                };
+                window.renderUserManagement = renderUserManagement;
+
+                document.addEventListener('DOMContentLoaded', function() {
+                    setTimeout(function() { _mrBackfillMarginPermissionSchema().catch(function() {}); }, 1200);
+                    setTimeout(function() { _mrBackfillMarginPermissionSchema().catch(function() {}); }, 4000);
+                });
+            })();
+
+
+            // --------------------------------------------------------------
+            // MuleRun final voice conference hardening
+            // Mesh calls stay alive while adding/removing members.
+            // --------------------------------------------------------------
+            (function _mrInstallFinalVoiceConferenceHardening() {
+                var _mrPeerRetryTimers = {};
+                function _mrMembers(list) {
+                    var out = [];
+                    (list || []).forEach(function(x) { if (x && out.indexOf(x) === -1) out.push(x); });
+                    return out;
+                }
+                function _mrPairPath(callId, a, b) { return 'voiceSignals/' + callId + '/' + _pair(a, b); }
+                function _mrPeerLooksDead(pc) {
+                    if (!pc) return true;
+                    var cs = pc.connectionState || '';
+                    var ice = pc.iceConnectionState || '';
+                    return cs === 'failed' || cs === 'closed' || ice === 'failed' || ice === 'closed';
+                }
+                function _mrStillInActiveCall(callId, peer) {
+                    return !!(_mrVoice && _mrVoice.callId === callId && (_mrVoice.members || []).indexOf(peer) !== -1 && STATE.currentUser && (_mrVoice.members || []).indexOf(STATE.currentUser.username) !== -1);
+                }
+                function _mrClosePeerOnly(peer) {
+                    try { if (_mrVoice.peers && _mrVoice.peers[peer]) { _mrVoice.peers[peer].close(); delete _mrVoice.peers[peer]; } } catch (_) {}
+                    try { if (_mrVoice.remoteAudio && _mrVoice.remoteAudio[peer]) { _mrVoice.remoteAudio[peer].remove(); delete _mrVoice.remoteAudio[peer]; } } catch (_) {}
+                }
+                async function _mrClearPeerSignals(callId, peer) {
+                    if (!firebaseConnected || !db || !STATE.currentUser || !callId || !peer) return;
+                    try { await db.ref(_mrPairPath(callId, STATE.currentUser.username, peer)).remove(); } catch (_) {}
+                }
+                async function _mrEnsurePeer(callId, peer, force) {
+                    if (!_mrStillInActiveCall(callId, peer) || peer === STATE.currentUser.username) return;
+                    if (!_mrVoice.localStream) return;
+                    var pc = _mrVoice.peers && _mrVoice.peers[peer];
+                    if (!force && pc && !_mrPeerLooksDead(pc)) return;
+                    if (_mrPeerRetryTimers[peer]) return;
+                    _mrPeerRetryTimers[peer] = setTimeout(async function() {
+                        delete _mrPeerRetryTimers[peer];
+                        if (!_mrStillInActiveCall(callId, peer)) return;
+                        try {
+                            _mrClosePeerOnly(peer);
+                            await _mrClearPeerSignals(callId, peer);
+                            await _createPeer(callId, peer, true);
+                            var vs = document.getElementById('voiceStatus');
+                            if (vs) vs.textContent = 'Voice meeting active. Reconnected audio path with ' + peer + '.';
+                        } catch (e) {
+                            showToast('Retrying voice link with ' + peer + '.', 'warning', 4000);
+                            setTimeout(function() { _mrEnsurePeer(callId, peer, true); }, 2200);
+                        }
+                    }, force ? 250 : 1200);
+                }
+                window._mrEnsurePeer = _mrEnsurePeer;
+
+                var _mrPrevCreatePeerHardening = window._createPeer || _createPeer;
+                _createPeer = async function(callId, peer, initiator) {
+                    var pc = await _mrPrevCreatePeerHardening.apply(this, arguments);
+                    try {
+                        function scheduleCheck() {
+                            if (!_mrStillInActiveCall(callId, peer)) return;
+                            var state = (pc.connectionState || pc.iceConnectionState || '');
+                            if (state === 'failed' || state === 'disconnected') _mrEnsurePeer(callId, peer, true);
+                        }
+                        pc.onconnectionstatechange = (function(prev) { return function(ev) { try { if (prev) prev.call(pc, ev); } catch (_) {} scheduleCheck(); }; })(pc.onconnectionstatechange);
+                        pc.oniceconnectionstatechange = (function(prev) { return function(ev) { try { if (prev) prev.call(pc, ev); } catch (_) {} scheduleCheck(); }; })(pc.oniceconnectionstatechange);
+                    } catch (_) {}
+                    return pc;
+                };
+                window._createPeer = _createPeer;
+
+                async function _mrSyncEveryActivePeer(callId) {
+                    if (!_mrVoice || _mrVoice.callId !== callId || !_mrVoice.localStream || !STATE.currentUser) return;
+                    var me = STATE.currentUser.username;
+                    var members = _mrMembers(_mrVoice.members || []);
+                    for (var i = 0; i < members.length; i++) {
+                        var peer = members[i];
+                        if (peer !== me) await _mrEnsurePeer(callId, peer, false);
+                    }
+                }
+                window._mrSyncEveryActivePeer = _mrSyncEveryActivePeer;
+
+                var _mrPrevAcceptHardening = window.acceptVoiceCall || acceptVoiceCall;
+                acceptVoiceCall = async function(callId) {
+                    var result = await _mrPrevAcceptHardening.apply(this, arguments);
+                    setTimeout(function() { _mrSyncEveryActivePeer(callId); }, 900);
+                    setTimeout(function() { _mrSyncEveryActivePeer(callId); }, 2800);
+                    return result;
+                };
+                window.acceptVoiceCall = acceptVoiceCall;
+
+                var _mrPrevAttachHardening = window.attachVoiceCallListener || attachVoiceCallListener;
+                attachVoiceCallListener = function() {
+                    try { _mrPrevAttachHardening.apply(this, arguments); } catch (_) {}
+                    if (!firebaseConnected || !db || !STATE.currentUser) return;
+                    if (window._mrFinalVoiceCallRef) try { window._mrFinalVoiceCallRef.off(); } catch (_) {}
+                    window._mrFinalVoiceCallRef = db.ref('voiceCalls');
+                    window._mrFinalVoiceCallRef.on('value', function(snap) {
+                        var calls = snap.val() || {}, me = STATE.currentUser.username;
+                        Object.keys(calls).forEach(function(id) {
+                            var c = calls[id] || {}, members = _mrMembers(c.members || []), inCall = members.indexOf(me) !== -1;
+                            if (_mrVoice.callId === id && inCall && c.status !== 'ended') {
+                                _mrVoice.members = members;
+                                setTimeout(function() { _mrSyncEveryActivePeer(id); }, 450);
+                                setTimeout(function() { _mrSyncEveryActivePeer(id); }, 2400);
+                            }
+                            if (!_mrVoice.callId && inCall && c.status === 'ringing' && c.from !== me && !document.getElementById('voicePanel')) {
+                                try {
+                                    showToast('Incoming voice meeting from ' + (c.from || 'agent'), 'info', 9000);
+                                    if ('Notification' in window) {
+                                        if (Notification.permission === 'default') Notification.requestPermission();
+                                        if (Notification.permission === 'granted') new Notification('Incoming voice meeting', { body: 'Call from ' + (c.from || 'agent') });
+                                    }
+                                    showVoicePanel('Incoming meeting from ' + (c.from || 'agent'), true, id);
+                                } catch (_) {}
+                            }
+                        });
+                    });
+                };
+                window.attachVoiceCallListener = attachVoiceCallListener;
+                try { attachVoiceCallListener(); } catch (_) {}
+
+                window.leaveVoiceMeeting = async function() {
+                    if (!_mrVoice || !_mrVoice.callId || !STATE.currentUser) return;
+                    var callId = _mrVoice.callId, me = STATE.currentUser.username;
+                    try {
+                        var call = await readData('voiceCalls/' + callId, null, true) || {};
+                        var next = _mrMembers(call.members || _mrVoice.members || []).filter(function(m) { return m !== me; });
+                        if (next.length) {
+                            await writeData('voiceCalls/' + callId + '/members', next, null);
+                            await writeData('voiceCalls/' + callId + '/leftAt/' + _mrFirebaseKey(me), getNowISO(), null);
+                            await writeData('voiceCalls/' + callId + '/updatedAt', getNowISO(), null);
+                            await writeData('voiceCalls/' + callId + '/inviteVersion', Date.now(), null);
+                            for (var i = 0; i < (call.members || []).length; i++) {
+                                if (call.members[i] !== me) await _mrClearPeerSignals(callId, call.members[i]);
+                            }
+                        } else {
+                            await writeData('voiceCalls/' + callId + '/status', 'ended', null);
+                            await writeData('voiceCalls/' + callId + '/endedAt', getNowISO(), null);
+                            await writeData('voiceCalls/' + callId + '/endedBy', me, null);
+                        }
+                    } catch (_) {}
+                    if (typeof _mrLocalVoiceCleanup === 'function') _mrLocalVoiceCleanup('You left the voice meeting.', true);
+                };
+
+                var _mrPrevShowVoicePanelHardening = window.showVoicePanel || showVoicePanel;
+                showVoicePanel = function(title, incoming, callId) {
+                    var result = _mrPrevShowVoicePanelHardening.apply(this, arguments);
+                    try {
+                        var panel = document.getElementById('voicePanel');
+                        var actions = panel && panel.querySelector('.voice-actions');
+                        if (actions && !actions.querySelector('.mr-leave-meeting-btn')) {
+                            var btn = document.createElement('button');
+                            btn.className = 'btn btn-warning btn-sm mr-leave-meeting-btn';
+                            btn.innerHTML = '<i class="fas fa-right-from-bracket"></i> Leave';
+                            btn.onclick = function() { window.leaveVoiceMeeting(); };
+                            var endBtn = actions.querySelector('.btn-danger');
+                            if (endBtn) actions.insertBefore(btn, endBtn); else actions.appendChild(btn);
+                        }
+                        var status = document.getElementById('voiceStatus');
+                        if (status) status.textContent = 'Browser WebRTC voice meeting. Add/remove agents without reconnecting existing members.';
+                    } catch (_) {}
+                    return result;
+                };
+                window.showVoicePanel = showVoicePanel;
+
+                var _mrPrevPeopleManagerHardening = window.showVoicePeopleManager || showVoicePeopleManager;
+                showVoicePeopleManager = async function(callId) {
+                    await _mrPrevPeopleManagerHardening.apply(this, arguments);
+                    setTimeout(function() {
+                        var btn = document.getElementById('btnSaveVoicePeople');
+                        if (!btn || btn.dataset.hardened === '1') return;
+                        btn.dataset.hardened = '1';
+                        var oldClick = btn.onclick;
+                        btn.onclick = async function() {
+                            var before = (_mrVoice && _mrVoice.members || []).slice();
+                            if (oldClick) await oldClick.apply(this, arguments);
+                            var after = (_mrVoice && _mrVoice.members || []).slice();
+                            var removed = before.filter(function(m) { return after.indexOf(m) === -1; });
+                            var cid = (_mrVoice && _mrVoice.callId) || callId;
+                            for (var r = 0; r < removed.length; r++) {
+                                await _mrClearPeerSignals(cid, removed[r]);
+                            }
+                            setTimeout(function() { _mrSyncEveryActivePeer(cid); }, 700);
+                            setTimeout(function() { _mrSyncEveryActivePeer(cid); }, 2600);
+                        };
+                    }, 80);
+                };
+                window.showVoicePeopleManager = showVoicePeopleManager;
+            })();
+
+            // --------------------------------------------------------------
+            // MuleRun permanent voice audio fix
+            // - Uses Firebase-safe voice signaling keys
+            // - Rebuilds peer audio with explicit autoplay unlocking
+            // - Adds a low-bitrate Firebase audio relay fallback when WebRTC
+            //   media cannot connect, so single and conference calls remain audible
+            // --------------------------------------------------------------
+            (function _mrInstallPermanentVoiceAudioFix() {
+                if (window._mrPermanentVoiceAudioFixInstalled) return;
+                window._mrPermanentVoiceAudioFixInstalled = true;
+
+                var _mrRelay = {
+                    callId: null,
+                    recorder: null,
+                    listener: null,
+                    seq: 0,
+                    seen: {},
+                    queues: {},
+                    playing: {},
+                    blocked: false,
+                    audios: {}
+                };
+
+                function _mrSafeKey(v) {
+                    if (typeof _mrFirebaseKey === 'function') return _mrFirebaseKey(v);
+                    return encodeURIComponent(String(v || '')).replace(/[.#$\[\]\/%]/g, function(ch) {
+                        return '%' + ch.charCodeAt(0).toString(16).toUpperCase();
+                    });
+                }
+                function _mrVoicePairKey(a, b) {
+                    return [_mrSafeKey(a), _mrSafeKey(b)].sort().join('__');
+                }
+                function _mrVoiceSignalPath(callId, a, b) {
+                    return 'voiceSignals/' + callId + '/' + _mrVoicePairKey(a, b);
+                }
+                function _mrAsDesc(desc) {
+                    if (!desc) return desc;
+                    try {
+                        var C = window.RTCSessionDescription || window.webkitRTCSessionDescription || window.mozRTCSessionDescription;
+                        return C ? new C(desc) : desc;
+                    } catch (_) { return desc; }
+                }
+                function _mrAsIce(cand) {
+                    if (!cand) return cand;
+                    try {
+                        var C = window.RTCIceCandidate || window.webkitRTCIceCandidate || window.mozRTCIceCandidate;
+                        return C ? new C(cand) : cand;
+                    } catch (_) { return cand; }
+                }
+                function _mrIcePayload(candidate) {
+                    if (!candidate) return null;
+                    if (candidate.toJSON) return candidate.toJSON();
+                    return {
+                        candidate: candidate.candidate,
+                        sdpMid: candidate.sdpMid,
+                        sdpMLineIndex: candidate.sdpMLineIndex,
+                        usernameFragment: candidate.usernameFragment
+                    };
+                }
+                function _mrVoiceCtor() {
+                    return window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection || null;
+                }
+                function _mrSetVoiceStatus(text) {
+                    var s = document.getElementById('voiceStatus');
+                    if (s && text) s.textContent = text;
+                }
+                function _mrShowEnableAudio(show) {
+                    var btn = document.getElementById('mrEnableVoiceAudioBtn');
+                    if (btn) btn.style.display = show ? '' : 'none';
+                }
+                function _mrPeerConnected(peer) {
+                    var pc = _mrVoice && _mrVoice.peers && _mrVoice.peers[peer];
+                    if (!pc) return false;
+                    var cs = pc.connectionState || '';
+                    var ice = pc.iceConnectionState || '';
+                    return cs === 'connected' || cs === 'completed' || ice === 'connected' || ice === 'completed';
+                }
+                function _mrAttachVoiceAudio(peer, stream) {
+                    if (!stream) return;
+                    var key = _mrSafeKey(peer || 'agent');
+                    var audio = document.getElementById('voiceAudio_' + key) || (_mrVoice && _mrVoice.remoteAudio && _mrVoice.remoteAudio[peer]);
+                    if (!audio) {
+                        audio = document.createElement('audio');
+                        audio.id = 'voiceAudio_' + key;
+                        audio.autoplay = true;
+                        audio.controls = true;
+                        audio.playsInline = true;
+                        audio.setAttribute('playsinline', '');
+                        audio.dataset.peer = peer || '';
+                        audio.style.cssText = 'display:block;width:100%;margin-top:8px;';
+                        var box = document.getElementById('voiceAudios');
+                        if (box) box.appendChild(audio);
+                    }
+                    audio.muted = false;
+                    audio.volume = 1;
+                    try { audio.srcObject = stream; }
+                    catch (_) { try { audio.src = URL.createObjectURL(stream); } catch (__) {} }
+                    if (_mrVoice) {
+                        _mrVoice.remoteAudio = _mrVoice.remoteAudio || {};
+                        _mrVoice.remoteAudio[peer] = audio;
+                    }
+                    try {
+                        var p = audio.play();
+                        if (p && p.catch) p.catch(function() { _mrShowEnableAudio(true); });
+                    } catch (_) { _mrShowEnableAudio(true); }
+                }
+                function _mrUnlockVoiceAudio() {
+                    try {
+                        var Ctx = window.AudioContext || window.webkitAudioContext;
+                        if (Ctx) {
+                            window._mrVoiceAudioCtx = window._mrVoiceAudioCtx || new Ctx();
+                            if (window._mrVoiceAudioCtx.state === 'suspended') window._mrVoiceAudioCtx.resume();
+                            var b = window._mrVoiceAudioCtx.createBuffer(1, 1, 22050);
+                            var s = window._mrVoiceAudioCtx.createBufferSource();
+                            s.buffer = b;
+                            s.connect(window._mrVoiceAudioCtx.destination);
+                            if (s.start) s.start(0);
+                        }
+                    } catch (_) {}
+                    try {
+                        document.querySelectorAll('#voicePanel audio').forEach(function(a) {
+                            a.muted = false;
+                            a.volume = 1;
+                            var p = a.play && a.play();
+                            if (p && p.catch) p.catch(function() {});
+                        });
+                    } catch (_) {}
+                    _mrRelay.blocked = false;
+                    Object.keys(_mrRelay.queues || {}).forEach(_mrPlayRelayQueue);
+                    _mrShowEnableAudio(false);
+                    _mrSetVoiceStatus('Voice audio enabled. If WebRTC is blocked, relay audio will keep the call audible.');
+                }
+                window._mrUnlockVoiceAudio = _mrUnlockVoiceAudio;
+                document.addEventListener('pointerdown', function() {
+                    if (document.getElementById('voicePanel')) _mrUnlockVoiceAudio();
+                }, true);
+
+                _createPeer = async function(callId, peer, initiator) {
+                    var Ctor = _mrVoiceCtor();
+                    if (!Ctor) throw new Error('WebRTC is not supported in this browser.');
+                    if (!STATE.currentUser || !STATE.currentUser.username) throw new Error('Login is required for voice calls.');
+                    var me = STATE.currentUser.username;
+                    var pc = new Ctor(typeof _pcConfig === 'function' ? _pcConfig() : { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+                    _mrVoice.peers = _mrVoice.peers || {};
+                    _mrVoice.remoteAudio = _mrVoice.remoteAudio || {};
+                    _mrVoice.peers[peer] = pc;
+
+                    try {
+                        if (_mrVoice.localStream && pc.addTrack) {
+                            _mrVoice.localStream.getAudioTracks().forEach(function(t) { pc.addTrack(t, _mrVoice.localStream); });
+                        } else if (_mrVoice.localStream && pc.addStream) {
+                            pc.addStream(_mrVoice.localStream);
+                        } else if (pc.addTransceiver) {
+                            pc.addTransceiver('audio', { direction: 'recvonly' });
+                        }
+                    } catch (_) {}
+
+                    pc.ontrack = function(ev) {
+                        var stream = (ev.streams && ev.streams[0]) || (ev.track ? new MediaStream([ev.track]) : null);
+                        _mrAttachVoiceAudio(peer, stream);
+                    };
+                    pc.onaddstream = function(ev) { _mrAttachVoiceAudio(peer, ev.stream); };
+                    pc.onicecandidate = function(ev) {
+                        var payload = _mrIcePayload(ev && ev.candidate);
+                        if (payload && firebaseConnected && db) {
+                            db.ref(_mrVoiceSignalPath(callId, me, peer) + '/candidates/' + _mrSafeKey(me)).push(payload);
+                        }
+                    };
+                    pc.onconnectionstatechange = pc.oniceconnectionstatechange = function() {
+                        var connected = _mrPeerConnected(peer);
+                        if (connected) {
+                            _mrSetVoiceStatus('Voice meeting active. Direct audio connected with ' + peer + '.');
+                        } else if ((pc.connectionState === 'failed' || pc.iceConnectionState === 'failed') && typeof _mrEnsurePeer === 'function') {
+                            try { _mrEnsurePeer(callId, peer, true); } catch (_) {}
+                        }
+                    };
+
+                    if (initiator) {
+                        try {
+                            var existing = await readData(_mrVoiceSignalPath(callId, me, peer), null, true) || {};
+                            if (existing.offer && existing.offer.to === me && existing.offer.from === peer) {
+                                if (!pc.remoteDescription || !pc.remoteDescription.type) await pc.setRemoteDescription(_mrAsDesc(existing.offer.sdp));
+                                var answer = await pc.createAnswer();
+                                await pc.setLocalDescription(answer);
+                                await writeData(_mrVoiceSignalPath(callId, me, peer) + '/answer', { from: me, to: peer, sdp: pc.localDescription || answer, at: getNowISO() }, null);
+                                return pc;
+                            }
+                        } catch (_) {}
+                        var offer = await pc.createOffer({ offerToReceiveAudio: true });
+                        await pc.setLocalDescription(offer);
+                        await writeData(_mrVoiceSignalPath(callId, me, peer) + '/offer', {
+                            from: me,
+                            to: peer,
+                            fromKey: _mrSafeKey(me),
+                            toKey: _mrSafeKey(peer),
+                            sdp: pc.localDescription || offer,
+                            at: getNowISO()
+                        }, null);
+                    }
+                    return pc;
+                };
+                window._createPeer = _createPeer;
+
+                listenVoiceSignals = function(callId) {
+                    if (!firebaseConnected || !db) return showToast('Voice signaling needs Firebase connection.', 'warning');
+                    if (!STATE.currentUser || !STATE.currentUser.username) return;
+                    if (_mrVoice.signalListener) try { _mrVoice.signalListener.off(); } catch (_) {}
+                    var me = STATE.currentUser.username;
+                    _mrVoice._seenIce = _mrVoice._seenIce || {};
+                    _mrVoice.signalListener = db.ref('voiceSignals/' + callId);
+                    _mrVoice.signalListener.on('value', async function(snap) {
+                        var all = snap.val() || {};
+                        for (var key in all) {
+                            var sig = all[key] || {};
+                            var peer = null;
+                            if (sig.offer && (sig.offer.to === me || sig.offer.from === me)) peer = sig.offer.to === me ? sig.offer.from : sig.offer.to;
+                            if (!peer && sig.answer && (sig.answer.to === me || sig.answer.from === me)) peer = sig.answer.to === me ? sig.answer.from : sig.answer.to;
+                            if (!peer && key.indexOf('__') !== -1) {
+                                var parts = key.split('__');
+                                if (parts[0] === _mrSafeKey(me)) peer = parts[1];
+                                if (parts[1] === _mrSafeKey(me)) peer = parts[0];
+                            }
+                            if (!peer || peer === me) continue;
+                            var pc = _mrVoice.peers && _mrVoice.peers[peer];
+                            try {
+                                if (sig.offer && sig.offer.to === me) {
+                                    pc = pc || await _createPeer(callId, peer, false);
+                                    if (pc.signalingState === 'have-local-offer') {
+                                        try { await pc.setLocalDescription({ type: 'rollback' }); } catch (_) {}
+                                    }
+                                    if (!pc.remoteDescription || !pc.remoteDescription.type) await pc.setRemoteDescription(_mrAsDesc(sig.offer.sdp));
+                                    if (pc.signalingState !== 'stable' || !sig.answer) {
+                                        var ans = await pc.createAnswer();
+                                        await pc.setLocalDescription(ans);
+                                        await writeData(_mrVoiceSignalPath(callId, me, peer) + '/answer', { from: me, to: peer, sdp: pc.localDescription || ans, at: getNowISO() }, null);
+                                    }
+                                }
+                                if (sig.answer && sig.answer.to === me) {
+                                    pc = pc || _mrVoice.peers[peer];
+                                    if (pc && (!pc.remoteDescription || !pc.remoteDescription.type) && pc.signalingState !== 'stable') {
+                                        await pc.setRemoteDescription(_mrAsDesc(sig.answer.sdp));
+                                    }
+                                }
+                                var cands = sig.candidates || {};
+                                Object.keys(cands).forEach(function(owner) {
+                                    if (owner === me || owner === _mrSafeKey(me)) return;
+                                    Object.keys(cands[owner] || {}).forEach(function(k) {
+                                        var seenKey = callId + '/' + key + '/' + owner + '/' + k;
+                                        if (_mrVoice._seenIce[seenKey]) return;
+                                        _mrVoice._seenIce[seenKey] = true;
+                                        var cand = cands[owner][k];
+                                        if (pc && cand && pc.addIceCandidate) pc.addIceCandidate(_mrAsIce(cand)).catch(function() {});
+                                    });
+                                });
+                            } catch (e) {
+                                showToast('Voice connection issue with ' + peer + ': ' + (e.message || e), 'warning', 5000);
+                            }
+                        }
+                    });
+                };
+                window.listenVoiceSignals = listenVoiceSignals;
+
+                async function _mrEnsureVoiceMesh(callId, force) {
+                    if (!_mrVoice || _mrVoice.callId !== callId || !_mrVoice.localStream || !STATE.currentUser) return;
+                    var me = STATE.currentUser.username;
+                    var members = (_mrVoice.members || []).filter(function(x, i, a) { return x && a.indexOf(x) === i; });
+                    for (var i = 0; i < members.length; i++) {
+                        var peer = members[i];
+                        if (peer === me) continue;
+                        var pc = _mrVoice.peers && _mrVoice.peers[peer];
+                        if (!force && pc && pc.signalingState !== 'closed' && pc.connectionState !== 'closed') continue;
+                        try { await _createPeer(callId, peer, true); } catch (_) {}
+                    }
+                }
+                window._mrEnsureVoiceMesh = _mrEnsureVoiceMesh;
+
+                function _mrRelayMime() {
+                    if (!window.MediaRecorder) return '';
+                    var types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+                    for (var i = 0; i < types.length; i++) {
+                        try { if (MediaRecorder.isTypeSupported(types[i])) return types[i]; } catch (_) {}
+                    }
+                    return '';
+                }
+                function _mrStartVoiceRelay(callId) {
+                    if (!firebaseConnected || !db || !window.MediaRecorder || !_mrVoice || !_mrVoice.localStream || !STATE.currentUser) return;
+                    if (_mrRelay.callId === callId && _mrRelay.recorder) return;
+                    _mrStopVoiceRelay(false);
+                    _mrRelay.callId = callId;
+                    _mrRelay.seq = 0;
+                    _mrRelay.seen = {};
+                    var me = STATE.currentUser.username;
+                    var mime = _mrRelayMime();
+                    try {
+                        var opts = mime ? { mimeType: mime, audioBitsPerSecond: 24000 } : { audioBitsPerSecond: 24000 };
+                        _mrRelay.recorder = new MediaRecorder(_mrVoice.localStream, opts);
+                        _mrRelay.recorder.ondataavailable = function(ev) {
+                            if (!ev.data || !ev.data.size || !_mrVoice || _mrVoice.callId !== callId) return;
+                            var reader = new FileReader();
+                            reader.onload = function() {
+                                var payload = { by: me, seq: ++_mrRelay.seq, at: Date.now(), mime: ev.data.type || mime || 'audio/webm', data: reader.result };
+                                var ref = db.ref('voiceRelays/' + callId + '/' + _mrSafeKey(me) + '/chunks').push();
+                                ref.set(payload);
+                                setTimeout(function() { try { ref.remove(); } catch (_) {} }, 45000);
+                            };
+                            reader.readAsDataURL(ev.data);
+                        };
+                        _mrRelay.recorder.start(1600);
+                    } catch (_) { _mrRelay.recorder = null; }
+                    if (_mrRelay.listener) try { _mrRelay.listener.off(); } catch (_) {}
+                    _mrRelay.listener = db.ref('voiceRelays/' + callId);
+                    _mrRelay.listener.on('value', function(snap) {
+                        var relays = snap.val() || {};
+                        Object.keys(relays).forEach(function(senderKey) {
+                            var box = relays[senderKey] || {};
+                            var chunks = box.chunks || {};
+                            Object.keys(chunks).forEach(function(chunkKey) {
+                                var chunk = chunks[chunkKey] || {};
+                                var sender = chunk.by || senderKey;
+                                if (!sender || sender === me) return;
+                                var seen = callId + '/' + senderKey + '/' + chunkKey;
+                                if (_mrRelay.seen[seen]) return;
+                                _mrRelay.seen[seen] = true;
+                                if (!_mrPeerConnected(sender)) _mrQueueRelayChunk(sender, chunk);
+                            });
+                        });
+                    });
+                    _mrSetVoiceStatus('Voice meeting active. Direct WebRTC audio is preferred; relay fallback is armed if a network blocks media.');
+                }
+                window._mrStartVoiceRelay = _mrStartVoiceRelay;
+
+                function _mrQueueRelayChunk(sender, chunk) {
+                    _mrRelay.queues[sender] = _mrRelay.queues[sender] || [];
+                    _mrRelay.queues[sender].push(chunk);
+                    _mrRelay.queues[sender].sort(function(a, b) { return (a.seq || 0) - (b.seq || 0); });
+                    _mrPlayRelayQueue(sender);
+                }
+                function _mrPlayRelayQueue(sender) {
+                    if (_mrRelay.playing[sender] || _mrRelay.blocked || _mrPeerConnected(sender)) return;
+                    var q = _mrRelay.queues[sender] || [];
+                    var chunk = q.shift();
+                    if (!chunk || !chunk.data) return;
+                    var a = _mrRelay.audios[sender];
+                    if (!a) {
+                        a = document.createElement('audio');
+                        a.controls = true;
+                        a.autoplay = true;
+                        a.playsInline = true;
+                        a.setAttribute('playsinline', '');
+                        a.dataset.relayPeer = sender;
+                        a.style.cssText = 'display:block;width:100%;margin-top:8px;';
+                        var box = document.getElementById('voiceAudios');
+                        if (box) {
+                            var label = document.createElement('div');
+                            label.className = 'text-xs text-muted';
+                            label.textContent = sender + ' relay audio fallback';
+                            box.appendChild(label);
+                            box.appendChild(a);
+                        }
+                        _mrRelay.audios[sender] = a;
+                    }
+                    _mrRelay.playing[sender] = true;
+                    a.muted = false;
+                    a.volume = 1;
+                    a.src = chunk.data;
+                    a.onended = a.onerror = function() {
+                        _mrRelay.playing[sender] = false;
+                        setTimeout(function() { _mrPlayRelayQueue(sender); }, 20);
+                    };
+                    try {
+                        var p = a.play();
+                        if (p && p.catch) p.catch(function() {
+                            q.unshift(chunk);
+                            _mrRelay.playing[sender] = false;
+                            _mrRelay.blocked = true;
+                            _mrShowEnableAudio(true);
+                            _mrSetVoiceStatus('Click Enable Audio to hear the call. Browser autoplay blocked remote audio.');
+                        });
+                    } catch (_) {
+                        q.unshift(chunk);
+                        _mrRelay.playing[sender] = false;
+                        _mrRelay.blocked = true;
+                        _mrShowEnableAudio(true);
+                    }
+                }
+                function _mrStopVoiceRelay(removeMine) {
+                    try { if (_mrRelay.recorder && _mrRelay.recorder.state !== 'inactive') _mrRelay.recorder.stop(); } catch (_) {}
+                    try { if (_mrRelay.listener) _mrRelay.listener.off(); } catch (_) {}
+                    if (removeMine !== false && firebaseConnected && db && STATE.currentUser && _mrRelay.callId) {
+                        try { db.ref('voiceRelays/' + _mrRelay.callId + '/' + _mrSafeKey(STATE.currentUser.username)).remove(); } catch (_) {}
+                    }
+                    Object.keys(_mrRelay.audios || {}).forEach(function(k) { try { _mrRelay.audios[k].remove(); } catch (_) {} });
+                    _mrRelay = { callId: null, recorder: null, listener: null, seq: 0, seen: {}, queues: {}, playing: {}, blocked: false, audios: {} };
+                }
+                window._mrStopVoiceRelay = _mrStopVoiceRelay;
+
+                var _mrPrevShowVoicePanelAudioFix = window.showVoicePanel || showVoicePanel;
+                showVoicePanel = function(title, incoming, callId) {
+                    var result = _mrPrevShowVoicePanelAudioFix.apply(this, arguments);
+                    try {
+                        var panel = document.getElementById('voicePanel');
+                        var actions = panel && panel.querySelector('.voice-actions');
+                        if (actions && !document.getElementById('mrEnableVoiceAudioBtn')) {
+                            var btn = document.createElement('button');
+                            btn.id = 'mrEnableVoiceAudioBtn';
+                            btn.className = 'btn btn-info btn-sm';
+                            btn.style.display = 'none';
+                            btn.innerHTML = '<i class="fas fa-volume-high"></i> Enable Audio';
+                            btn.onclick = _mrUnlockVoiceAudio;
+                            actions.insertBefore(btn, actions.firstChild);
+                        }
+                    } catch (_) {}
+                    return result;
+                };
+                window.showVoicePanel = showVoicePanel;
+
+                var _mrPrevStartVoicePermanent = window.startVoiceCall || startVoiceCall;
+                startVoiceCall = async function() {
+                    _mrUnlockVoiceAudio();
+                    var r = await _mrPrevStartVoicePermanent.apply(this, arguments);
+                    setTimeout(function() {
+                        if (_mrVoice && _mrVoice.callId) {
+                            _mrStartVoiceRelay(_mrVoice.callId);
+                            _mrEnsureVoiceMesh(_mrVoice.callId, false);
+                        }
+                    }, 1200);
+                    return r;
+                };
+                window.startVoiceCall = startVoiceCall;
+
+                var _mrPrevAcceptVoicePermanent = window.acceptVoiceCall || acceptVoiceCall;
+                acceptVoiceCall = async function(callId) {
+                    _mrUnlockVoiceAudio();
+                    var r = await _mrPrevAcceptVoicePermanent.apply(this, arguments);
+                    setTimeout(function() {
+                        if (_mrVoice && _mrVoice.callId) {
+                            _mrStartVoiceRelay(_mrVoice.callId);
+                            _mrEnsureVoiceMesh(_mrVoice.callId, false);
+                        }
+                    }, 1200);
+                    return r;
+                };
+                window.acceptVoiceCall = acceptVoiceCall;
+
+                var _mrPrevEndVoicePermanent = window.endVoiceCall || endVoiceCall;
+                endVoiceCall = function() {
+                    try { _mrStopVoiceRelay(true); } catch (_) {}
+                    return _mrPrevEndVoicePermanent.apply(this, arguments);
+                };
+                window.endVoiceCall = endVoiceCall;
+
+                setInterval(function() {
+                    try {
+                        if (_mrVoice && _mrVoice.callId && _mrVoice.localStream) {
+                            _mrStartVoiceRelay(_mrVoice.callId);
+                            _mrEnsureVoiceMesh(_mrVoice.callId, false);
+                        }
+                    } catch (_) {}
+                }, 6000);
+            })();
+
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
