@@ -12230,7 +12230,8 @@
                         var send = function(){
                             if(window.Notification.permission !== 'granted') return;
                             var options = Object.assign({ body: body || '', tag: tag || title, renotify: true }, opts || {});
-                            new window.Notification(title, options);
+                            var n = new window.Notification(title, options);
+                            n.onclick = function(){ try{ window.focus(); }catch(_){} try{ n.close(); }catch(_){} };
                         };
                         if(window.Notification.permission === 'granted') send();
                         else if(window.Notification.permission === 'default') window.Notification.requestPermission().then(function(p){ if(p === 'granted') send(); });
@@ -12244,8 +12245,13 @@
                 function _noticeMsgId(m){ return (typeof _chatMessageId === 'function') ? _chatMessageId(m) : (m && (m._key || m._id || m.id)); }
                 function _isIncomingDesktopMessage(m, me){
                     if(!m || m.deleted || !me || m.from === me) return false;
-                    if(m.groupId) return (m.members || []).indexOf(me) !== -1 && !(m.readBy && m.readBy[me]);
-                    return m.to === me && !m.read;
+                    if(m.groupId){
+                        if(m.readBy && m.readBy[me]) return false;
+                        if((m.members || []).indexOf(me) !== -1) return true;
+                        var g = (STATE.chatGroups || {})[m.groupId] || {};
+                        return (g.members || []).indexOf(me) !== -1;
+                    }
+                    return (m.to === me || (m.participants || []).indexOf(me) !== -1) && !m.read;
                 }
                 function _attachDesktopChatNotifications(){
                     try{
@@ -12256,6 +12262,7 @@
                         _desktopChatUser = me;
                         _desktopChatLast = Date.now();
                         _desktopChatSeen = {};
+                        try{ readData('chatGroups','ph_chat_groups',true).then(function(g){ if(g) STATE.chatGroups = g; }); }catch(_){}
                         if(_desktopChatRef && _desktopChatRef.off) try{ _desktopChatRef.off(); }catch(_){}
                         if(_desktopChatPoll) clearInterval(_desktopChatPoll);
                         function handle(all){
@@ -12296,7 +12303,7 @@
                                 if(c.status === 'ringing' && c.from !== me && inCall && !_desktopCallSeen[id]){
                                     _desktopCallSeen[id] = true;
                                     try{ sessionStorage.setItem('ph_desktop_call_seen_' + id, '1'); }catch(_){}
-                                    _desktopNotify('Incoming voice call', (c.from || 'User') + ' is calling you', 'call_' + id, { requireInteraction: true });
+                                    _desktopNotify('Join conference call', (c.from || 'User') + ' invited you to join a conference call', 'call_' + id, { requireInteraction: true });
                                 }
                             });
                         });
@@ -12418,6 +12425,25 @@
                     _confRenderRoster();
                 }
 
+                function _confCloseLocalOnly(reason){
+                    try { if (typeof _mrScreen !== 'undefined' && _mrScreen && _mrScreen.stream && typeof _mrStopScreenShare === 'function') _mrStopScreenShare(); } catch(_){}
+                    try { if (typeof _mrStopScreenFrameBroadcast === 'function') _mrStopScreenFrameBroadcast(true); } catch(_){}
+                    try { if (_mrVoice && _mrVoice.signalListener && _mrVoice.signalListener.off) _mrVoice.signalListener.off(); } catch(_){}
+                    try { if (typeof _mrScreenListener !== 'undefined' && _mrScreenListener && _mrScreenListener.off) _mrScreenListener.off(); } catch(_){}
+                    try { if (typeof _mrScreenMemberSyncListener !== 'undefined' && _mrScreenMemberSyncListener && _mrScreenMemberSyncListener.off) _mrScreenMemberSyncListener.off(); } catch(_){}
+                    try { if (typeof _mrScreenFrameListener !== 'undefined' && _mrScreenFrameListener && _mrScreenFrameListener.off) _mrScreenFrameListener.off(); } catch(_){}
+                    try { Object.keys((_mrVoice && _mrVoice.peers) || {}).forEach(function(k){ try { _mrVoice.peers[k].close(); } catch(_){} }); } catch(_){}
+                    try { if (_mrVoice && _mrVoice.localStream) _mrVoice.localStream.getTracks().forEach(function(t){ try { t.stop(); } catch(_){} }); } catch(_){}
+                    try { Object.keys((_mrVoice && _mrVoice.remoteAudio) || {}).forEach(function(k){ try { _mrVoice.remoteAudio[k].remove(); } catch(_){} }); } catch(_){}
+                    ['voicePanel','mrScreensContainer','mr-screen-browser','mr-screen-local'].forEach(function(id){ var el=document.getElementById(id); if(el) try{ el.remove(); }catch(_){} });
+                    try { if (typeof _mrScreen !== 'undefined') _mrScreen = null; } catch(_){}
+                    try { if (typeof _mrScreenListener !== 'undefined') _mrScreenListener = null; } catch(_){}
+                    try { if (typeof _mrScreenMemberSyncListener !== 'undefined') _mrScreenMemberSyncListener = null; } catch(_){}
+                    try { if (typeof _mrScreenFrameListener !== 'undefined') _mrScreenFrameListener = null; } catch(_){}
+                    _mrVoice = {callId:null,localStream:null,peers:{},remoteAudio:{},listener:null,signalListener:null,members:[]};
+                }
+                window._mrCloseVoiceLocalOnly = _confCloseLocalOnly;
+
                 var _confRosterListener = null;
                 function _confAttachRosterSync(){
                     if (!firebaseConnected || !db || !STATE.currentUser) return;
@@ -12432,11 +12458,11 @@
                             var inCall = members.indexOf(me) !== -1;
                             if (_mrVoice.callId === id && !inCall && c.status !== 'ended'){
                                 try { showToast('You were removed from the conference.', 'warning'); } catch(_){}
-                                try { endVoiceCall(); } catch(_){}
+                                try { _confCloseLocalOnly('removed'); } catch(_){}
                                 return;
                             }
                             if (_mrVoice.callId === id && c.status === 'ended'){
-                                try { endVoiceCall(); } catch(_){}
+                                try { _confCloseLocalOnly('ended'); } catch(_){}
                                 return;
                             }
                             if (_mrVoice.callId === id && inCall){
@@ -12577,6 +12603,7 @@
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
