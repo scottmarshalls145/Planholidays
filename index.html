@@ -12597,6 +12597,38 @@
                     };
                 };
 
+                async function _confEndVoiceCallSafe(forceEnd){
+                    var callId = _mrVoice && _mrVoice.callId;
+                    var me = _confMe();
+                    var shouldEndForEveryone = !!forceEnd;
+                    try {
+                        if (callId && firebaseConnected && db){
+                            var call = await readData('voiceCalls/'+callId, null, true) || {};
+                            var members = call.members || _mrVoice.members || [];
+                            if (call.status === 'ended'){
+                                shouldEndForEveryone = false;
+                            } else if (members.indexOf(me) !== -1){
+                                shouldEndForEveryone = true;
+                            } else {
+                                shouldEndForEveryone = false;
+                            }
+                            if (shouldEndForEveryone){
+                                await writeData('voiceCalls/'+callId+'/status', 'ended', null);
+                                await writeData('voiceCalls/'+callId+'/endedAt', getNowISO(), null);
+                                await writeData('voiceCalls/'+callId+'/endedBy', me || 'unknown', null);
+                            }
+                        } else if (callId) {
+                            shouldEndForEveryone = true;
+                        }
+                    } catch(_){
+                        shouldEndForEveryone = true;
+                        try { if (callId) await writeData('voiceCalls/'+callId+'/status', 'ended', null); } catch(__){}
+                    }
+                    try { _confCloseLocalOnly(shouldEndForEveryone ? 'ended' : 'removed'); } catch(_){}
+                }
+                endVoiceCall = function(forceEnd){ return _confEndVoiceCallSafe(forceEnd); };
+                window.endVoiceCall = endVoiceCall;
+
                 try { if (_confInCall()) _confRenderRoster(); } catch(_){}
             })();
 
