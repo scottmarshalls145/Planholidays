@@ -12166,13 +12166,15 @@
                         if(!iso) return '';
                         try{
                             var d = new Date(iso);
-                            return d.toLocaleDateString()+' '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+                            return d.toLocaleDateString()+' '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
                         }catch(_){ return iso; }
                     }
                     function fmtDur(s){
                         if(!s && s!==0) return '—';
-                        var m = Math.floor(s/60), sec = s%60;
-                        return m+':'+(sec<10?'0':'')+sec;
+                        s = Math.max(0, parseInt(s, 10) || 0);
+                        var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+                        function pad(n){ return (n < 10 ? '0' : '') + n; }
+                        return pad(h)+':'+pad(m)+':'+pad(sec);
                     }
                     function names(list){
                         list = list||[];
@@ -12208,6 +12210,143 @@
                     if(STATE.currentUser && !_presenceHeartbeat) _kickoff();
                     _updateOnlineBadge();
                 }, 5000);
+            })();
+
+
+            // MuleRun requested patch: desktop notifications + automatic agent shift start
+            (function _mrDesktopNotifyAndAutoShiftPatch(){
+                var _desktopChatRef = null, _desktopChatPoll = null, _desktopChatUser = null, _desktopChatLast = Date.now(), _desktopChatSeen = {};
+                var _desktopCallRef = null, _desktopCallUser = null, _desktopCallSeen = {};
+
+                function _hasDesktopNotifications(){ return typeof window !== 'undefined' && 'Notification' in window; }
+                function _requestDesktopPermission(){
+                    try{
+                        if(_hasDesktopNotifications() && window.Notification.permission === 'default') window.Notification.requestPermission();
+                    }catch(_){}
+                }
+                function _desktopNotify(title, body, tag, opts){
+                    try{
+                        if(!_hasDesktopNotifications()) return;
+                        var send = function(){
+                            if(window.Notification.permission !== 'granted') return;
+                            var options = Object.assign({ body: body || '', tag: tag || title, renotify: true }, opts || {});
+                            new window.Notification(title, options);
+                        };
+                        if(window.Notification.permission === 'granted') send();
+                        else if(window.Notification.permission === 'default') window.Notification.requestPermission().then(function(p){ if(p === 'granted') send(); });
+                    }catch(_){}
+                }
+                function _noticeValues(all){
+                    if(typeof _mrVals === 'function') return _mrVals(all || {});
+                    if(Array.isArray(all)) return all;
+                    return Object.keys(all || {}).map(function(k){ var v = all[k] || {}; if(!v._key) v._key = k; return v; });
+                }
+                function _noticeMsgId(m){ return (typeof _chatMessageId === 'function') ? _chatMessageId(m) : (m && (m._key || m._id || m.id)); }
+                function _isIncomingDesktopMessage(m, me){
+                    if(!m || m.deleted || !me || m.from === me) return false;
+                    if(m.groupId) return (m.members || []).indexOf(me) !== -1 && !(m.readBy && m.readBy[me]);
+                    return m.to === me && !m.read;
+                }
+                function _attachDesktopChatNotifications(){
+                    try{
+                        if(!STATE.currentUser) return;
+                        var me = STATE.currentUser.username;
+                        if(_desktopChatUser === me && (_desktopChatRef || _desktopChatPoll)) return;
+                        _requestDesktopPermission();
+                        _desktopChatUser = me;
+                        _desktopChatLast = Date.now();
+                        _desktopChatSeen = {};
+                        if(_desktopChatRef && _desktopChatRef.off) try{ _desktopChatRef.off(); }catch(_){}
+                        if(_desktopChatPoll) clearInterval(_desktopChatPoll);
+                        function handle(all){
+                            var inc = _noticeValues(all).filter(function(m){ return _isIncomingDesktopMessage(m, me); });
+                            inc.sort(function(a,b){ return new Date(b.timestamp || 0) - new Date(a.timestamp || 0); });
+                            var m = inc[0];
+                            if(!m) return;
+                            var ts = new Date(m.timestamp || 0).getTime();
+                            var id = _noticeMsgId(m) || ((m.from || 'user') + '_' + ts);
+                            if(!ts || ts <= _desktopChatLast || _desktopChatSeen[id]) return;
+                            _desktopChatSeen[id] = true;
+                            _desktopChatLast = Math.max(_desktopChatLast, ts);
+                            _desktopNotify('New portal message', (m.from || 'User') + ': ' + (m.message || '[Image]'), 'chat_' + id);
+                        }
+                        if(firebaseConnected && db){
+                            _desktopChatRef = db.ref('chatMessages');
+                            _desktopChatRef.on('value', function(snap){ handle(snap.val() || {}); });
+                        } else {
+                            _desktopChatPoll = setInterval(async function(){ handle(await readData('chatMessages','ph_chat_messages',true) || {}); }, 6000);
+                        }
+                    }catch(_){}
+                }
+                function _attachDesktopCallNotifications(){
+                    try{
+                        if(!STATE.currentUser || !firebaseConnected || !db) return;
+                        var me = STATE.currentUser.username;
+                        if(_desktopCallUser === me && _desktopCallRef) return;
+                        _requestDesktopPermission();
+                        _desktopCallUser = me;
+                        _desktopCallSeen = {};
+                        if(_desktopCallRef && _desktopCallRef.off) try{ _desktopCallRef.off(); }catch(_){}
+                        _desktopCallRef = db.ref('voiceCalls');
+                        _desktopCallRef.on('value', function(snap){
+                            var calls = snap.val() || {};
+                            Object.keys(calls).forEach(function(id){
+                                var c = calls[id] || {};
+                                var inCall = (c.members || []).indexOf(me) !== -1;
+                                if(c.status === 'ringing' && c.from !== me && inCall && !_desktopCallSeen[id]){
+                                    _desktopCallSeen[id] = true;
+                                    try{ sessionStorage.setItem('ph_desktop_call_seen_' + id, '1'); }catch(_){}
+                                    _desktopNotify('Incoming voice call', (c.from || 'User') + ' is calling you', 'call_' + id, { requireInteraction: true });
+                                }
+                            });
+                        });
+                    }catch(_){}
+                }
+
+                if(typeof promptStartShift === 'function' && typeof checkInAgent === 'function'){
+                    promptStartShift = async function(){
+                        var user = STATE.currentUser;
+                        if(!user || (user.role !== 'agent' && user.role !== 'manager')) return;
+                        try{
+                            await loadAgentTimes();
+                            var today = getToday();
+                            var openShift = (STATE.agentTimes || []).find(function(t){
+                                return t.agentName === user.username && t.date === today && !t.checkOut;
+                            });
+                            if(openShift){ STATE.activeAgentShift = openShift; updateAgentTimeBadge(); return; }
+                            await checkInAgent();
+                        }catch(e){ console.warn('Auto check-in failed:', e); }
+                    };
+                    window.promptStartShift = promptStartShift;
+                }
+
+                if(typeof attachRealtimeChatNotifications === 'function'){
+                    var _origAttachChatNotifications = attachRealtimeChatNotifications;
+                    attachRealtimeChatNotifications = function(){
+                        var result = _origAttachChatNotifications.apply(this, arguments);
+                        setTimeout(_attachDesktopChatNotifications, 100);
+                        setTimeout(_attachDesktopCallNotifications, 150);
+                        return result;
+                    };
+                }
+                if(typeof attachVoiceCallListener === 'function'){
+                    var _origAttachVoiceCallListener = attachVoiceCallListener;
+                    attachVoiceCallListener = function(){
+                        var result = _origAttachVoiceCallListener.apply(this, arguments);
+                        setTimeout(_attachDesktopCallNotifications, 100);
+                        return result;
+                    };
+                }
+                if(typeof afterLogin === 'function'){
+                    var _origAfterLoginForDesktop = afterLogin;
+                    afterLogin = async function(user){
+                        var result = await _origAfterLoginForDesktop.apply(this, arguments);
+                        _requestDesktopPermission();
+                        setTimeout(_attachDesktopChatNotifications, 200);
+                        setTimeout(_attachDesktopCallNotifications, 250);
+                        return result;
+                    };
+                }
             })();
 
             document.addEventListener('DOMContentLoaded', init);
