@@ -2260,6 +2260,12 @@
                     <h4>Chat</h4>
                     <p>Private chat with image upload</p>
                 </div>
+                <div class="dash-card" data-action="calls">
+                    <i class="fas fa-phone-volume"></i>
+                    <h4>Calls</h4>
+                    <p>Online agents &amp; call logs</p>
+                    <span class="badge-count" id="onlineAgentsBadge">0</span>
+                </div>
                 <div class="dash-card" data-action="theme">
                     <i class="fas fa-palette"></i>
                     <h4>Theme</h4>
@@ -5445,6 +5451,9 @@
                         break;
                     case 'chat':
                         showChatUI();
+                        break;
+                    case 'calls':
+                        try { showCallsCenter(); } catch(e){ showToast('Calls module not ready.','error'); }
                         break;
                     case 'calendar':
                         showCalendar();
@@ -11297,9 +11306,442 @@
                 }
             })();
 
+            // ==============================================================
+            // CALLS CENTER (additive) — presence, call logs, quick-call agents
+            // Admin sees full logs; agents see logs of calls they participated in.
+            // ==============================================================
+            (function _callsCenterModule(){
+                if (document.getElementById('calls-center-styles')) return;
+                var st = document.createElement('style');
+                st.id = 'calls-center-styles';
+                st.textContent =
+                    '.cc-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}'+
+                    '.cc-tabs button{padding:8px 14px;border-radius:10px;border:1px solid rgba(0,0,0,.1);background:transparent;cursor:pointer;font-weight:600;}'+
+                    '.cc-tabs button.active{background:var(--primary);color:#fff;border-color:var(--primary);}'+
+                    '.cc-agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}'+
+                    '.cc-agent-card{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid rgba(0,0,0,.1);border-radius:12px;background:rgba(0,0,0,.02);cursor:pointer;transition:.15s;}'+
+                    '.cc-agent-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.08);border-color:var(--primary);}'+
+                    '.cc-agent-card.offline{opacity:.55;cursor:not-allowed;}'+
+                    '.cc-avatar{width:42px;height:42px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;position:relative;flex-shrink:0;}'+
+                    '.cc-avatar .cc-dot{position:absolute;bottom:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:#bbb;border:2px solid #fff;}'+
+                    '.cc-avatar .cc-dot.online{background:#27ae60;}'+
+                    '.cc-agent-main{flex:1;min-width:0;}'+
+                    '.cc-agent-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'+
+                    '.cc-agent-sub{font-size:.78rem;color:var(--text-muted,#888);}'+
+                    '.cc-call-btn{background:#27ae60;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-weight:600;cursor:pointer;}'+
+                    '.cc-call-btn:disabled{background:#bbb;cursor:not-allowed;}'+
+                    '.cc-table{width:100%;border-collapse:collapse;font-size:.9rem;}'+
+                    '.cc-table th,.cc-table td{padding:8px 10px;border-bottom:1px solid rgba(0,0,0,.08);text-align:left;}'+
+                    '.cc-table th{background:rgba(0,0,0,.04);font-weight:700;}'+
+                    '.dark .cc-table th{background:rgba(255,255,255,.05);}'+
+                    '.dark .cc-table th,.dark .cc-table td{border-bottom-color:rgba(255,255,255,.08);}'+
+                    '.cc-pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.75rem;font-weight:600;}'+
+                    '.cc-pill.completed{background:rgba(39,174,96,.18);color:#1f7a43;}'+
+                    '.cc-pill.missed{background:rgba(192,57,43,.18);color:#8a2b21;}'+
+                    '.cc-pill.ringing{background:rgba(243,156,18,.18);color:#a76a04;}'+
+                    '.cc-pill.ended{background:rgba(0,0,0,.1);color:#555;}'+
+                    '.cc-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;}'+
+                    '.cc-filters input,.cc-filters select{padding:6px 10px;border:1px solid rgba(0,0,0,.15);border-radius:8px;}'+
+                    '.cc-empty{text-align:center;padding:30px;color:var(--text-muted,#888);}'+
+                    '';
+                document.head.appendChild(st);
+
+                // ---------- PRESENCE TRACKING ----------
+                var _presenceRef = null, _presenceListener = null, _presenceHeartbeat = null;
+                var _onlineAgents = {}; // { username: {lastSeen, name} }
+
+                function _presenceKey(u){ return 'presence/'+u; }
+
+                function _startPresence(){
+                    try{
+                        if(!STATE.currentUser) return;
+                        var me = STATE.currentUser.username;
+                        function beat(){
+                            var payload = { username: me, name: STATE.currentUser.name || me, role: STATE.currentUser.role || 'agent', lastSeen: Date.now(), ts: getNowISO() };
+                            try{ writeData(_presenceKey(me), payload, null); }catch(_){}
+                            try{ localStorage.setItem('ph_presence_'+me, JSON.stringify(payload)); }catch(_){}
+                        }
+                        beat();
+                        if(_presenceHeartbeat) clearInterval(_presenceHeartbeat);
+                        _presenceHeartbeat = setInterval(beat, 25000);
+                        window.addEventListener('beforeunload', function(){
+                            try{ writeData(_presenceKey(me)+'/lastSeen', Date.now()-999999, null); }catch(_){}
+                            try{ writeData(_presenceKey(me)+'/offline', true, null); }catch(_){}
+                        });
+                        // Firebase disconnect handler
+                        try{
+                            if(firebaseConnected && db){
+                                db.ref(_presenceKey(me)).onDisconnect().update({ offline:true, lastSeen: firebase.database.ServerValue.TIMESTAMP });
+                            }
+                        }catch(_){}
+                    }catch(_){}
+                }
+
+                function _attachPresenceListener(cb){
+                    try{
+                        if(!firebaseConnected || !db){
+                            // localStorage fallback: scan keys
+                            _onlineAgents = {};
+                            for(var i=0;i<localStorage.length;i++){
+                                var k = localStorage.key(i);
+                                if(k && k.indexOf('ph_presence_')===0){
+                                    try{ var v = JSON.parse(localStorage.getItem(k)); if(v && v.username) _onlineAgents[v.username]=v; }catch(_){}
+                                }
+                            }
+                            if(cb) cb(_onlineAgents);
+                            return;
+                        }
+                        if(_presenceListener) try{ _presenceListener.off(); }catch(_){}
+                        _presenceListener = db.ref('presence');
+                        _presenceListener.on('value', function(snap){
+                            _onlineAgents = snap.val() || {};
+                            _updateOnlineBadge();
+                            if(cb) cb(_onlineAgents);
+                            // Refresh calls center if open
+                            var ccOnline = document.getElementById('ccOnlineList');
+                            if(ccOnline) _renderOnlineAgents();
+                        });
+                    }catch(_){}
+                }
+
+                function _isOnline(u){
+                    var p = _onlineAgents[u];
+                    if(!p) return false;
+                    if(p.offline) return false;
+                    var ls = p.lastSeen || 0;
+                    return (Date.now() - ls) < 60000; // 60s window
+                }
+
+                function _updateOnlineBadge(){
+                    var b = document.getElementById('onlineAgentsBadge');
+                    if(!b) return;
+                    var me = (STATE.currentUser && STATE.currentUser.username) || '';
+                    var n = Object.keys(_onlineAgents || {}).filter(function(k){ return k!==me && _isOnline(k); }).length;
+                    b.textContent = n;
+                }
+
+                // ---------- CALL LOGS ----------
+                var _callLogListener = null;
+                var _callLogs = {}; // {id: log}
+
+                // Track known voice call state to derive log entries
+                var _knownCallState = {}; // callId -> {status, startedAt, acceptedBy:{}, from, members}
+
+                function _logCall(entry){
+                    try{
+                        if(!entry || !entry.id) return;
+                        writeData('callLogs/'+entry.id, entry, 'ph_call_logs_'+entry.id);
+                    }catch(_){}
+                }
+
+                function _attachCallLogListener(){
+                    try{
+                        if(!firebaseConnected || !db){
+                            // localStorage fallback
+                            _callLogs = {};
+                            for(var i=0;i<localStorage.length;i++){
+                                var k = localStorage.key(i);
+                                if(k && k.indexOf('ph_call_logs_')===0){
+                                    try{ var v = JSON.parse(localStorage.getItem(k)); if(v && v.id) _callLogs[v.id]=v; }catch(_){}
+                                }
+                            }
+                            return;
+                        }
+                        if(_callLogListener) try{ _callLogListener.off(); }catch(_){}
+                        _callLogListener = db.ref('callLogs');
+                        _callLogListener.on('value', function(snap){
+                            _callLogs = snap.val() || {};
+                            var lst = document.getElementById('ccLogsList');
+                            if(lst) _renderCallLogs();
+                        });
+                    }catch(_){}
+                }
+
+                // Watch voiceCalls to build call log entries
+                function _attachVoiceCallsForLogging(){
+                    try{
+                        if(!firebaseConnected || !db) return;
+                        db.ref('voiceCalls').on('value', function(snap){
+                            var calls = snap.val() || {};
+                            Object.keys(calls).forEach(function(id){
+                                var c = calls[id] || {};
+                                var prev = _knownCallState[id] || {};
+                                var members = c.members || [];
+                                var accepted = c.accepted || {};
+                                var acceptedList = Object.keys(accepted).filter(function(k){ return accepted[k]; });
+                                var wasEnded = prev.status === 'ended';
+                                var nowEnded = c.status === 'ended';
+                                var justStarted = !prev.status && c.status;
+
+                                if(justStarted){
+                                    _knownCallState[id] = { status: c.status, startedAt: c.createdAt || getNowISO(), from: c.from, members: members.slice(), acceptedBy: {} };
+                                    // Log initial "ringing" entry only if admin/creator
+                                    if(STATE.currentUser && STATE.currentUser.username === c.from){
+                                        _logCall({
+                                            id: id,
+                                            from: c.from,
+                                            to: (members||[]).filter(function(m){return m!==c.from;}),
+                                            members: members,
+                                            status: c.status || 'ringing',
+                                            startedAt: c.createdAt || getNowISO(),
+                                            source: c.source || 'chat',
+                                            createdBy: c.from
+                                        });
+                                    }
+                                }
+                                _knownCallState[id].status = c.status;
+                                _knownCallState[id].members = members.slice();
+                                _knownCallState[id].acceptedBy = accepted;
+
+                                if(!wasEnded && nowEnded){
+                                    // Compute duration
+                                    var startMs = (function(){ try{ return new Date(_knownCallState[id].startedAt).getTime(); }catch(_){ return Date.now(); } })();
+                                    var durSec = Math.max(0, Math.round((Date.now() - startMs)/1000));
+                                    var finalStatus = acceptedList.length ? 'completed' : 'missed';
+                                    // Only original caller writes the final log
+                                    if(STATE.currentUser && STATE.currentUser.username === c.from){
+                                        _logCall({
+                                            id: id,
+                                            from: c.from,
+                                            to: (members||[]).filter(function(m){return m!==c.from;}),
+                                            members: members,
+                                            acceptedBy: acceptedList,
+                                            status: finalStatus,
+                                            startedAt: _knownCallState[id].startedAt,
+                                            endedAt: getNowISO(),
+                                            durationSec: durSec,
+                                            source: c.source || 'chat',
+                                            createdBy: c.from
+                                        });
+                                    }
+                                }
+                            });
+                        });
+                    }catch(_){}
+                }
+
+                // ---------- UI: CALLS CENTER ----------
+                var _ccTab = 'online';
+
+                window.showCallsCenter = function(){
+                    if(!STATE.currentUser){ showToast('Please login first.','warning'); return; }
+                    _attachCallLogListener();
+                    var html = '<h3><i class="fas fa-phone-volume"></i> Calls Center</h3>'+
+                        '<p class="text-muted text-sm">See which agents are online and click to start a voice call. Admin can review all call logs.</p>'+
+                        '<div class="cc-tabs">'+
+                            '<button data-cc-tab="online" class="active"><i class="fas fa-users"></i> Online Agents</button>'+
+                            '<button data-cc-tab="logs"><i class="fas fa-clock-rotate-left"></i> Call Logs</button>'+
+                        '</div>'+
+                        '<div id="ccPanel"></div>'+
+                        '<div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
+                    showModal(html);
+                    document.querySelectorAll('[data-cc-tab]').forEach(function(b){
+                        b.onclick = function(){
+                            document.querySelectorAll('[data-cc-tab]').forEach(function(x){x.classList.remove('active');});
+                            this.classList.add('active');
+                            _ccTab = this.getAttribute('data-cc-tab');
+                            _renderCCPanel();
+                        };
+                    });
+                    _renderCCPanel();
+                };
+
+                function _renderCCPanel(){
+                    var p = document.getElementById('ccPanel');
+                    if(!p) return;
+                    if(_ccTab === 'online'){
+                        p.innerHTML =
+                            '<div class="cc-filters">'+
+                                '<input id="ccAgentSearch" placeholder="Search agents..." />'+
+                                '<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="ccShowOffline" /> Show offline agents</label>'+
+                            '</div>'+
+                            '<div id="ccOnlineList" class="cc-agent-grid"></div>';
+                        _renderOnlineAgents();
+                        var s = document.getElementById('ccAgentSearch');
+                        if(s) s.oninput = function(){
+                            var q = (this.value||'').toLowerCase();
+                            document.querySelectorAll('#ccOnlineList .cc-agent-card').forEach(function(c){
+                                c.style.display = (c.dataset.search||'').indexOf(q)!==-1 ? 'flex' : 'none';
+                            });
+                        };
+                        var so = document.getElementById('ccShowOffline');
+                        if(so) so.onchange = _renderOnlineAgents;
+                    } else if(_ccTab === 'logs'){
+                        p.innerHTML =
+                            '<div class="cc-filters">'+
+                                '<input id="ccLogSearch" placeholder="Search by agent or admin..." />'+
+                                '<select id="ccLogStatus"><option value="">All statuses</option><option value="completed">Completed</option><option value="missed">Missed</option><option value="ringing">Ringing</option><option value="ended">Ended</option></select>'+
+                                '<input type="date" id="ccLogDate" />'+
+                                (isAdmin() ? '<button class="btn btn-sm btn-danger" id="ccClearLogs"><i class="fas fa-trash"></i> Clear All</button>' : '')+
+                            '</div>'+
+                            '<div id="ccLogsList"></div>';
+                        _renderCallLogs();
+                        var ls = document.getElementById('ccLogSearch'); if(ls) ls.oninput = _renderCallLogs;
+                        var lst = document.getElementById('ccLogStatus'); if(lst) lst.onchange = _renderCallLogs;
+                        var ld = document.getElementById('ccLogDate'); if(ld) ld.onchange = _renderCallLogs;
+                        var cb = document.getElementById('ccClearLogs');
+                        if(cb) cb.onclick = function(){
+                            if(!confirm('Clear ALL call logs? This cannot be undone.')) return;
+                            try{
+                                if(firebaseConnected && db) db.ref('callLogs').remove();
+                                Object.keys(localStorage).forEach(function(k){ if(k.indexOf('ph_call_logs_')===0) localStorage.removeItem(k); });
+                                _callLogs = {};
+                                _renderCallLogs();
+                                showToast('Call logs cleared.','success');
+                            }catch(e){ showToast('Failed to clear: '+e.message,'error'); }
+                        };
+                    }
+                }
+
+                function _renderOnlineAgents(){
+                    var list = document.getElementById('ccOnlineList');
+                    if(!list) return;
+                    var users = STATE.users || {};
+                    var me = (STATE.currentUser && STATE.currentUser.username) || '';
+                    var showOffline = document.getElementById('ccShowOffline');
+                    var includeOffline = showOffline && showOffline.checked;
+                    var keys = Object.keys(users).filter(function(k){
+                        var u = users[k] || {};
+                        if(k === me) return false;
+                        if(u.disabled || u.active === false) return false;
+                        if(u.role === 'readonly') return false;
+                        if(!includeOffline && !_isOnline(k)) return false;
+                        return true;
+                    }).sort(function(a,b){
+                        var ao = _isOnline(a)?0:1, bo = _isOnline(b)?0:1;
+                        if(ao!==bo) return ao-bo;
+                        return ((users[a].name||a)+'').localeCompare(users[b].name||b);
+                    });
+                    if(!keys.length){
+                        list.innerHTML = '<div class="cc-empty"><i class="fas fa-user-slash" style="font-size:2rem;opacity:.4;"></i><p>No agents are online right now.</p></div>';
+                        return;
+                    }
+                    list.innerHTML = keys.map(function(k){
+                        var u = users[k] || {};
+                        var name = u.name || k;
+                        var online = _isOnline(k);
+                        var initials = (name||k).split(/\s+/).map(function(x){return x[0];}).join('').slice(0,2).toUpperCase();
+                        var search = ((name+' '+k+' '+(u.role||'')).toLowerCase());
+                        return '<div class="cc-agent-card '+(online?'':'offline')+'" data-search="'+escapeHTML(search)+'" data-username="'+escapeHTML(k)+'">'+
+                            '<div class="cc-avatar">'+escapeHTML(initials)+'<span class="cc-dot '+(online?'online':'')+'"></span></div>'+
+                            '<div class="cc-agent-main">'+
+                                '<div class="cc-agent-name">'+escapeHTML(name)+'</div>'+
+                                '<div class="cc-agent-sub">@'+escapeHTML(k)+' · '+escapeHTML(u.role||'agent')+' · '+(online?'<span style="color:#27ae60;font-weight:600;">Online</span>':'Offline')+'</div>'+
+                            '</div>'+
+                            '<button class="cc-call-btn" '+(online?'':'disabled')+' data-call-agent="'+escapeHTML(k)+'"><i class="fas fa-phone"></i> Call</button>'+
+                        '</div>';
+                    }).join('');
+                    list.querySelectorAll('[data-call-agent]').forEach(function(btn){
+                        btn.onclick = function(ev){
+                            ev.stopPropagation();
+                            var target = this.getAttribute('data-call-agent');
+                            if(!target) return;
+                            window.closeModal();
+                            try{
+                                if(typeof _mrStartVoiceCallWithTargets === 'function'){
+                                    _mrStartVoiceCallWithTargets([target], 'calls-center');
+                                } else if(typeof window._mrStartVoiceCallWithTargets === 'function'){
+                                    window._mrStartVoiceCallWithTargets([target], 'calls-center');
+                                } else {
+                                    showToast('Voice call module unavailable.','error');
+                                }
+                            }catch(e){ showToast('Could not start call: '+e.message,'error'); }
+                        };
+                    });
+                    list.querySelectorAll('.cc-agent-card').forEach(function(card){
+                        card.onclick = function(){
+                            if(this.classList.contains('offline')) return;
+                            var b = this.querySelector('[data-call-agent]');
+                            if(b) b.click();
+                        };
+                    });
+                }
+
+                function _renderCallLogs(){
+                    var box = document.getElementById('ccLogsList');
+                    if(!box) return;
+                    var me = (STATE.currentUser && STATE.currentUser.username) || '';
+                    var adminView = isAdmin();
+                    var q = ((document.getElementById('ccLogSearch')||{}).value||'').toLowerCase();
+                    var stF = ((document.getElementById('ccLogStatus')||{}).value||'');
+                    var dF = ((document.getElementById('ccLogDate')||{}).value||'');
+                    var arr = Object.keys(_callLogs).map(function(k){ return _callLogs[k]; }).filter(function(l){
+                        if(!l) return false;
+                        if(!adminView){
+                            var involved = (l.from===me) || (l.members||[]).indexOf(me)!==-1 || (l.to||[]).indexOf(me)!==-1;
+                            if(!involved) return false;
+                        }
+                        if(stF && l.status!==stF) return false;
+                        if(dF){
+                            var d = (l.startedAt||'').slice(0,10);
+                            if(d !== dF) return false;
+                        }
+                        if(q){
+                            var hay = (l.from+' '+(l.to||[]).join(' ')+' '+(l.members||[]).join(' ')).toLowerCase();
+                            if(hay.indexOf(q)===-1) return false;
+                        }
+                        return true;
+                    }).sort(function(a,b){
+                        return (b.startedAt||'').localeCompare(a.startedAt||'');
+                    });
+
+                    if(!arr.length){
+                        box.innerHTML = '<div class="cc-empty"><i class="fas fa-phone-slash" style="font-size:2rem;opacity:.4;"></i><p>No call logs match the filters.</p></div>';
+                        return;
+                    }
+
+                    function fmtDate(iso){
+                        if(!iso) return '';
+                        try{
+                            var d = new Date(iso);
+                            return d.toLocaleDateString()+' '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+                        }catch(_){ return iso; }
+                    }
+                    function fmtDur(s){
+                        if(!s && s!==0) return '—';
+                        var m = Math.floor(s/60), sec = s%60;
+                        return m+':'+(sec<10?'0':'')+sec;
+                    }
+                    function names(list){
+                        list = list||[];
+                        var users = STATE.users||{};
+                        return list.map(function(u){ return escapeHTML((users[u]&&users[u].name)||u); }).join(', ');
+                    }
+                    var rows = arr.map(function(l){
+                        return '<tr>'+
+                            '<td>'+fmtDate(l.startedAt)+'</td>'+
+                            '<td>'+names([l.from])+' <span class="text-muted text-xs">@'+escapeHTML(l.from||'')+'</span></td>'+
+                            '<td>'+names(l.to||l.members||[])+'</td>'+
+                            '<td>'+(l.acceptedBy && l.acceptedBy.length ? names(l.acceptedBy) : '<span class="text-muted">—</span>')+'</td>'+
+                            '<td>'+fmtDur(l.durationSec)+'</td>'+
+                            '<td><span class="cc-pill '+(l.status||'ended')+'">'+escapeHTML(l.status||'ended')+'</span></td>'+
+                            '<td>'+escapeHTML(l.source||'')+'</td>'+
+                        '</tr>';
+                    }).join('');
+                    box.innerHTML = '<table class="cc-table">'+
+                        '<thead><tr><th>Date &amp; Time</th><th>From</th><th>To</th><th>Accepted By</th><th>Duration</th><th>Status</th><th>Source</th></tr></thead>'+
+                        '<tbody>'+rows+'</tbody></table>';
+                }
+
+                // Hook into afterLogin so presence starts once user is authenticated
+                function _kickoff(){
+                    try{ _startPresence(); }catch(_){}
+                    try{ _attachPresenceListener(); }catch(_){}
+                    try{ _attachCallLogListener(); }catch(_){}
+                    try{ _attachVoiceCallsForLogging(); }catch(_){}
+                }
+                // Wait a moment for login to complete, then kick off; also re-check on interval
+                setTimeout(_kickoff, 1500);
+                setInterval(function(){
+                    if(STATE.currentUser && !_presenceHeartbeat) _kickoff();
+                    _updateOnlineBadge();
+                }, 5000);
+            })();
+
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
