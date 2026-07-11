@@ -12349,9 +12349,235 @@
                 }
             })();
 
+            // ================================================================
+            // MuleRun conference-call fix: single shared session, dynamic
+            // add/remove without private-call fallback or reconnections.
+            // ================================================================
+            (function(){
+                if (typeof _mrVoice === 'undefined' || typeof _createPeer !== 'function') return;
+
+                function _confMe(){ return STATE.currentUser && STATE.currentUser.username; }
+                function _confRoster(){ return (_mrVoice && _mrVoice.members) || []; }
+                function _confInCall(){ return !!(_mrVoice && _mrVoice.callId); }
+                function _confRenderRoster(){
+                    var panel = document.getElementById('voicePanel'); if (!panel) return;
+                    var rosterEl = document.getElementById('voiceRoster');
+                    if (!rosterEl){
+                        rosterEl = document.createElement('div');
+                        rosterEl.id = 'voiceRoster';
+                        rosterEl.className = 'text-sm';
+                        rosterEl.style.margin = '6px 0';
+                        var status = document.getElementById('voiceStatus');
+                        (status ? status.parentNode.insertBefore(rosterEl, status.nextSibling) : panel.appendChild(rosterEl));
+                    }
+                    var me = _confMe();
+                    var list = _confRoster().slice();
+                    if (me && list.indexOf(me) === -1) list.push(me);
+                    rosterEl.innerHTML = '<i class="fas fa-users"></i> Conference participants: ' +
+                        list.map(function(m){ return '<span class="participant-chip">'+escapeHTML(m)+(m===me?' (you)':'')+'</span>'; }).join(' ');
+                }
+
+                async function _confEnsureMic(){
+                    if (_mrVoice.localStream) return _mrVoice.localStream;
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return null;
+                    try { _mrVoice.localStream = await navigator.mediaDevices.getUserMedia({audio:true,video:false}); }
+                    catch(_) { return null; }
+                    Object.keys(_mrVoice.peers||{}).forEach(function(peer){
+                        try {
+                            var pc = _mrVoice.peers[peer];
+                            var senders = pc.getSenders ? pc.getSenders() : [];
+                            var hasAudio = senders.some(function(s){ return s.track && s.track.kind==='audio'; });
+                            if (!hasAudio) _mrVoice.localStream.getTracks().forEach(function(t){ try{ pc.addTrack(t,_mrVoice.localStream); }catch(_){} });
+                        } catch(_){}
+                    });
+                    return _mrVoice.localStream;
+                }
+
+                async function _confReconcile(callId, membersFromDb){
+                    if (!callId || !_mrVoice || _mrVoice.callId !== callId) return;
+                    var me = _confMe(); if (!me) return;
+                    var members = (membersFromDb || []).slice();
+                    _mrVoice.members = members;
+                    for (var i=0; i<members.length; i++){
+                        var peer = members[i];
+                        if (!peer || peer === me) continue;
+                        if (_mrVoice.peers && _mrVoice.peers[peer]) continue;
+                        var initiator = me < peer;
+                        try { await _createPeer(callId, peer, initiator); } catch(_){}
+                    }
+                    Object.keys(_mrVoice.peers || {}).forEach(function(peer){
+                        if (members.indexOf(peer) === -1){
+                            try { _mrVoice.peers[peer].close(); } catch(_){}
+                            delete _mrVoice.peers[peer];
+                            if (_mrVoice.remoteAudio && _mrVoice.remoteAudio[peer]){
+                                try { _mrVoice.remoteAudio[peer].remove(); } catch(_){}
+                                delete _mrVoice.remoteAudio[peer];
+                            }
+                        }
+                    });
+                    _confRenderRoster();
+                }
+
+                var _confRosterListener = null;
+                function _confAttachRosterSync(){
+                    if (!firebaseConnected || !db || !STATE.currentUser) return;
+                    if (_confRosterListener) { try { _confRosterListener.off(); } catch(_){} }
+                    _confRosterListener = db.ref('voiceCalls');
+                    _confRosterListener.on('value', function(snap){
+                        var calls = snap.val() || {};
+                        var me = _confMe(); if (!me) return;
+                        Object.keys(calls).forEach(function(id){
+                            var c = calls[id] || {};
+                            var members = c.members || [];
+                            var inCall = members.indexOf(me) !== -1;
+                            if (_mrVoice.callId === id && !inCall && c.status !== 'ended'){
+                                try { showToast('You were removed from the conference.', 'warning'); } catch(_){}
+                                try { endVoiceCall(); } catch(_){}
+                                return;
+                            }
+                            if (_mrVoice.callId === id && c.status === 'ended'){
+                                try { endVoiceCall(); } catch(_){}
+                                return;
+                            }
+                            if (_mrVoice.callId === id && inCall){
+                                _confReconcile(id, members);
+                                return;
+                            }
+                            if (!_confInCall() && inCall && c.status === 'ringing' && c.from !== me
+                                && !document.getElementById('voicePanel')){
+                                try { showToast('Incoming conference from ' + (c.from||'user'), 'info', 8000); } catch(_){}
+                                try { showVoicePanel('Incoming conference from ' + (c.from||'user'), true, id); } catch(_){}
+                            }
+                        });
+                    });
+                }
+                try { if (_mrVoice.listener && _mrVoice.listener.off) _mrVoice.listener.off(); } catch(_){}
+                _mrVoice.listener = null;
+                if (typeof attachVoiceCallListener === 'function'){
+                    attachVoiceCallListener = _confAttachRosterSync;
+                    window.attachVoiceCallListener = _confAttachRosterSync;
+                }
+                try { _confAttachRosterSync(); } catch(_){}
+
+                var _origAccept = window.acceptVoiceCall;
+                window.acceptVoiceCall = async function(callId){
+                    if (!callId) return;
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ showToast('Voice calls need microphone support.','error'); return; }
+                    if (!firebaseConnected || !db){ showToast('Voice calls need Firebase connection.','error'); return; }
+                    var stream = await _confEnsureMic();
+                    if (!stream){ showToast('Microphone permission was blocked or unavailable.','error'); return; }
+                    _mrVoice.callId = callId;
+                    try {
+                        var call = await readData('voiceCalls/'+callId, null, true) || {};
+                        _mrVoice.members = call.members || [];
+                        showVoicePanel('Conference connected');
+                        listenVoiceSignals(callId);
+                        await writeData('voiceCalls/'+callId+'/accepted/'+_confMe(), true, null);
+                        await _confReconcile(callId, _mrVoice.members);
+                        showToast('Joined the conference.', 'success');
+                    } catch(e){
+                        try { if (typeof _origAccept === 'function') return _origAccept.call(this, callId); } catch(_){}
+                        showToast('Could not join conference: ' + (e && e.message || e), 'error');
+                    }
+                };
+
+                async function _confAddMembers(newTargets){
+                    var callId = _mrVoice && _mrVoice.callId;
+                    if (!callId){ showToast('No active conference.', 'warning'); return false; }
+                    if (!firebaseConnected || !db){ showToast('Adding to conference needs Firebase connection.', 'error'); return false; }
+                    var call = await readData('voiceCalls/'+callId, null, true) || {};
+                    var members = (call.members || _mrVoice.members || []).slice();
+                    var me = _confMe();
+                    var added = [];
+                    (newTargets||[]).forEach(function(t){
+                        if (t && t !== me && members.indexOf(t) === -1){ members.push(t); added.push(t); }
+                    });
+                    if (!added.length){ showToast('Selected agents are already in the conference.', 'info'); return true; }
+                    await writeData('voiceCalls/'+callId+'/members', members, null);
+                    await writeData('voiceCalls/'+callId+'/status', 'ringing', null);
+                    await writeData('voiceCalls/'+callId+'/updatedAt', getNowISO(), null);
+                    await writeData('voiceCalls/'+callId+'/updatedBy', me, null);
+                    _mrVoice.members = members;
+                    await _confReconcile(callId, members);
+                    showToast('Added to conference: ' + added.join(', '), 'success');
+                    return true;
+                }
+                window._mrAddToActiveConference = _confAddMembers;
+
+                var _origStartWithTargets = window._mrStartVoiceCallWithTargets;
+                if (typeof _origStartWithTargets === 'function'){
+                    window._mrStartVoiceCallWithTargets = async function(targets, sourceLabel){
+                        if (_confInCall()){
+                            await _confEnsureMic();
+                            return _confAddMembers(targets || []);
+                        }
+                        return _origStartWithTargets.call(this, targets, sourceLabel);
+                    };
+                }
+                var _origStartVoiceCall = window.startVoiceCall;
+                if (typeof _origStartVoiceCall === 'function'){
+                    window.startVoiceCall = async function(){
+                        if (_confInCall()){
+                            var targets = [];
+                            try { if (typeof mrGetVoiceTargets === 'function') targets = await mrGetVoiceTargets(); } catch(_){}
+                            if (!targets || !targets.length){ showToast('Use Add / Remove Agents to invite more people.', 'info'); return; }
+                            await _confEnsureMic();
+                            return _confAddMembers(targets);
+                        }
+                        return _origStartVoiceCall.apply(this, arguments);
+                    };
+                }
+
+                window.showVoicePeopleManager = async function(callId){
+                    callId = callId || (_mrVoice && _mrVoice.callId);
+                    if (!callId) return showToast('Start or accept a conference first.','warning');
+                    if (!firebaseConnected || !db) return showToast('Managing conference needs Firebase connection.','error');
+                    var call = await readData('voiceCalls/'+callId, null, true) || {};
+                    var users = await readData('users','ph_users',true) || {};
+                    var members = (call.members || _mrVoice.members || []).slice();
+                    var me = _confMe();
+                    if (members.indexOf(me) === -1) members.push(me);
+                    var html = Object.keys(users).filter(function(k){ return users[k] && users[k].role !== 'readonly'; }).map(function(k){
+                        var checked = members.indexOf(k) !== -1 ? 'checked' : '';
+                        var isMe = k === me;
+                        return '<label><input type="checkbox" class="voice-member-check" value="'+escapeHTML(k)+'" '+checked+(isMe?' disabled':'')+' /> '+
+                            escapeHTML((users[k].name)||k)+' <span class="text-muted text-xs">@'+escapeHTML(k)+(isMe?' · you':'')+'</span></label>';
+                    }).join('');
+                    showModal('<h3><i class="fas fa-users"></i> Manage Conference</h3>'+
+                        '<p class="text-muted text-sm">Add or remove agents without ending the conference. New agents get an incoming conference notification and join this same session on accept.</p>'+
+                        '<div class="group-member-grid">'+html+'</div>'+
+                        '<div class="modal-actions"><button class="btn btn-primary" id="btnSaveConfPeople"><i class="fas fa-save"></i> Update Conference</button>'+
+                        '<button class="btn btn-close-modal" data-close-modal>Close</button></div>');
+                    document.getElementById('btnSaveConfPeople').onclick = async function(){
+                        var selected = Array.from(document.querySelectorAll('.voice-member-check:checked')).map(function(c){return c.value;});
+                        if (selected.indexOf(me) === -1) selected.push(me);
+                        if (selected.length < 2) return showToast('A conference needs at least one other agent.','warning');
+                        var oldMembers = call.members || [];
+                        var toAdd = selected.filter(function(x){ return oldMembers.indexOf(x) === -1; });
+                        var toRemove = oldMembers.filter(function(x){ return selected.indexOf(x) === -1; });
+                        try {
+                            await writeData('voiceCalls/'+callId+'/members', selected, null);
+                            await writeData('voiceCalls/'+callId+'/status', 'ringing', null);
+                            await writeData('voiceCalls/'+callId+'/updatedAt', getNowISO(), null);
+                            await writeData('voiceCalls/'+callId+'/updatedBy', me, null);
+                            _mrVoice.members = selected;
+                            await _confReconcile(callId, selected);
+                            window.closeModal();
+                            if (toAdd.length) showToast('Invited to conference: ' + toAdd.join(', '), 'success');
+                            if (toRemove.length) showToast('Removed from conference: ' + toRemove.join(', '), 'info');
+                        } catch(e){
+                            showToast('Could not update conference: ' + (e && e.message || e), 'error');
+                        }
+                    };
+                };
+
+                try { if (_confInCall()) _confRenderRoster(); } catch(_){}
+            })();
+
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
