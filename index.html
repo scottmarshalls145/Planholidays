@@ -2113,6 +2113,14 @@
         .chat-delete-check{width:14px;height:14px;accent-color:var(--danger);cursor:pointer}
         .messenger-input.view-only{opacity:.74}
         .messenger-input.view-only input{cursor:not-allowed}
+        .voice-panel.mr-call-window{resize:both;overflow:auto;min-width:300px;min-height:78px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px)}
+        .mr-call-window-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-4px -2px 10px;padding:4px 2px 8px;border-bottom:1px solid rgba(255,255,255,.12);cursor:move;user-select:none}
+        .mr-call-window-bar strong{display:flex;align-items:center;gap:7px;font-size:.82rem}
+        .mr-call-window-actions{display:flex;gap:6px}
+        .mr-call-window-actions button{width:28px;height:28px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.10);color:inherit;cursor:pointer}
+        .voice-panel.call-minimized{width:310px!important;height:48px!important;min-height:48px!important;resize:none;overflow:hidden}
+        .voice-panel.call-minimized>:not(.mr-call-window-bar){display:none!important}
+        .voice-panel.call-maximized{left:8px!important;top:8px!important;right:auto!important;bottom:auto!important;width:calc(100vw - 16px)!important;height:calc(100vh - 16px)!important}
 
     </style>
 </head>
@@ -10552,12 +10560,88 @@
                 _mrEnsureScreensContainer();
             }
 
+            function _mrEnhanceVoicePanelWindow() {
+                var panel = document.getElementById('voicePanel');
+                if (!panel || panel._mrCallWindowReady) return;
+                panel._mrCallWindowReady = true;
+                panel.classList.add('mr-call-window');
+                var bar = document.createElement('div');
+                bar.className = 'mr-call-window-bar';
+                bar.innerHTML = '<strong><i class="fas fa-phone"></i> Call window</strong><div class="mr-call-window-actions"><button type="button" title="Minimize"><i class="fas fa-minus"></i></button><button type="button" title="Maximize / restore"><i class="fas fa-up-right-and-down-left-from-center"></i></button></div>';
+                panel.insertBefore(bar, panel.firstChild);
+                var btns = bar.querySelectorAll('button');
+                var minBtn = btns[0], maxBtn = btns[1];
+                var saved = null;
+                function saveBounds() {
+                    var r = panel.getBoundingClientRect();
+                    saved = { left: r.left, top: r.top, width: r.width, height: r.height };
+                    panel.style.left = r.left + 'px';
+                    panel.style.top = r.top + 'px';
+                    panel.style.width = r.width + 'px';
+                    panel.style.height = r.height + 'px';
+                    panel.style.right = 'auto';
+                    panel.style.bottom = 'auto';
+                }
+                function restoreBounds() {
+                    if (!saved) return;
+                    panel.style.left = saved.left + 'px';
+                    panel.style.top = saved.top + 'px';
+                    panel.style.width = saved.width + 'px';
+                    panel.style.height = saved.height + 'px';
+                    panel.style.right = 'auto';
+                    panel.style.bottom = 'auto';
+                }
+                minBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    if (!panel.classList.contains('call-minimized')) saveBounds();
+                    panel.classList.remove('call-maximized');
+                    panel.classList.toggle('call-minimized');
+                    if (!panel.classList.contains('call-minimized')) restoreBounds();
+                };
+                maxBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    if (!panel.classList.contains('call-maximized')) saveBounds();
+                    panel.classList.remove('call-minimized');
+                    panel.classList.toggle('call-maximized');
+                    if (!panel.classList.contains('call-maximized')) restoreBounds();
+                };
+                bar.addEventListener('pointerdown', function(e) {
+                    if (e.target.closest('button')) return;
+                    panel.classList.remove('call-maximized');
+                    saveBounds();
+                    var r = panel.getBoundingClientRect();
+                    var startX = e.clientX, startY = e.clientY, startLeft = r.left, startTop = r.top;
+                    bar.setPointerCapture(e.pointerId);
+                    function move(ev) {
+                        var vw = window.innerWidth || 1200;
+                        var vh = window.innerHeight || 800;
+                        var left = Math.min(Math.max(6, startLeft + ev.clientX - startX), Math.max(6, vw - r.width - 6));
+                        var top = Math.min(Math.max(6, startTop + ev.clientY - startY), Math.max(6, vh - r.height - 6));
+                        panel.style.left = left + 'px';
+                        panel.style.top = top + 'px';
+                        panel.style.right = 'auto';
+                        panel.style.bottom = 'auto';
+                    }
+                    function up() {
+                        bar.removeEventListener('pointermove', move);
+                        bar.removeEventListener('pointerup', up);
+                        bar.removeEventListener('pointercancel', up);
+                        try { bar.releasePointerCapture(e.pointerId); } catch (_) {}
+                        saveBounds();
+                    }
+                    bar.addEventListener('pointermove', move);
+                    bar.addEventListener('pointerup', up);
+                    bar.addEventListener('pointercancel', up);
+                });
+            }
+
             // Wrap showVoicePanel to inject the Share Screen button + screens area every render
             (function _amWrapShowVoicePanel() {
                 if (typeof showVoicePanel !== 'function') return;
                 var orig = showVoicePanel;
                 showVoicePanel = function(title, incoming, callId) {
                     orig.call(this, title, incoming, callId);
+                    setTimeout(_mrEnhanceVoicePanelWindow, 20);
                     setTimeout(_amUpdateVoicePanelButtons, 40);
                 };
                 window.showVoicePanel = showVoicePanel;
@@ -10627,27 +10711,337 @@
                 return isLocal ? 'local' : ('remote_' + _mrFirebaseKey(label));
             }
 
+            var _mrScreenBrowserSavedBounds = null;
+            var _mrRemoteControlEnabled = false;
+            var _mrRemoteControlListener = null;
+            var _mrRemoteControlSeen = {};
+
+            function _mrClampScreenBrowser(w) {
+                if (!w || w.classList.contains('minimized') || w.classList.contains('maximized')) return;
+                var rect = w.getBoundingClientRect();
+                var minW = 320, minH = 220;
+                var vw = window.innerWidth || document.documentElement.clientWidth || 1200;
+                var vh = window.innerHeight || document.documentElement.clientHeight || 800;
+                var width = Math.min(Math.max(rect.width || minW, minW), Math.max(minW, vw - 12));
+                var height = Math.min(Math.max(rect.height || minH, minH), Math.max(minH, vh - 12));
+                var left = Math.min(Math.max(rect.left || 8, 6), Math.max(6, vw - width - 6));
+                var top = Math.min(Math.max(rect.top || 8, 6), Math.max(6, vh - height - 6));
+                w.style.left = left + 'px';
+                w.style.top = top + 'px';
+                w.style.width = width + 'px';
+                w.style.height = height + 'px';
+                w.style.right = 'auto';
+                w.style.bottom = 'auto';
+                _mrScreenBrowserSavedBounds = { left: left, top: top, width: width, height: height };
+            }
+
+            function _mrApplyScreenBrowserSavedBounds(w) {
+                if (!w || !_mrScreenBrowserSavedBounds) return;
+                w.style.left = _mrScreenBrowserSavedBounds.left + 'px';
+                w.style.top = _mrScreenBrowserSavedBounds.top + 'px';
+                w.style.width = _mrScreenBrowserSavedBounds.width + 'px';
+                w.style.height = _mrScreenBrowserSavedBounds.height + 'px';
+                w.style.right = 'auto';
+                w.style.bottom = 'auto';
+            }
+
+            function _mrMakeScreenBrowserMovable(w) {
+                if (!w || w._mrWindowReady) return;
+                w._mrWindowReady = true;
+                var topbar = w.querySelector('.mr-screen-browser-top');
+                var handle = w.querySelector('.mr-screen-resize-handle');
+                if (topbar) {
+                    topbar.addEventListener('pointerdown', function(e) {
+                        if (e.target.closest('button,.mr-screen-tabbar,.mr-screen-window-actions')) return;
+                        if (w.classList.contains('minimized')) return;
+                        w.classList.remove('maximized');
+                        _mrClampScreenBrowser(w);
+                        var rect = w.getBoundingClientRect();
+                        var startX = e.clientX, startY = e.clientY, startLeft = rect.left, startTop = rect.top;
+                        topbar.setPointerCapture(e.pointerId);
+                        function move(ev) {
+                            var vw = window.innerWidth || 1200;
+                            var vh = window.innerHeight || 800;
+                            var nextLeft = Math.min(Math.max(6, startLeft + ev.clientX - startX), Math.max(6, vw - rect.width - 6));
+                            var nextTop = Math.min(Math.max(6, startTop + ev.clientY - startY), Math.max(6, vh - rect.height - 6));
+                            w.style.left = nextLeft + 'px';
+                            w.style.top = nextTop + 'px';
+                            w.style.right = 'auto';
+                            w.style.bottom = 'auto';
+                        }
+                        function up() {
+                            topbar.removeEventListener('pointermove', move);
+                            topbar.removeEventListener('pointerup', up);
+                            topbar.removeEventListener('pointercancel', up);
+                            try { topbar.releasePointerCapture(e.pointerId); } catch (_) {}
+                            _mrClampScreenBrowser(w);
+                        }
+                        topbar.addEventListener('pointermove', move);
+                        topbar.addEventListener('pointerup', up);
+                        topbar.addEventListener('pointercancel', up);
+                    });
+                }
+                if (handle) {
+                    handle.addEventListener('pointerdown', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        w.classList.remove('maximized', 'minimized');
+                        _mrClampScreenBrowser(w);
+                        var rect = w.getBoundingClientRect();
+                        var startX = e.clientX, startY = e.clientY, startW = rect.width, startH = rect.height;
+                        handle.setPointerCapture(e.pointerId);
+                        function move(ev) {
+                            var vw = window.innerWidth || 1200;
+                            var vh = window.innerHeight || 800;
+                            var width = Math.min(Math.max(320, startW + ev.clientX - startX), Math.max(320, vw - rect.left - 6));
+                            var height = Math.min(Math.max(220, startH + ev.clientY - startY), Math.max(220, vh - rect.top - 6));
+                            w.style.width = width + 'px';
+                            w.style.height = height + 'px';
+                        }
+                        function up() {
+                            handle.removeEventListener('pointermove', move);
+                            handle.removeEventListener('pointerup', up);
+                            handle.removeEventListener('pointercancel', up);
+                            try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+                            _mrClampScreenBrowser(w);
+                        }
+                        handle.addEventListener('pointermove', move);
+                        handle.addEventListener('pointerup', up);
+                        handle.addEventListener('pointercancel', up);
+                    });
+                }
+                window.addEventListener('resize', function() { _mrClampScreenBrowser(w); });
+            }
+
+            function _mrCurrentRemoteScreenItem() {
+                if (!_mrScreenActiveKey || !_mrScreenStreams || !_mrScreenStreams[_mrScreenActiveKey]) return null;
+                var item = _mrScreenStreams[_mrScreenActiveKey];
+                if (!item || item.isLocal) return null;
+                return item;
+            }
+
+            function _mrRemoteControlPath(targetUser) {
+                if (!_mrVoice || !_mrVoice.callId || !targetUser) return null;
+                return 'voiceCalls/' + _mrVoice.callId + '/remoteControl/' + _mrFirebaseKey(targetUser) + '/events';
+            }
+
+            function _mrSendRemoteControlEvent(type, data) {
+                if (!_mrRemoteControlEnabled || typeof isAdmin !== 'function' || !isAdmin() || !firebaseConnected || !db) return;
+                var item = _mrCurrentRemoteScreenItem();
+                if (!item || !item.label) return;
+                var path = _mrRemoteControlPath(item.label);
+                if (!path) return;
+                var payload = Object.assign({
+                    type: type,
+                    by: STATE.currentUser && STATE.currentUser.username,
+                    byRole: 'admin',
+                    at: Date.now()
+                }, data || {});
+                try { db.ref(path).push(payload); } catch (_) {}
+            }
+
+            function _mrInstallRemoteControlInput(stage, activeKey) {
+                if (!stage || stage._mrRemoteControlKey === activeKey) return;
+                stage._mrRemoteControlKey = activeKey;
+                stage.tabIndex = 0;
+                function pointerRatio(e) {
+                    var r = stage.getBoundingClientRect();
+                    var media = stage.querySelector('video,img');
+                    var mw = (media && (media.videoWidth || media.naturalWidth)) || r.width || 1;
+                    var mh = (media && (media.videoHeight || media.naturalHeight)) || r.height || 1;
+                    var scale = Math.min(r.width / mw, r.height / mh);
+                    var shownW = mw * scale, shownH = mh * scale;
+                    var left = r.left + (r.width - shownW) / 2;
+                    var top = r.top + (r.height - shownH) / 2;
+                    return {
+                        x: Math.min(Math.max(0, (e.clientX - left) / shownW), 1),
+                        y: Math.min(Math.max(0, (e.clientY - top) / shownH), 1)
+                    };
+                }
+                if (!stage._mrRemoteControlHandlersInstalled) {
+                    stage._mrRemoteControlHandlersInstalled = true;
+                    stage.addEventListener('pointerdown', function(e) {
+                        if (!_mrRemoteControlEnabled || !_mrCurrentRemoteScreenItem()) return;
+                        e.preventDefault();
+                        stage.focus();
+                        var pos = pointerRatio(e);
+                        _mrSendRemoteControlEvent('pointerdown', { x: pos.x, y: pos.y, button: e.button || 0 });
+                    });
+                    stage.addEventListener('pointermove', function(e) {
+                        if (!_mrRemoteControlEnabled || !_mrCurrentRemoteScreenItem()) return;
+                        var now = Date.now();
+                        if (stage._mrLastRemoteMove && now - stage._mrLastRemoteMove < 70) return;
+                        stage._mrLastRemoteMove = now;
+                        var pos = pointerRatio(e);
+                        _mrSendRemoteControlEvent('pointermove', { x: pos.x, y: pos.y });
+                    });
+                    stage.addEventListener('pointerup', function(e) {
+                        if (!_mrRemoteControlEnabled || !_mrCurrentRemoteScreenItem()) return;
+                        e.preventDefault();
+                        var pos = pointerRatio(e);
+                        _mrSendRemoteControlEvent('pointerup', { x: pos.x, y: pos.y, button: e.button || 0 });
+                    });
+                    stage.addEventListener('wheel', function(e) {
+                        if (!_mrRemoteControlEnabled || !_mrCurrentRemoteScreenItem()) return;
+                        e.preventDefault();
+                        var pos = pointerRatio(e);
+                        _mrSendRemoteControlEvent('wheel', { x: pos.x, y: pos.y, deltaX: e.deltaX || 0, deltaY: e.deltaY || 0 });
+                    }, { passive: false });
+                    stage.addEventListener('keydown', function(e) {
+                        if (!_mrRemoteControlEnabled || !_mrCurrentRemoteScreenItem()) return;
+                        e.preventDefault();
+                        _mrSendRemoteControlEvent('keydown', { key: e.key, code: e.code, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey });
+                    });
+                }
+                stage.classList.toggle('remote-control-on', !!(_mrRemoteControlEnabled && _mrCurrentRemoteScreenItem()));
+            }
+
+            function _mrToggleRemoteControlMode() {
+                if (typeof isAdmin !== 'function' || !isAdmin()) { showToast('Only admin can control a shared screen.', 'warning'); return; }
+                if (!_mrCurrentRemoteScreenItem()) { showToast('Open an agent shared screen first.', 'warning'); return; }
+                _mrRemoteControlEnabled = !_mrRemoteControlEnabled;
+                var btn = document.getElementById('mrScreenControlBtn');
+                if (btn) btn.classList.toggle('active', _mrRemoteControlEnabled);
+                var stage = document.getElementById('mrScreenStage');
+                if (stage) stage.classList.toggle('remote-control-on', _mrRemoteControlEnabled);
+                showToast(_mrRemoteControlEnabled ? 'Control mode enabled. Click, type, scroll, or select inside the shared screen.' : 'Control mode disabled.', _mrRemoteControlEnabled ? 'success' : 'info');
+            }
+
+            function _mrRemoteTargetAt(ev) {
+                var x = Math.min(Math.max(0, ev.x || 0), 1) * (window.innerWidth || document.documentElement.clientWidth || 1);
+                var y = Math.min(Math.max(0, ev.y || 0), 1) * (window.innerHeight || document.documentElement.clientHeight || 1);
+                return { x: x, y: y, el: document.elementFromPoint(x, y) || document.body };
+            }
+
+            function _mrShowRemotePointer(x, y) {
+                var p = document.getElementById('mrRemoteControlPointer');
+                if (!p) {
+                    p = document.createElement('div');
+                    p.id = 'mrRemoteControlPointer';
+                    p.className = 'mr-screen-remote-pointer';
+                    document.body.appendChild(p);
+                }
+                p.style.left = x + 'px';
+                p.style.top = y + 'px';
+                p.style.display = 'block';
+                clearTimeout(p._hideTimer);
+                p._hideTimer = setTimeout(function() { p.style.display = 'none'; }, 1400);
+            }
+
+            function _mrTypeIntoElement(el, ev) {
+                if (!el) return false;
+                var key = ev.key || '';
+                var editable = el.isContentEditable;
+                var tag = (el.tagName || '').toLowerCase();
+                var isText = tag === 'textarea' || (tag === 'input' && !/^(button|checkbox|radio|submit|reset|file|color|range)$/i.test(el.type || 'text'));
+                if (!editable && !isText) return false;
+                try { el.focus(); } catch (_) {}
+                if (key === 'Backspace') {
+                    if (isText && typeof el.selectionStart === 'number') {
+                        var s = el.selectionStart, e = el.selectionEnd;
+                        if (s === e && s > 0) s -= 1;
+                        el.setRangeText('', s, e, 'end');
+                    } else { document.execCommand('delete'); }
+                } else if (key === 'Delete') {
+                    if (isText && typeof el.selectionStart === 'number') {
+                        var s2 = el.selectionStart, e2 = el.selectionEnd;
+                        if (s2 === e2) e2 += 1;
+                        el.setRangeText('', s2, e2, 'end');
+                    } else { document.execCommand('forwardDelete'); }
+                } else if (key === 'Enter') {
+                    if (isText) el.setRangeText('\n', el.selectionStart, el.selectionEnd, 'end'); else document.execCommand('insertText', false, '\n');
+                } else if (key.length === 1 && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+                    if (isText) el.setRangeText(key, el.selectionStart, el.selectionEnd, 'end'); else document.execCommand('insertText', false, key);
+                } else {
+                    return false;
+                }
+                try { el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
+                return true;
+            }
+
+            function _mrApplyRemoteControlEvent(ev, eventId) {
+                if (!ev || !ev.type || _mrRemoteControlSeen[eventId]) return;
+                _mrRemoteControlSeen[eventId] = true;
+                if (ev.byRole !== 'admin') return;
+                var point = _mrRemoteTargetAt(ev);
+                _mrShowRemotePointer(point.x, point.y);
+                try {
+                    if (ev.type === 'pointermove') return;
+                    if (ev.type === 'wheel') {
+                        try { point.el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaX: ev.deltaX || 0, deltaY: ev.deltaY || 0 })); } catch (_) {}
+                        window.scrollBy(ev.deltaX || 0, ev.deltaY || 0);
+                        return;
+                    }
+                    if (ev.type === 'pointerdown') {
+                        try { point.el.focus && point.el.focus(); } catch (_) {}
+                        try { point.el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: point.x, clientY: point.y, button: ev.button || 0 })); } catch (_) {}
+                        return;
+                    }
+                    if (ev.type === 'pointerup') {
+                        try { point.el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, clientX: point.x, clientY: point.y, button: ev.button || 0 })); } catch (_) {}
+                        try { point.el.click && point.el.click(); } catch (_) {}
+                        return;
+                    }
+                    if (ev.type === 'keydown') {
+                        if (!_mrTypeIntoElement(document.activeElement, ev)) {
+                            try { document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: ev.key, code: ev.code, ctrlKey: !!ev.ctrlKey, shiftKey: !!ev.shiftKey, altKey: !!ev.altKey, metaKey: !!ev.metaKey })); } catch (_) {}
+                        }
+                    }
+                } finally {
+                    try {
+                        if (firebaseConnected && db && _mrVoice && _mrVoice.callId && STATE.currentUser) {
+                            db.ref(_mrRemoteControlPath(STATE.currentUser.username) + '/' + eventId).remove();
+                        }
+                    } catch (_) {}
+                }
+            }
+
+            function _mrAttachRemoteControlListener(callId) {
+                if (!firebaseConnected || !db || !callId || !STATE.currentUser) return;
+                if (_mrRemoteControlListener) { try { _mrRemoteControlListener.off(); } catch (_) {} }
+                var me = STATE.currentUser.username;
+                var path = _mrRemoteControlPath(me);
+                if (!path) return;
+                _mrRemoteControlListener = db.ref(path);
+                _mrRemoteControlListener.on('child_added', function(snap) {
+                    var ev = snap.val() || {};
+                    if (ev.by && ev.by !== me) {
+                        if (!_mrRemoteControlListener._notified) {
+                            _mrRemoteControlListener._notified = true;
+                            showToast('Admin remote control input is active on your shared screen.', 'info', 5000);
+                        }
+                        _mrApplyRemoteControlEvent(ev, snap.key);
+                    }
+                });
+            }
+
             function _mrInstallScreenTabStyles() {
                 if (document.getElementById('mrScreenTabStyles')) return;
                 var st = document.createElement('style');
                 st.id = 'mrScreenTabStyles';
                 st.textContent =
-                    '#mrScreenBrowser{position:fixed;inset:56px 22px 24px 22px;z-index:999998;display:flex;flex-direction:column;background:#080b12;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:18px;box-shadow:0 28px 90px rgba(0,0,0,.48);overflow:hidden;}' +
+                    '#mrScreenBrowser{position:fixed;left:22px;top:56px;width:calc(100vw - 44px);height:calc(100vh - 80px);min-width:320px;min-height:220px;max-width:calc(100vw - 12px);max-height:calc(100vh - 12px);z-index:999998;display:flex;flex-direction:column;background:#080b12;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:18px;box-shadow:0 28px 90px rgba(0,0,0,.48);overflow:hidden;}' +
                     '#mrScreenBrowser.hidden{display:none!important;}' +
-                    '#mrScreenBrowser.minimized{inset:auto 22px 90px auto;width:300px;height:48px;}' +
-                    '#mrScreenBrowser.minimized .mr-screen-stage{display:none;}' +
-                    '.mr-screen-browser-top{height:48px;display:flex;align-items:center;gap:8px;padding:7px 9px;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border-bottom:1px solid rgba(255,255,255,.12);}' +
+                    '#mrScreenBrowser.minimized{left:auto!important;top:auto!important;right:22px!important;bottom:90px!important;width:320px!important;height:48px!important;min-height:48px!important;resize:none;}' +
+                    '#mrScreenBrowser.minimized .mr-screen-stage,#mrScreenBrowser.minimized .mr-screen-resize-handle{display:none;}' +
+                    '#mrScreenBrowser.maximized{left:8px!important;top:8px!important;width:calc(100vw - 16px)!important;height:calc(100vh - 16px)!important;}' +
+                    '.mr-screen-browser-top{height:48px;display:flex;align-items:center;gap:8px;padding:7px 9px;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border-bottom:1px solid rgba(255,255,255,.12);cursor:move;user-select:none;}' +
                     '.mr-screen-title{font-weight:700;font-size:.86rem;white-space:nowrap;display:flex;align-items:center;gap:7px;color:#fff;}' +
                     '.mr-screen-tabbar{display:flex;gap:6px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;}' +
                     '.mr-screen-tab{border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);color:#fff;border-radius:999px;padding:6px 11px;font-size:.78rem;white-space:nowrap;cursor:pointer;}' +
                     '.mr-screen-tab.active{background:var(--primary);border-color:var(--primary);color:#111;}' +
                     '.mr-screen-window-actions{display:flex;gap:6px;}' +
                     '.mr-screen-window-actions button{width:30px;height:30px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.1);color:#fff;cursor:pointer;}' +
+                    '.mr-screen-window-actions button.active{background:var(--primary);border-color:var(--primary);color:#111;}' +
                     '.mr-screen-stage{position:relative;flex:1;min-height:260px;background:#05070d;display:flex;align-items:center;justify-content:center;}' +
-                    '.mr-screen-stage video{width:100%;height:100%;object-fit:contain;background:#05070d;}' +
+                    '.mr-screen-stage video,.mr-screen-stage img{width:100%;height:100%;object-fit:contain;background:#05070d;}' +
+                    '.mr-screen-stage.remote-control-on{cursor:crosshair;outline:2px solid var(--primary);outline-offset:-2px;}' +
                     '.mr-screen-stage-label{position:absolute;left:16px;bottom:14px;background:rgba(0,0,0,.58);color:#fff;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:7px 12px;font-size:.82rem;}' +
+                    '.mr-screen-control-hint{position:absolute;right:14px;bottom:14px;background:rgba(184,134,11,.92);color:#111;border-radius:999px;padding:7px 12px;font-size:.78rem;font-weight:800;}' +
+                    '.mr-screen-remote-pointer{position:fixed;z-index:999999;width:18px;height:18px;border:2px solid var(--primary);border-radius:999px;transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 0 7px rgba(184,134,11,.18);display:none;}' +
+                    '.mr-screen-resize-handle{position:absolute;right:0;bottom:0;width:24px;height:24px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,rgba(255,255,255,.38) 51%);z-index:3;}' +
                     '.mr-screen-empty{color:rgba(255,255,255,.72);text-align:center;font-size:.92rem;padding:24px;}' +
-                    '@media(max-width:720px){#mrScreenBrowser{inset:48px 8px 12px 8px;border-radius:14px}.mr-screen-title{display:none}.voice-panel{left:8px;bottom:8px;width:calc(100vw - 16px)}}';
+                    '@media(max-width:720px){#mrScreenBrowser{left:8px!important;top:48px!important;width:calc(100vw - 16px)!important;height:calc(100vh - 60px)!important;border-radius:14px}.mr-screen-title{display:none}.voice-panel{left:8px;bottom:8px;width:calc(100vw - 16px)}}';
                 document.head.appendChild(st);
             }
 
@@ -10662,17 +11056,34 @@
                     '<div class="mr-screen-title"><i class="fas fa-desktop"></i> Screen Share</div>' +
                     '<div class="mr-screen-tabbar" id="mrScreenTabBar"></div>' +
                     '<div class="mr-screen-window-actions">' +
+                    '<button type="button" title="Admin control mode" id="mrScreenControlBtn"><i class="fas fa-keyboard"></i></button>' +
                     '<button type="button" title="Minimize" id="mrScreenMinBtn"><i class="fas fa-minus"></i></button>' +
+                    '<button type="button" title="Maximize / restore" id="mrScreenMaxBtn"><i class="fas fa-up-right-and-down-left-from-center"></i></button>' +
                     '<button type="button" title="Close view" id="mrScreenCloseBtn"><i class="fas fa-xmark"></i></button>' +
-                    '</div></div><div class="mr-screen-stage" id="mrScreenStage"></div>';
+                    '</div></div><div class="mr-screen-stage" id="mrScreenStage"></div><div class="mr-screen-resize-handle" title="Drag to resize"></div>';
                 document.body.appendChild(w);
+                _mrMakeScreenBrowserMovable(w);
+                var controlBtn = document.getElementById('mrScreenControlBtn');
+                if (controlBtn) {
+                    controlBtn.style.display = (typeof isAdmin === 'function' && isAdmin()) ? 'inline-flex' : 'none';
+                    controlBtn.onclick = _mrToggleRemoteControlMode;
+                }
                 document.getElementById('mrScreenMinBtn').onclick = function() {
+                    if (!w.classList.contains('minimized')) _mrClampScreenBrowser(w);
+                    w.classList.remove('maximized');
                     w.classList.toggle('minimized');
+                    if (!w.classList.contains('minimized')) _mrApplyScreenBrowserSavedBounds(w);
                     this.innerHTML = w.classList.contains('minimized') ? '<i class="fas fa-up-right-and-down-left-from-center"></i>' : '<i class="fas fa-minus"></i>';
+                };
+                document.getElementById('mrScreenMaxBtn').onclick = function() {
+                    if (!w.classList.contains('maximized')) _mrClampScreenBrowser(w);
+                    w.classList.toggle('maximized');
+                    w.classList.remove('minimized');
+                    if (!w.classList.contains('maximized')) _mrApplyScreenBrowserSavedBounds(w);
                 };
                 document.getElementById('mrScreenCloseBtn').onclick = function() {
                     w.classList.add('hidden');
-                    w.classList.remove('minimized');
+                    w.classList.remove('minimized', 'maximized');
                 };
                 return w;
             }
@@ -10712,7 +11123,21 @@
                 label.className = 'mr-screen-stage-label';
                 label.textContent = current.label + (current.isLocal ? ' (you are sharing)' : ' is sharing');
                 stage.appendChild(label);
-                w.classList.remove('hidden', 'minimized');
+                _mrInstallRemoteControlInput(stage, activeKey);
+                var controlBtn = document.getElementById('mrScreenControlBtn');
+                if (controlBtn) {
+                    var canControl = typeof isAdmin === 'function' && isAdmin() && !current.isLocal;
+                    controlBtn.style.display = (typeof isAdmin === 'function' && isAdmin()) ? 'inline-flex' : 'none';
+                    controlBtn.disabled = !canControl;
+                    controlBtn.classList.toggle('active', !!(_mrRemoteControlEnabled && canControl));
+                }
+                if (_mrRemoteControlEnabled && !current.isLocal) {
+                    var hint = document.createElement('div');
+                    hint.className = 'mr-screen-control-hint';
+                    hint.textContent = 'Admin control mode on';
+                    stage.appendChild(hint);
+                }
+                w.classList.remove('hidden');
             }
 
             function _mrOpenScreenTab(label, stream, isLocal) {
@@ -10734,8 +11159,13 @@
             function _mrClearScreenTabs() {
                 _mrScreenStreams = {};
                 _mrScreenActiveKey = null;
+                _mrRemoteControlEnabled = false;
+                try { if (_mrRemoteControlListener) _mrRemoteControlListener.off(); } catch (_) {}
+                _mrRemoteControlListener = null;
                 var w = document.getElementById('mrScreenBrowser');
                 if (w) w.remove();
+                var p = document.getElementById('mrRemoteControlPointer');
+                if (p) p.remove();
             }
 
             _mrShowLocalScreen = function(stream) {
@@ -11001,6 +11431,7 @@
                         }
                     });
                 });
+                try { _mrAttachRemoteControlListener(callId); } catch (_) {}
             };
 
             (function _mrWrapVoiceButtonsForScreenTabs() {
@@ -11097,7 +11528,21 @@
                 label.className = 'mr-screen-stage-label';
                 label.textContent = (current.label || 'Screen') + (current.isLocal ? ' (you are sharing)' : (current.stream ? ' is sharing' : ' live view'));
                 stage.appendChild(label);
-                w.classList.remove('hidden', 'minimized');
+                _mrInstallRemoteControlInput(stage, activeKey);
+                var controlBtn = document.getElementById('mrScreenControlBtn');
+                if (controlBtn) {
+                    var canControl = typeof isAdmin === 'function' && isAdmin() && !current.isLocal;
+                    controlBtn.style.display = (typeof isAdmin === 'function' && isAdmin()) ? 'inline-flex' : 'none';
+                    controlBtn.disabled = !canControl;
+                    controlBtn.classList.toggle('active', !!(_mrRemoteControlEnabled && canControl));
+                }
+                if (_mrRemoteControlEnabled && !current.isLocal) {
+                    var hint = document.createElement('div');
+                    hint.className = 'mr-screen-control-hint';
+                    hint.textContent = 'Admin control mode on';
+                    stage.appendChild(hint);
+                }
+                w.classList.remove('hidden');
             };
 
             function _mrShowRemoteScreenFrame(sender, frame) {
@@ -11741,6 +12186,7 @@
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
