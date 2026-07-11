@@ -2990,7 +2990,13 @@
                     canCreateTasks: true,
                     canEditTasks: true,
                     canViewTaskHistory: true,
-                    canDeleteTasks: true
+                    canDeleteTasks: true,
+                    canViewAgentMargins: true,
+                    canAddAgentMargins: true,
+                    canEditAgentMargins: true,
+                    canDeleteAgentMargins: true,
+                    canManageAgents: true,
+                    canManageMonths: true
                 }
             };
 
@@ -7824,7 +7830,7 @@
 
             function showAddUser() {
                 showModal(
-                    '<h3>Add User</h3><div class="form-row"><div class="form-group"><label>Username *</label><input type="text" id="newUsername" /></div><div class="form-group"><label>Password *</label><input type="password" id="newPassword" /></div><div class="form-group"><label>Full Name</label><input type="text" id="newName" /></div><div class="form-group"><label>Email</label><input type="email" id="newEmail" /></div><div class="form-group"><label>Role</label><select id="newRole"><option value="agent">Agent</option><option value="manager">Manager</option><option value="readonly">Read Only</option></select></div></div><div class="form-group"><label>Permissions</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;"><label><input type="checkbox" class="perm-check" value="canCreateQuotes" checked /> Create Quotes</label><label><input type="checkbox" class="perm-check" value="canEditQuotes" checked /> Edit Quotes</label><label><input type="checkbox" class="perm-check" value="canViewInvoices" checked /> View Invoices</label><label><input type="checkbox" class="perm-check" value="canManageAccounts" /> Manage Accounts</label><label><input type="checkbox" class="perm-check" value="canViewQuoteHistory" checked /> Quote History (Own Quotes)</label><label><input type="checkbox" class="perm-check" value="canDeleteQuotes" /> Delete Quotes</label><label><input type="checkbox" class="perm-check" value="canDeleteInvoices" /> Delete Invoices</label><label><input type="checkbox" class="perm-check" value="canExportData" /> Export Data</label><label><input type="checkbox" class="perm-check" value="canAssignAgents" /> Assign Agents</label><label><input type="checkbox" class="perm-check" value="canEditInvoices" /> Edit Invoices</label><label><input type="checkbox" class="perm-check" value="canViewInquiries" checked /> View Inquiries (Own)</label><label><input type="checkbox" class="perm-check" value="canCreateInquiries" checked /> Create Inquiries</label><label><input type="checkbox" class="perm-check" value="canEditInquiries" /> Edit Inquiries</label><label><input type="checkbox" class="perm-check" value="canDeleteInquiries" /> Delete Inquiries</label><label><input type="checkbox" class="perm-check" value="canMakeInvoice" /> Make Invoice</label><label><input type="checkbox" class="perm-check" value="canEditInvoiceAgent" /> Edit Invoice (Agent)</label><label><input type="checkbox" class="perm-check" value="canAddAccountsFromInvoice" /> Add Accounts from Invoice</label><label><input type="checkbox" class="perm-check" value="canEditAccountsAgent" /> Edit Accounts (Agent)</label><label><input type="checkbox" class="perm-check" value="canCreateAtol" /> Create ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canEditAtol" /> Edit ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canViewAtolHistory" /> Certificate History</label><label><input type="checkbox" class="perm-check" value="canViewCalendar" checked /> View Calendar</label><label><input type="checkbox" class="perm-check" value="canAddCalendarTasks" checked /> Add Daily Task on Calendar</label><label><input type="checkbox" class="perm-check" value="canCreateTasks" checked /> Create Task</label><label><input type="checkbox" class="perm-check" value="canEditTasks" /> Edit Task</label><label><input type="checkbox" class="perm-check" value="canViewTaskHistory" checked /> View Task History</label><label><input type="checkbox" class="perm-check" value="canDeleteTasks" /> Delete Task</label></div></div><div class="modal-actions"><button class="btn btn-primary" id="btnCreateUser">Create</button><button class="btn btn-close-modal" data-close-modal>Cancel</button></div>'
+                    '<h3>Add User</h3><div class="form-row"><div class="form-group"><label>Username *</label><input type="text" id="newUsername" /></div><div class="form-group"><label>Password *</label><input type="password" id="newPassword" /></div><div class="form-group"><label>Full Name</label><input type="text" id="newName" /></div><div class="form-group"><label>Email</label><input type="email" id="newEmail" /></div><div class="form-group"><label>Role</label><select id="newRole"><option value="agent">Agent</option><option value="manager">Manager</option><option value="accounts">Accounts</option><option value="readonly">Read Only</option></select></div></div><div class="form-group"><label>Permissions</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;"><label><input type="checkbox" class="perm-check" value="canCreateQuotes" checked /> Create Quotes</label><label><input type="checkbox" class="perm-check" value="canEditQuotes" checked /> Edit Quotes</label><label><input type="checkbox" class="perm-check" value="canViewInvoices" checked /> View Invoices</label><label><input type="checkbox" class="perm-check" value="canManageAccounts" /> Manage Accounts</label><label><input type="checkbox" class="perm-check" value="canViewQuoteHistory" checked /> Quote History (Own Quotes)</label><label><input type="checkbox" class="perm-check" value="canDeleteQuotes" /> Delete Quotes</label><label><input type="checkbox" class="perm-check" value="canDeleteInvoices" /> Delete Invoices</label><label><input type="checkbox" class="perm-check" value="canExportData" /> Export Data</label><label><input type="checkbox" class="perm-check" value="canAssignAgents" /> Assign Agents</label><label><input type="checkbox" class="perm-check" value="canEditInvoices" /> Edit Invoices</label><label><input type="checkbox" class="perm-check" value="canViewInquiries" checked /> View Inquiries (Own)</label><label><input type="checkbox" class="perm-check" value="canCreateInquiries" checked /> Create Inquiries</label><label><input type="checkbox" class="perm-check" value="canEditInquiries" /> Edit Inquiries</label><label><input type="checkbox" class="perm-check" value="canDeleteInquiries" /> Delete Inquiries</label><label><input type="checkbox" class="perm-check" value="canMakeInvoice" /> Make Invoice</label><label><input type="checkbox" class="perm-check" value="canEditInvoiceAgent" /> Edit Invoice (Agent)</label><label><input type="checkbox" class="perm-check" value="canAddAccountsFromInvoice" /> Add Accounts from Invoice</label><label><input type="checkbox" class="perm-check" value="canEditAccountsAgent" /> Edit Accounts (Agent)</label><label><input type="checkbox" class="perm-check" value="canCreateAtol" /> Create ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canEditAtol" /> Edit ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canViewAtolHistory" /> Certificate History</label><label><input type="checkbox" class="perm-check" value="canViewCalendar" checked /> View Calendar</label><label><input type="checkbox" class="perm-check" value="canAddCalendarTasks" checked /> Add Daily Task on Calendar</label><label><input type="checkbox" class="perm-check" value="canCreateTasks" checked /> Create Task</label><label><input type="checkbox" class="perm-check" value="canEditTasks" /> Edit Task</label><label><input type="checkbox" class="perm-check" value="canViewTaskHistory" checked /> View Task History</label><label><input type="checkbox" class="perm-check" value="canDeleteTasks" /> Delete Task</label><label><input type="checkbox" class="perm-check" value="canViewAgentMargins" /> View Agent Margins</label><label><input type="checkbox" class="perm-check" value="canAddAgentMargins" /> Add Agent Margins</label><label><input type="checkbox" class="perm-check" value="canEditAgentMargins" /> Edit Agent Margins</label><label><input type="checkbox" class="perm-check" value="canDeleteAgentMargins" /> Delete Agent Margins</label><label><input type="checkbox" class="perm-check" value="canManageAgents" /> Manage Agents</label><label><input type="checkbox" class="perm-check" value="canManageMonths" /> Manage Months</label></div></div><div class="modal-actions"><button class="btn btn-primary" id="btnCreateUser">Create</button><button class="btn btn-close-modal" data-close-modal>Cancel</button></div>'
                     );
                 document.getElementById('btnCreateUser').addEventListener('click', async function() {
                     var username = document.getElementById('newUsername').value.trim();
@@ -7858,7 +7864,9 @@
                         '<option value="agent" ' + (u.role === 'agent' ? 'selected' : '') +
                         '>Agent</option><option value="manager" ' + (u.role === 'manager' ?
                             'selected' : '') +
-                        '>Manager</option><option value="readonly" ' + (u.role === 'readonly' ?
+                        '>Manager</option><option value="accounts" ' + (u.role === 'accounts' ?
+                            'selected' : '') +
+                        '>Accounts</option><option value="readonly" ' + (u.role === 'readonly' ?
                             'selected' : '') + '>Read Only</option>';
                     showModal(
                         '<h3>Edit User: ' + username +
@@ -7961,6 +7969,24 @@
                         '<label><input type="checkbox" class="edit-perm" value="canDeleteTasks" ' +
                         (perms.canDeleteTasks ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
                         ' /> Delete Task</label>' +
+                        '<label><input type="checkbox" class="edit-perm" value="canViewAgentMargins" ' +
+                        ((perms.canViewAgentMargins || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
+                        ' /> View Agent Margins</label>' +
+                        '<label><input type="checkbox" class="edit-perm" value="canAddAgentMargins" ' +
+                        ((perms.canAddAgentMargins || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
+                        ' /> Add Agent Margins</label>' +
+                        '<label><input type="checkbox" class="edit-perm" value="canEditAgentMargins" ' +
+                        ((perms.canEditAgentMargins || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
+                        ' /> Edit Agent Margins</label>' +
+                        '<label><input type="checkbox" class="edit-perm" value="canDeleteAgentMargins" ' +
+                        ((perms.canDeleteAgentMargins || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
+                        ' /> Delete Agent Margins</label>' +
+                        '<label><input type="checkbox" class="edit-perm" value="canManageAgents" ' +
+                        ((perms.canManageAgents || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
+                        ' /> Manage Agents</label>' +
+                        '<label><input type="checkbox" class="edit-perm" value="canManageMonths" ' +
+                        ((perms.canManageMonths || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
+                        ' /> Manage Months</label>' +
                         '</div>' + (isAdminUser ?
                             '<div class="input-hint">Admin has all permissions by default.</div>' :
                             '') +
@@ -9614,7 +9640,8 @@
                 var permClass = isEdit ? 'edit-perm' : 'perm-check';
                 var existing = document.querySelectorAll('.' + permClass);
                 if (!existing.length) return;
-                var container = existing[0].parentNode;
+                var container = existing[0].closest('div');
+                if (!container) container = existing[0].parentNode;
                 if (!container) return;
                 var isAdminUser = isEdit && userObj && userObj.username === 'Plan';
                 var perms = (userObj && userObj.permissions) || {};
@@ -12186,6 +12213,7 @@
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
