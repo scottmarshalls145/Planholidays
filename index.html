@@ -4653,14 +4653,28 @@
                         buildInvoicePDFHTML(quoteData, branding, condText) :
                         buildQuotePDFHTML(quoteData, branding, condText);
                     var pdfContainer = document.getElementById('pdfContent');
+                    var oldPdfContainerStyle = pdfContainer.getAttribute('style') || '';
                     pdfContainer.innerHTML = html;
                     pdfContainer.style.display = 'block';
+                    pdfContainer.style.width = '190mm';
+                    pdfContainer.style.maxWidth = 'none';
+                    pdfContainer.style.minWidth = '190mm';
+                    pdfContainer.style.margin = '0 auto';
+                    pdfContainer.style.padding = '0';
+                    pdfContainer.style.background = '#fff';
+                    pdfContainer.style.overflow = 'visible';
                     var opt = {
-                        margin: [10, 10, 10, 10],
+                        margin: [7, 7, 7, 7],
                         filename: (isInvoice ? 'Invoice' : 'Quote') + '_' + (quoteData.quoteNumber || quoteData
                             .invoiceNumber || 'draft') + '.pdf',
                         image: { type: 'jpeg', quality: 0.98 },
-                        html2canvas: { scale: 2, useCORS: true },
+                        html2canvas: {
+                            scale: 2,
+                            useCORS: true,
+                            scrollX: 0,
+                            scrollY: 0,
+                            windowWidth: pdfContainer.scrollWidth
+                        },
                         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
                         pagebreak: { mode: ['css', 'legacy'], before: '.pdf-page-break' }
                     };
@@ -4690,7 +4704,7 @@
                             win.document.close();
                         }
                     }
-                    pdfContainer.style.display = 'none';
+                    pdfContainer.setAttribute('style', oldPdfContainerStyle || 'display:none;');
                 } catch (e) {
                     console.error('PDF error:', e);
                     showToast('PDF generation failed: ' + e.message, 'error');
@@ -9282,12 +9296,14 @@
                 var old=document.getElementById('voicePanel'); if(old) old.remove();
                 var activeCallId=callId||(_mrVoice&&_mrVoice.callId)||'';
                 var d=document.createElement('div'); d.id='voicePanel'; d.className='voice-panel';
+                var endCallLabel = 'Leave Call';
+                try { if (typeof isAdmin === 'function' && isAdmin()) endCallLabel = 'End Call'; } catch(_) {}
                 d.innerHTML='<h4><i class="fas fa-phone"></i> '+escapeHTML(title||'Voice call')+'</h4>'+
                     '<div id="voiceStatus" class="text-sm">Browser WebRTC voice meeting. Keep this page open. Participants can add/remove agents while the call is active.</div>'+
                     '<div id="voiceAudios"></div><div class="voice-actions">'+
                     (incoming?'<button class="btn btn-success btn-sm" onclick="acceptVoiceCall(\''+activeCallId+'\')"><i class="fas fa-phone"></i> Accept</button>':'')+
                     '<button class="btn btn-primary btn-sm" onclick="showVoicePeopleManager(\''+activeCallId+'\')"><i class="fas fa-user-plus"></i> Add / Remove Agents</button>'+
-                    '<button class="btn btn-danger btn-sm" onclick="endVoiceCall()"><i class="fas fa-phone-slash"></i> End</button></div>';
+                    '<button class="btn btn-danger btn-sm" onclick="endVoiceCall()"><i class="fas fa-phone-slash"></i> '+endCallLabel+'</button></div>';
                 document.body.appendChild(d);
             }
             window.showVoicePeopleManager=async function(callId){
@@ -12601,13 +12617,16 @@
                     var callId = _mrVoice && _mrVoice.callId;
                     var me = _confMe();
                     var shouldEndForEveryone = !!forceEnd;
+                    var adminEnding = false;
+                    try { adminEnding = (typeof isAdmin === 'function' && isAdmin()); }
+                    catch(_) { adminEnding = !!(STATE.currentUser && STATE.currentUser.role === 'admin'); }
                     try {
                         if (callId && firebaseConnected && db){
                             var call = await readData('voiceCalls/'+callId, null, true) || {};
                             var members = call.members || _mrVoice.members || [];
                             if (call.status === 'ended'){
                                 shouldEndForEveryone = false;
-                            } else if (members.indexOf(me) !== -1){
+                            } else if (adminEnding || forceEnd === true){
                                 shouldEndForEveryone = true;
                             } else {
                                 shouldEndForEveryone = false;
@@ -12616,15 +12635,21 @@
                                 await writeData('voiceCalls/'+callId+'/status', 'ended', null);
                                 await writeData('voiceCalls/'+callId+'/endedAt', getNowISO(), null);
                                 await writeData('voiceCalls/'+callId+'/endedBy', me || 'unknown', null);
+                            } else if (me && members.indexOf(me) !== -1){
+                                var remaining = members.filter(function(member){ return member !== me; });
+                                await writeData('voiceCalls/'+callId+'/members', remaining, null);
+                                await writeData('voiceCalls/'+callId+'/left/'+me, getNowISO(), null);
+                                await writeData('voiceCalls/'+callId+'/updatedAt', getNowISO(), null);
+                                await writeData('voiceCalls/'+callId+'/updatedBy', me, null);
                             }
                         } else if (callId) {
-                            shouldEndForEveryone = true;
+                            shouldEndForEveryone = adminEnding || forceEnd === true;
                         }
                     } catch(_){
-                        shouldEndForEveryone = true;
-                        try { if (callId) await writeData('voiceCalls/'+callId+'/status', 'ended', null); } catch(__){}
+                        shouldEndForEveryone = adminEnding || forceEnd === true;
+                        try { if (callId && shouldEndForEveryone) await writeData('voiceCalls/'+callId+'/status', 'ended', null); } catch(__){}
                     }
-                    try { _confCloseLocalOnly(shouldEndForEveryone ? 'ended' : 'removed'); } catch(_){}
+                    try { _confCloseLocalOnly(shouldEndForEveryone ? 'ended' : 'left'); } catch(_){}
                 }
                 endVoiceCall = function(forceEnd){ return _confEndVoiceCallSafe(forceEnd); };
                 window.endVoiceCall = endVoiceCall;
@@ -12726,6 +12751,7 @@
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
