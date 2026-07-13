@@ -3657,35 +3657,12 @@
                             '') : '') + (f.aircraft ? ' · ' + f.aircraft : '') + (f.cabinClass ? ' · ' + f.cabinClass :
                             '') +
                         '</span></div>' + imgHtml +
-                        '<div class="form-row mt-8">' +
-                        '<div class="form-group"><label>Airline Code</label><input type="text" value="' + escapeHTML(f.airlineCode || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'airlineCode\',this.value.toUpperCase())" /></div>' +
-                        '<div class="form-group"><label>Airline Name</label><input type="text" value="' + escapeHTML(f.airlineName || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'airlineName\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Flight Number</label><input type="text" value="' + escapeHTML(f.flightNumber || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'flightNumber\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Origin</label><input type="text" value="' + escapeHTML(f.origin || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'origin\',this.value)" placeholder="e.g. LHR" /></div>' +
-                        '<div class="form-group"><label>Destination</label><input type="text" value="' + escapeHTML(f.destination || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'destination\',this.value)" placeholder="e.g. DXB" /></div>' +
-                        '<div class="form-group"><label>Departure Date</label><input type="date" value="' + escapeHTML(f.departDate || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'departDate\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Departure Time</label><input type="text" value="' + escapeHTML(f.departTime || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'departTime\',this.value)" placeholder="e.g. 14:30" /></div>' +
-                        '<div class="form-group"><label>Arrival Date</label><input type="date" value="' + escapeHTML(f.arriveDate || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'arriveDate\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Arrival Time</label><input type="text" value="' + escapeHTML(f.arriveTime || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'arriveTime\',this.value)" placeholder="e.g. 22:10" /></div>' +
-                        '<div class="form-group"><label>Cabin Class</label><input type="text" value="' + escapeHTML(f.cabinClass || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'cabinClass\',this.value)" placeholder="Economy, Business..." /></div>' +
-                        '<div class="form-group"><label>Aircraft</label><input type="text" value="' + escapeHTML(f.aircraft || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'aircraft\',this.value)" /></div>' +
-                        '</div>' +
                         '<div class="text-xs text-muted mt-8">' + (f.originCity || '') + (f.originCountry ? ' (' + f
                         .originCountry + ')' : '') + ' → ' + (f.destinationCity || '') + (f.destinationCountry ?
                             ' (' + f.destinationCountry + ')' : '') + '</div></div>';
                 });
                 container.innerHTML = html;
                 window._removeFlight = removeFlight;
-                window._updateFlightField = updateFlightField;
-            }
-
-            function updateFlightField(id, field, value) {
-                var flights = STATE.currentQuote.flights || [];
-                var f = flights.find(function(f) { return f.id === id; });
-                if (!f) return;
-                f[field] = value;
-                if (field === 'airlineCode' && !f.airlineName) f.airlineName = getAirlineName(String(value || '').toUpperCase());
-                renderFlights();
             }
 
             function parseGDS(text) {
@@ -4676,50 +4653,19 @@
                         buildInvoicePDFHTML(quoteData, branding, condText) :
                         buildQuotePDFHTML(quoteData, branding, condText);
                     var pdfContainer = document.getElementById('pdfContent');
-                    var oldPdfContainerStyle = pdfContainer.getAttribute('style') || '';
                     pdfContainer.innerHTML = html;
                     pdfContainer.style.display = 'block';
-                    pdfContainer.style.position = 'fixed';
-                    pdfContainer.style.left = '0';
-                    pdfContainer.style.top = '0';
-                    pdfContainer.style.zIndex = '99997';
-                    pdfContainer.style.pointerEvents = 'none';
-                    pdfContainer.style.width = '210mm';
-                    pdfContainer.style.maxWidth = '210mm';
-                    pdfContainer.style.minWidth = '210mm';
-                    pdfContainer.style.margin = '0';
-                    pdfContainer.style.padding = '0';
-                    pdfContainer.style.background = '#fff';
-                    pdfContainer.style.overflow = 'visible';
-                    var pdfPage = pdfContainer.firstElementChild || pdfContainer;
-                    if (pdfPage && pdfPage.style) {
-                        pdfPage.style.width = '210mm';
-                        pdfPage.style.maxWidth = '210mm';
-                        pdfPage.style.minWidth = '210mm';
-                        pdfPage.style.margin = '0';
-                        pdfPage.style.padding = '10mm';
-                        pdfPage.style.boxSizing = 'border-box';
-                    }
-                    var pageWidthPx = Math.ceil((pdfPage.getBoundingClientRect && pdfPage.getBoundingClientRect().width) || pdfContainer.scrollWidth || 794);
                     var opt = {
-                        margin: 0,
+                        margin: [10, 10, 10, 10],
                         filename: (isInvoice ? 'Invoice' : 'Quote') + '_' + (quoteData.quoteNumber || quoteData
                             .invoiceNumber || 'draft') + '.pdf',
                         image: { type: 'jpeg', quality: 0.98 },
-                        html2canvas: {
-                            scale: 2,
-                            useCORS: true,
-                            backgroundColor: '#ffffff',
-                            scrollX: 0,
-                            scrollY: 0,
-                            width: pageWidthPx,
-                            windowWidth: pageWidthPx
-                        },
+                        html2canvas: { scale: 2, useCORS: true },
                         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
                         pagebreak: { mode: ['css', 'legacy'], before: '.pdf-page-break' }
                     };
                     if (action === 'download') {
-                        await html2pdf().set(opt).from(pdfPage).save();
+                        await html2pdf().set(opt).from(pdfContainer).save();
                         showToast((isInvoice ? 'Invoice' : 'PDF') + ' downloaded.', 'success');
                     } else if (action === 'preview') {
                         var win = window.open('', '_blank', 'width=800,height=900');
@@ -4744,7 +4690,7 @@
                             win.document.close();
                         }
                     }
-                    pdfContainer.setAttribute('style', oldPdfContainerStyle || 'display:none;');
+                    pdfContainer.style.display = 'none';
                 } catch (e) {
                     console.error('PDF error:', e);
                     showToast('PDF generation failed: ' + e.message, 'error');
@@ -9336,14 +9282,12 @@
                 var old=document.getElementById('voicePanel'); if(old) old.remove();
                 var activeCallId=callId||(_mrVoice&&_mrVoice.callId)||'';
                 var d=document.createElement('div'); d.id='voicePanel'; d.className='voice-panel';
-                var endCallLabel = 'Leave Call';
-                try { if (typeof isAdmin === 'function' && isAdmin()) endCallLabel = 'End Call'; } catch(_) {}
                 d.innerHTML='<h4><i class="fas fa-phone"></i> '+escapeHTML(title||'Voice call')+'</h4>'+
                     '<div id="voiceStatus" class="text-sm">Browser WebRTC voice meeting. Keep this page open. Participants can add/remove agents while the call is active.</div>'+
                     '<div id="voiceAudios"></div><div class="voice-actions">'+
                     (incoming?'<button class="btn btn-success btn-sm" onclick="acceptVoiceCall(\''+activeCallId+'\')"><i class="fas fa-phone"></i> Accept</button>':'')+
                     '<button class="btn btn-primary btn-sm" onclick="showVoicePeopleManager(\''+activeCallId+'\')"><i class="fas fa-user-plus"></i> Add / Remove Agents</button>'+
-                    '<button class="btn btn-danger btn-sm" onclick="endVoiceCall()"><i class="fas fa-phone-slash"></i> '+endCallLabel+'</button></div>';
+                    '<button class="btn btn-danger btn-sm" onclick="endVoiceCall()"><i class="fas fa-phone-slash"></i> End</button></div>';
                 document.body.appendChild(d);
             }
             window.showVoicePeopleManager=async function(callId){
@@ -12657,16 +12601,13 @@
                     var callId = _mrVoice && _mrVoice.callId;
                     var me = _confMe();
                     var shouldEndForEveryone = !!forceEnd;
-                    var adminEnding = false;
-                    try { adminEnding = (typeof isAdmin === 'function' && isAdmin()); }
-                    catch(_) { adminEnding = !!(STATE.currentUser && STATE.currentUser.role === 'admin'); }
                     try {
                         if (callId && firebaseConnected && db){
                             var call = await readData('voiceCalls/'+callId, null, true) || {};
                             var members = call.members || _mrVoice.members || [];
                             if (call.status === 'ended'){
                                 shouldEndForEveryone = false;
-                            } else if (adminEnding || forceEnd === true){
+                            } else if (members.indexOf(me) !== -1){
                                 shouldEndForEveryone = true;
                             } else {
                                 shouldEndForEveryone = false;
@@ -12675,21 +12616,15 @@
                                 await writeData('voiceCalls/'+callId+'/status', 'ended', null);
                                 await writeData('voiceCalls/'+callId+'/endedAt', getNowISO(), null);
                                 await writeData('voiceCalls/'+callId+'/endedBy', me || 'unknown', null);
-                            } else if (me && members.indexOf(me) !== -1){
-                                var remaining = members.filter(function(member){ return member !== me; });
-                                await writeData('voiceCalls/'+callId+'/members', remaining, null);
-                                await writeData('voiceCalls/'+callId+'/left/'+me, getNowISO(), null);
-                                await writeData('voiceCalls/'+callId+'/updatedAt', getNowISO(), null);
-                                await writeData('voiceCalls/'+callId+'/updatedBy', me, null);
                             }
                         } else if (callId) {
-                            shouldEndForEveryone = adminEnding || forceEnd === true;
+                            shouldEndForEveryone = true;
                         }
                     } catch(_){
-                        shouldEndForEveryone = adminEnding || forceEnd === true;
-                        try { if (callId && shouldEndForEveryone) await writeData('voiceCalls/'+callId+'/status', 'ended', null); } catch(__){}
+                        shouldEndForEveryone = true;
+                        try { if (callId) await writeData('voiceCalls/'+callId+'/status', 'ended', null); } catch(__){}
                     }
-                    try { _confCloseLocalOnly(shouldEndForEveryone ? 'ended' : 'left'); } catch(_){}
+                    try { _confCloseLocalOnly(shouldEndForEveryone ? 'ended' : 'removed'); } catch(_){}
                 }
                 endVoiceCall = function(forceEnd){ return _confEndVoiceCallSafe(forceEnd); };
                 window.endVoiceCall = endVoiceCall;
@@ -12791,9 +12726,6 @@
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
