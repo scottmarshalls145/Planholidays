@@ -4656,7 +4656,7 @@
                     pdfContainer.innerHTML = html;
                     pdfContainer.style.display = 'block';
                     var opt = {
-                        margin: [12, 12, 12, 12],
+                        margin: [10, 10, 10, 10],
                         filename: (isInvoice ? 'Invoice' : 'Quote') + '_' + (quoteData.quoteNumber || quoteData
                             .invoiceNumber || 'draft') + '.pdf',
                         image: { type: 'jpeg', quality: 0.98 },
@@ -4672,7 +4672,7 @@
                         if (win) {
                             win.document.write(
                                 '<html><head><title>' + (isInvoice ? 'Invoice' : 'Quote') +
-                                ' Preview</title><style>body{font-family:Inter,sans-serif;padding:20px;background:#fff;color:#000;}.pdf-page{max-width:210mm;margin:0 auto;}.flight-image-large{max-width:100%!important;width:100%!important;height:auto!important;}</style></head><body><div class="pdf-page">' +
+                                ' Preview</title><style>body{font-family:Inter,sans-serif;padding:20px;background:#fff;color:#000;}.pdf-page{max-width:190mm;margin:0 auto;box-sizing:border-box;}.flight-image-large{max-width:100%!important;width:100%!important;height:auto!important;}</style></head><body><div class="pdf-page">' +
                                 html +
                                 '</div><script>window.onload=function(){window.print();}<\/script></body></html>'
                                 );
@@ -4683,7 +4683,7 @@
                         if (win) {
                             win.document.write(
                                 '<html><head><title>' + (isInvoice ? 'Invoice' : 'Quote') +
-                                ' Print</title><style>body{font-family:Inter,sans-serif;padding:20px;background:#fff;color:#000;}.pdf-page{max-width:210mm;margin:0 auto;}.flight-image-large{max-width:100%!important;width:100%!important;height:auto!important;}</style></head><body><div class="pdf-page">' +
+                                ' Print</title><style>body{font-family:Inter,sans-serif;padding:20px;background:#fff;color:#000;}.pdf-page{max-width:190mm;margin:0 auto;box-sizing:border-box;}.flight-image-large{max-width:100%!important;width:100%!important;height:auto!important;}</style></head><body><div class="pdf-page">' +
                                 html +
                                 '</div><script>window.onload=function(){window.print();}<\/script></body></html>'
                                 );
@@ -4703,14 +4703,14 @@
                 var logoHtml = branding && branding.logo ?
                     '<img src="' + branding.logo +
                     '" style="height:155px;max-width:285px;width:auto;border-radius:14px;object-fit:contain;" />' :
-                    '<h1 style="font-family:\'Playfair Display\',serif;font-size:2.2rem;color:#b8860b;">Plan Holidays</h1>';
+                    '<h1 style="font-family:\'Playfair Display\',serif;font-size:2.2rem;color:#12324a;">Plan Holidays</h1>';
 
                 var flightsHtml = (quote.flights || []).map(function(f) {
                     var imgHtml = f.airlineLogo ?
-                        '<div style="margin:8px 0;text-align:center;"><img src="' + f.airlineLogo +
-                        '" class="flight-image-large" style="max-width:100%;width:100%;height:auto;border-radius:8px;border:1px solid #eee;object-fit:contain;" /></div>' :
+                        '<div style="margin:4px 0;text-align:center;"><img src="' + f.airlineLogo +
+                        '" class="flight-image-large" style="max-width:100%;width:100%;height:auto;border-radius:8px;border:1px solid #dbe5ec;object-fit:contain;" /></div>' :
                         '';
-                    return '<div style="padding:8px 12px;border:1px solid #eee;border-radius:8px;margin:4px 0;background:#fafafa;"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;"><span><strong>' +
+                    return '<div style="padding:6px 9px;border:1px solid #dbe5ec;border-radius:8px;margin:2px 0;background:#f8fafc;"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;"><span><strong>' +
                         (f.airlineName || f.airlineCode || 'Flight') + '</strong> ' + (f.flightNumber || '') +
                         '</span><span>' + (f.origin || '') + ' → ' + (f.destination || '') +
                         '</span><span style="color:#666;font-size:0.8rem;">' + (f.departDate || '') + ' ' + (f
@@ -4721,7 +4721,7 @@
                 var hotelsHtml = (quote.hotels || []).map(function(h) {
                     var imgs = (h.images || []).map(function(img) {
                         return '<img src="' + img +
-                            '" style="height:180px;width:220px;object-fit:cover;border-radius:8px;border:1px solid #eee;" />';
+                            '" style="height:180px;width:220px;object-fit:cover;border-radius:8px;border:1px solid #dbe5ec;" />';
                     }).join('');
                     var passengers = [];
                     if (parseInt(h.adults || 0) > 0) passengers.push(h.adults + ' Adult' + (parseInt(h.adults) > 1 ? 's' : ''));
@@ -4739,11 +4739,11 @@
                     if (coStr) rows += '<div><strong>Check-out Date:</strong> ' + coStr + '</div>';
                     if (nights) rows += '<div><strong>Total Nights:</strong> ' + nights + '</div>';
                     if (passStr) rows += '<div><strong>Passengers:</strong> ' + passStr + '</div>';
-                    return '<div style="padding:12px 16px;border:1px solid #eee;border-radius:10px;margin:6px 0;background:#fafafa;">' +
-                        (h.destination ? '<h5 style="margin:0 0 4px;font-size:1.15rem;color:#b8860b;font-family:\'Playfair Display\',serif;">' + h.destination + '</h5>' : '') +
-                        (h.hotelName ? '<div style="font-size:0.98rem;font-weight:700;margin-bottom:6px;">' + h.hotelName + (h.hotelCategory ? ' <span style="font-weight:400;color:#666;">(' + h.hotelCategory + ')</span>' : '') + '</div>' : '') +
-                        (rows ? '<div style="font-size:0.85rem;line-height:1.8;color:#333;">' + rows + '</div>' : '') +
-                        (imgs ? '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">' + imgs + '</div>' : '') +
+                    return '<div style="padding:5px 7px;border:1px solid #dbe5ec;border-radius:8px;margin:3px 0;background:#f8fafc;">' +
+                        (h.destination ? '<h5 style="margin:0 0 4px;font-size:1.15rem;color:#12324a;font-family:\'Playfair Display\',serif;">' + h.destination + '</h5>' : '') +
+                        (h.hotelName ? '<div style="font-size:0.98rem;font-weight:700;margin-bottom:3px;">' + h.hotelName + (h.hotelCategory ? ' <span style="font-weight:400;color:#666;">(' + h.hotelCategory + ')</span>' : '') + '</div>' : '') +
+                        (rows ? '<div style="font-size:0.85rem;line-height:1.45;color:#333;">' + rows + '</div>' : '') +
+                        (imgs ? '<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">' + imgs + '</div>' : '') +
                         (h.specialRequests ? '<div style="font-size:0.8rem;color:#888;margin-top:6px;"><strong>Requests:</strong> ' + h.specialRequests + '</div>' : '') +
                         '</div>';
                 }).join('');
@@ -4759,7 +4759,7 @@
                     if (t.pickupTime) rows += '<div><strong>Pickup Time:</strong> ' + t.pickupTime + '</div>';
                     if (t.driverNotes) rows += '<div><strong>Notes:</strong> ' + t.driverNotes + '</div>';
                     if (!rows) return '';
-                    return '<div style="padding:10px 14px;border:1px solid #eee;border-radius:8px;margin:6px 0;background:#fafafa;font-size:0.85rem;line-height:1.8;">' + rows + '</div>';
+                    return '<div style="padding:7px 10px;border:1px solid #dbe5ec;border-radius:8px;margin:3px 0;background:#f8fafc;font-size:0.84rem;line-height:1.45;">' + rows + '</div>';
                 }).join('');
 
                 var activitiesHtml = buildActivitiesPDFHTML(quote);
@@ -4767,11 +4767,11 @@
                 var activitiesHtml = buildActivitiesPDFHTML(quote);
 
                 var scheduleHtml = (quote.instalments || []).map(function(s) {
-                    return '<tr><td style="padding:6px 10px;border:1px solid #eee;">' + s.instalment +
-                        '</td><td style="padding:6px 10px;border:1px solid #eee;">' + (s.dueDate ? formatDateDisplay(s.dueDate) : '') +
-                        '</td><td style="padding:6px 10px;border:1px solid #eee;">' +
+                    return '<tr><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + s.instalment +
+                        '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + (s.dueDate ? formatDateDisplay(s.dueDate) : '') +
+                        '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' +
                         formatCurrency(s.amount, quote.currency || 'GBP') +
-                        '</td><td style="padding:6px 10px;border:1px solid #eee;">' + (s.status || 'Pending') +
+                        '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + (s.status || 'Pending') +
                         '</td></tr>';
                 }).join('');
 
@@ -4789,14 +4789,14 @@
                 if (quote.customerEmail) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Email:</td><td style="padding:4px 8px;">' + quote.customerEmail + '</td></tr>';
                 if (quote.passengerNames) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Passengers:</td><td style="padding:4px 8px;">' + quote.passengerNames + '</td></tr>';
                 if (passengerTypeSummary) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Passenger Types:</td><td style="padding:4px 8px;">' + passengerTypeSummary + '</td></tr>';
-                if (routeDisplay) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Route:</td><td style="padding:4px 8px;font-weight:600;color:#8b6914;">' + routeDisplay + '</td></tr>';
+                if (routeDisplay) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Route:</td><td style="padding:4px 8px;font-weight:600;color:#0f766e;">' + routeDisplay + '</td></tr>';
                 if (quote.agentName) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Agent:</td><td style="padding:4px 8px;">' + quote.agentName + '</td></tr>';
                 if (quote.referenceNumber) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Ref:</td><td style="padding:4px 8px;">' + quote.referenceNumber + '</td></tr>';
 
-                var flightsSection = flightsHtml ? '<div style="margin-bottom:10px;"><h4 style="font-size:1.1rem;margin:0 0 6px;color:#b8860b;border-bottom:1px solid #eee;padding-bottom:6px;">✈️ Flights</h4>' + flightsHtml + '</div>' : '';
-                var hotelsSection = hotelsHtml ? '<div style="margin-bottom:10px;"><h4 style="font-size:1.1rem;margin:0 0 6px;color:#b8860b;border-bottom:1px solid #eee;padding-bottom:6px;">🏨 Hotels</h4>' + hotelsHtml + '</div>' : '';
-                var transfersSection = transfersHtml ? '<div class="pdf-compact-section" style="margin-bottom:8px;"><h4 style="font-size:1.1rem;margin:0 0 6px;color:#b8860b;border-bottom:1px solid #eee;padding-bottom:6px;">Transfers</h4>' + transfersHtml + '</div>' : '';
-                var activitiesSection = activitiesHtml ? '<div class="pdf-compact-section" style="margin-bottom:8px;"><h4 style="font-size:1.1rem;margin:0 0 6px;color:#b8860b;border-bottom:1px solid #eee;padding-bottom:6px;">Other Activities</h4>' + activitiesHtml + '</div>' : '';
+                var flightsSection = flightsHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">✈️ Flights</h4>' + flightsHtml + '</div>' : '';
+                var hotelsSection = hotelsHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">🏨 Hotels</h4>' + hotelsHtml + '</div>' : '';
+                var transfersSection = transfersHtml ? '<div class="pdf-compact-section" style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">Transfers</h4>' + transfersHtml + '</div>' : '';
+                var activitiesSection = activitiesHtml ? '<div class="pdf-compact-section" style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">Other Activities</h4>' + activitiesHtml + '</div>' : '';
 
                 var paymentBits = '';
                 if (total > 0) paymentBits += '<span><strong>Total:</strong> ' + formatCurrency(total, quote.currency || 'GBP') + '</span>';
@@ -4805,31 +4805,31 @@
                 if (balance > 0) paymentBits += '<span><strong>Balance:</strong> ' + formatCurrency(balance, quote.currency || 'GBP') + '</span>';
 
                 var paymentSection = (paymentBits || scheduleHtml) ?
-                    '<div style="margin-bottom:10px;"><h4 style="font-size:1.1rem;margin:0 0 6px;color:#b8860b;border-bottom:1px solid #eee;padding-bottom:6px;">💳 Payment Plan</h4>' +
-                    (paymentBits ? '<div style="display:flex;gap:20px;flex-wrap:wrap;margin:6px 0 10px;font-size:0.95rem;">' + paymentBits + '</div>' : '') +
-                    (scheduleHtml ? '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;border:1px solid #eee;"><thead><tr style="background:#f0ebe3;"><th style="padding:8px 12px;border:1px solid #eee;">#</th><th style="padding:8px 12px;border:1px solid #eee;">Due Date</th><th style="padding:8px 12px;border:1px solid #eee;">Amount</th><th style="padding:8px 12px;border:1px solid #eee;">Status</th></tr></thead><tbody>' + scheduleHtml + '</tbody></table>' : '') +
+                    '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">💳 Payment Plan</h4>' +
+                    (paymentBits ? '<div style="display:flex;gap:10px 16px;flex-wrap:wrap;margin:3px 0 5px;font-size:0.9rem;">' + paymentBits + '</div>' : '') +
+                    (scheduleHtml ? '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;border:1px solid #dbe5ec;"><thead><tr style="background:#eaf1f6;"><th style="padding:5px 8px;border:1px solid #dbe5ec;">#</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Due Date</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Amount</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Status</th></tr></thead><tbody>' + scheduleHtml + '</tbody></table>' : '') +
                     '</div>' : '';
 
-                return '<div style="font-family:Inter,sans-serif;max-width:210mm;margin:0 auto;padding:22px;background:#fff;color:#222;font-size:12px;line-height:1.6;border:1px solid #e0d6c8;border-radius:16px;box-shadow:0 0 24px rgba(0,0,0,0.06);">' +
-                    '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #b8860b;padding-bottom:14px;margin-bottom:16px;">' +
+                return '<div style="font-family:Inter,sans-serif;width:190mm;max-width:190mm;margin:0 auto;padding:8mm;background:#fff;color:#1f2933;font-size:11.5px;line-height:1.42;border:1px solid #d7e0e8;border-radius:12px;box-shadow:none;box-sizing:border-box;overflow:hidden;">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #12324a;padding-bottom:8px;margin-bottom:8px;">' +
                     '<div>' + logoHtml + '</div>' +
-                    '<div style="text-align:right;"><div style="font-size:1.6rem;font-weight:700;font-family:\'Playfair Display\',serif;color:#b8860b;">' +
+                    '<div style="text-align:right;"><div style="font-size:1.6rem;font-weight:700;font-family:\'Playfair Display\',serif;color:#12324a;">' +
                     (branding && branding.companyName || 'Plan Holidays') +
                     '</div><div style="font-size:0.9rem;color:#666;">' + (branding && branding.tagline ||
                         'Luxury Travel Redefined') +
                     '</div><div style="font-size:0.8rem;color:#888;margin-top:2px;">' + (branding && branding
                         .telephone || '') + ' · ' + (branding && branding.email || '') +
                     '</div></div></div>' +
-                    '<div style="text-align:center;margin:6px 0 14px;"><h2 style="font-family:\'Playfair Display\',serif;font-size:2rem;color:#b8860b;margin:0;letter-spacing:1px;">Holiday Quotation</h2><div style="font-size:0.9rem;color:#666;">Quote #' +
+                    '<div style="text-align:center;margin:4px 0 8px;"><h2 style="font-family:\'Playfair Display\',serif;font-size:2rem;color:#12324a;margin:0;letter-spacing:1px;">Holiday Quotation</h2><div style="font-size:0.9rem;color:#666;">Quote #' +
                     (quote.quoteNumber || 'N/A') + (quote.quoteDate ? ' · ' + formatDateDisplay(quote.quoteDate) : '') + '</div></div>' +
-                    (custRows ? '<div style="background:#f9f6f0;padding:12px 18px;border-radius:10px;margin-bottom:12px;border-left:4px solid #b8860b;"><table style="width:100%;border-collapse:collapse;font-size:0.9rem;">' + custRows + '</table></div>' : '') +
+                    (custRows ? '<div style="background:#f8fafc;padding:9px 12px;border-radius:10px;margin-bottom:6px;border-left:4px solid #12324a;"><table style="width:100%;border-collapse:collapse;font-size:0.9rem;">' + custRows + '</table></div>' : '') +
                     flightsSection +
                     hotelsSection +
                     transfersSection +
                     activitiesSection +
                     paymentSection +
-                    (conditions ? '<div class="pdf-page-break" style="margin-top:14px;padding:14px 18px;background:#f9f6f0;border-radius:10px;font-size:0.85rem;color:#333;border:1px solid #eee;page-break-before:always;break-before:page;"><h5 style="margin:0 0 10px;font-size:1rem;color:#b8860b;">Booking Conditions</h5><div style="white-space:pre-wrap;line-height:1.6;word-break:break-word;">' + conditions + '</div></div>' : '') +
-                    '<div style="margin-top:14px;border-top:1px solid #eee;padding-top:10px;text-align:center;font-size:0.75rem;color:#999;">' +
+                    (conditions ? '<div class="pdf-compact-section" style="margin-top:5px;padding:9px 12px;background:#f8fafc;border-radius:10px;font-size:0.85rem;color:#333;border:1px solid #dbe5ec;"><h5 style="margin:0 0 5px;font-size:1rem;color:#12324a;">Booking Conditions</h5><div style="white-space:pre-wrap;line-height:1.38;word-break:break-word;">' + conditions + '</div></div>' : '') +
+                    '<div style="margin-top:6px;border-top:1px solid #dbe5ec;padding-top:6px;text-align:center;font-size:0.75rem;color:#999;">' +
                     (branding && branding.footer || '&copy; 2026 Plan Holidays UK. All rights reserved.') +
                     '<span style="display:block;margin-top:2px;">' + (branding && branding.website || '') + ' · ' +
                     (branding && branding.telephone || '') + ' · ' + (branding && branding.email || '') +
@@ -4841,14 +4841,14 @@
                 var logoHtml = branding && branding.logo ?
                     '<img src="' + branding.logo +
                     '" style="height:155px;max-width:285px;width:auto;border-radius:14px;object-fit:contain;" />' :
-                    '<h1 style="font-family:\'Playfair Display\',serif;font-size:2.2rem;color:#b8860b;">Plan Holidays</h1>';
+                    '<h1 style="font-family:\'Playfair Display\',serif;font-size:2.2rem;color:#12324a;">Plan Holidays</h1>';
 
                 var flightsHtml = (quote.flights || []).map(function(f) {
                     var imgHtml = f.airlineLogo ?
-                        '<div style="margin:8px 0;text-align:center;"><img src="' + f.airlineLogo +
-                        '" class="flight-image-large" style="max-width:100%;width:100%;height:auto;border-radius:8px;border:1px solid #eee;object-fit:contain;" /></div>' :
+                        '<div style="margin:4px 0;text-align:center;"><img src="' + f.airlineLogo +
+                        '" class="flight-image-large" style="max-width:100%;width:100%;height:auto;border-radius:8px;border:1px solid #dbe5ec;object-fit:contain;" /></div>' :
                         '';
-                    return '<div style="padding:8px 12px;border:1px solid #eee;border-radius:8px;margin:4px 0;background:#fafafa;"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;"><span><strong>' +
+                    return '<div style="padding:6px 9px;border:1px solid #dbe5ec;border-radius:8px;margin:2px 0;background:#f8fafc;"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;"><span><strong>' +
                         (f.airlineName || f.airlineCode || 'Flight') + '</strong> ' + (f.flightNumber || '') +
                         '</span><span>' + (f.origin || '') + ' → ' + (f.destination || '') +
                         '</span><span style="color:#666;font-size:0.8rem;">' + (f.departDate || '') + ' ' + (f
@@ -4859,7 +4859,7 @@
                 var hotelsHtml = (quote.hotels || []).map(function(h) {
                     var imgs = (h.images || []).map(function(img) {
                         return '<img src="' + img +
-                            '" style="height:180px;width:220px;object-fit:cover;border-radius:8px;border:1px solid #eee;" />';
+                            '" style="height:180px;width:220px;object-fit:cover;border-radius:8px;border:1px solid #dbe5ec;" />';
                     }).join('');
                     var passengers = [];
                     if (parseInt(h.adults || 0) > 0) passengers.push(h.adults + ' Adult' + (parseInt(h.adults) > 1 ? 's' : ''));
@@ -4875,11 +4875,11 @@
                     if (h.checkOut) rows += '<div><strong>Check-out Date:</strong> ' + (typeof formatDateDisplay === 'function' ? formatDateDisplay(h.checkOut) : h.checkOut) + '</div>';
                     if (nights) rows += '<div><strong>Total Nights:</strong> ' + nights + '</div>';
                     if (passStr) rows += '<div><strong>Passengers:</strong> ' + passStr + '</div>';
-                    return '<div style="padding:12px 16px;border:1px solid #eee;border-radius:10px;margin:6px 0;background:linear-gradient(135deg,#fdfbf5,#f9f6f0);box-shadow:0 1px 3px rgba(0,0,0,0.04);">' +
-                        (h.destination ? '<h5 style="margin:0 0 4px;font-size:1.05rem;color:#b8860b;font-family:\'Playfair Display\',serif;">' + h.destination + '</h5>' : '') +
-                        (h.hotelName ? '<div style="font-size:1rem;font-weight:700;margin-bottom:6px;color:#333;">' + h.hotelName + (h.hotelCategory ? ' <span style="font-weight:400;color:#888;font-size:0.85rem;">(' + h.hotelCategory + ')</span>' : '') + '</div>' : '') +
-                        (rows ? '<div style="font-size:0.85rem;line-height:1.7;color:#333;">' + rows + '</div>' : '') +
-                        (imgs ? '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">' + imgs + '</div>' : '') +
+                    return '<div style="padding:5px 7px;border:1px solid #dbe5ec;border-radius:8px;margin:3px 0;background:#f8fafc;box-shadow:none;">' +
+                        (h.destination ? '<h5 style="margin:0 0 4px;font-size:1.05rem;color:#12324a;font-family:\'Playfair Display\',serif;">' + h.destination + '</h5>' : '') +
+                        (h.hotelName ? '<div style="font-size:1rem;font-weight:700;margin-bottom:3px;color:#333;">' + h.hotelName + (h.hotelCategory ? ' <span style="font-weight:400;color:#888;font-size:0.85rem;">(' + h.hotelCategory + ')</span>' : '') + '</div>' : '') +
+                        (rows ? '<div style="font-size:0.85rem;line-height:1.45;color:#333;">' + rows + '</div>' : '') +
+                        (imgs ? '<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">' + imgs + '</div>' : '') +
                         (h.specialRequests ? '<div style="font-size:0.8rem;color:#888;margin-top:6px;font-style:italic;">Requests: ' + h.specialRequests + '</div>' : '') +
                         '</div>';
                 }).join('');
@@ -4894,7 +4894,7 @@
                     if (t.pickupTime) rows += '<div><strong>Pickup Time:</strong> ' + t.pickupTime + '</div>';
                     if (t.driverNotes) rows += '<div><strong>Driver Notes:</strong> ' + t.driverNotes + '</div>';
                     if (!rows) return '';
-                    return '<div style="padding:10px 14px;border:1px solid #eee;border-radius:8px;margin:6px 0;background:linear-gradient(135deg,#fdfbf5,#f9f6f0);font-size:0.85rem;line-height:1.7;">' +
+                    return '<div style="padding:7px 10px;border:1px solid #dbe5ec;border-radius:8px;margin:3px 0;background:#f8fafc;font-size:0.84rem;line-height:1.45;">' +
                         rows + '</div>';
                 }).join('');
 
@@ -4911,79 +4911,79 @@
                 var cur = quote.currency || 'GBP';
 
                 var scheduleHtml = (quote.instalments || []).map(function(s) {
-                    return '<tr><td style="padding:6px 10px;border:1px solid #eee;">' + s.instalment +
-                        '</td><td style="padding:6px 10px;border:1px solid #eee;">' + (typeof formatDateDisplay === 'function' ? formatDateDisplay(s.dueDate || '') : (s.dueDate || '')) +
-                        '</td><td style="padding:6px 10px;border:1px solid #eee;">' +
+                    return '<tr><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + s.instalment +
+                        '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + (typeof formatDateDisplay === 'function' ? formatDateDisplay(s.dueDate || '') : (s.dueDate || '')) +
+                        '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' +
                         formatCurrency(s.amount, cur) +
-                        '</td><td style="padding:6px 10px;border:1px solid #eee;">' + (s.status || 'Pending') +
+                        '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + (s.status || 'Pending') +
                         '</td></tr>';
                 }).join('');
 
                 var paymentHistoryHtml = '';
                 if (confirmedPayments.length) {
                     var rowsPay = confirmedPayments.map(function(p, i) {
-                        return '<tr><td style="padding:6px 10px;border:1px solid #eee;">' + (i + 1) +
-                            '</td><td style="padding:6px 10px;border:1px solid #eee;">' + (typeof formatDateDisplay === 'function' ? formatDateDisplay(p.date || p.paymentDate || p.createdAt || '') : (p.date || '')) +
-                            '</td><td style="padding:6px 10px;border:1px solid #eee;">' + (p.method || p.paymentMethod || '-') +
-                            '</td><td style="padding:6px 10px;border:1px solid #eee;">' + (p.reference || '-') +
-                            '</td><td style="padding:6px 10px;border:1px solid #eee;text-align:right;font-weight:600;color:#0a7d0a;">' +
+                        return '<tr><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + (i + 1) +
+                            '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + (typeof formatDateDisplay === 'function' ? formatDateDisplay(p.date || p.paymentDate || p.createdAt || '') : (p.date || '')) +
+                            '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + (p.method || p.paymentMethod || '-') +
+                            '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + (p.reference || '-') +
+                            '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;text-align:right;font-weight:600;color:#0a7d0a;">' +
                             formatCurrency(p.amount, cur) + '</td></tr>';
                     }).join('');
-                    paymentHistoryHtml = '<div style="margin-bottom:12px;"><h4 style="font-size:1.05rem;margin:0 0 8px;color:#b8860b;border-bottom:1px solid #eee;padding-bottom:6px;font-family:\'Playfair Display\',serif;">✅ Confirmed Payments Received</h4>' +
-                        '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;border:1px solid #eee;">' +
-                        '<thead><tr style="background:#eaf7ea;"><th style="padding:8px 10px;border:1px solid #eee;">#</th><th style="padding:8px 10px;border:1px solid #eee;">Date</th><th style="padding:8px 10px;border:1px solid #eee;">Method</th><th style="padding:8px 10px;border:1px solid #eee;">Reference</th><th style="padding:8px 10px;border:1px solid #eee;text-align:right;">Amount</th></tr></thead>' +
+                    paymentHistoryHtml = '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;font-family:\'Playfair Display\',serif;">✅ Confirmed Payments Received</h4>' +
+                        '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;border:1px solid #dbe5ec;">' +
+                        '<thead><tr style="background:#eaf7ea;"><th style="padding:5px 7px;border:1px solid #dbe5ec;">#</th><th style="padding:5px 7px;border:1px solid #dbe5ec;">Date</th><th style="padding:5px 7px;border:1px solid #dbe5ec;">Method</th><th style="padding:5px 7px;border:1px solid #dbe5ec;">Reference</th><th style="padding:5px 7px;border:1px solid #dbe5ec;text-align:right;">Amount</th></tr></thead>' +
                         '<tbody>' + rowsPay + '</tbody></table></div>';
                 }
 
                 var displayInvoiceNumber = quote.invoiceNumber || quote.quoteNumber || 'N/A';
                 var statusBadge = (balance <= 0 && totalReceived > 0) ? '<span style="display:inline-block;background:#0a7d0a;color:#fff;padding:4px 12px;border-radius:20px;font-size:0.75rem;letter-spacing:1px;font-weight:600;">PAID IN FULL</span>' :
-                    (totalReceived > 0) ? '<span style="display:inline-block;background:#b8860b;color:#fff;padding:4px 12px;border-radius:20px;font-size:0.75rem;letter-spacing:1px;font-weight:600;">PARTIALLY PAID</span>' :
+                    (totalReceived > 0) ? '<span style="display:inline-block;background:#12324a;color:#fff;padding:4px 12px;border-radius:20px;font-size:0.75rem;letter-spacing:1px;font-weight:600;">PARTIALLY PAID</span>' :
                     '<span style="display:inline-block;background:#c33;color:#fff;padding:4px 12px;border-radius:20px;font-size:0.75rem;letter-spacing:1px;font-weight:600;">UNPAID</span>';
 
                 var custRows = '';
-                if (quote.customerName) custRows += '<tr><td style="padding:4px 8px;font-weight:600;width:140px;color:#8b6914;">Customer:</td><td style="padding:4px 8px;">' + quote.customerName + '</td></tr>';
-                if (quote.customerPhone) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#8b6914;">Phone:</td><td style="padding:4px 8px;">' + quote.customerPhone + '</td></tr>';
-                if (quote.customerEmail) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#8b6914;">Email:</td><td style="padding:4px 8px;">' + quote.customerEmail + '</td></tr>';
-                if (routeDisplay) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#8b6914;">Route:</td><td style="padding:4px 8px;font-weight:600;color:#b8860b;">' + routeDisplay + '</td></tr>';
-                if (passengerTypeSummary) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#8b6914;">Passenger Types:</td><td style="padding:4px 8px;">' + passengerTypeSummary + '</td></tr>';
-                if (quote.agentName) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#8b6914;">Agent:</td><td style="padding:4px 8px;">' + quote.agentName + '</td></tr>';
-                if (quote.assignedTo || quote.agentName) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#8b6914;">Assigned To:</td><td style="padding:4px 8px;">' + (quote.assignedTo || quote.agentName) + '</td></tr>';
-                if (deadline) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#8b6914;">Balance Deadline:</td><td style="padding:4px 8px;color:#c33;font-weight:600;">' + (typeof formatDateDisplay === 'function' ? formatDateDisplay(deadline) : deadline) + '</td></tr>';
+                if (quote.customerName) custRows += '<tr><td style="padding:4px 8px;font-weight:600;width:140px;color:#0f766e;">Customer:</td><td style="padding:4px 8px;">' + quote.customerName + '</td></tr>';
+                if (quote.customerPhone) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Phone:</td><td style="padding:4px 8px;">' + quote.customerPhone + '</td></tr>';
+                if (quote.customerEmail) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Email:</td><td style="padding:4px 8px;">' + quote.customerEmail + '</td></tr>';
+                if (routeDisplay) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Route:</td><td style="padding:4px 8px;font-weight:600;color:#12324a;">' + routeDisplay + '</td></tr>';
+                if (passengerTypeSummary) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Passenger Types:</td><td style="padding:4px 8px;">' + passengerTypeSummary + '</td></tr>';
+                if (quote.agentName) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Agent:</td><td style="padding:4px 8px;">' + quote.agentName + '</td></tr>';
+                if (quote.assignedTo || quote.agentName) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Assigned To:</td><td style="padding:4px 8px;">' + (quote.assignedTo || quote.agentName) + '</td></tr>';
+                if (deadline) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Balance Deadline:</td><td style="padding:4px 8px;color:#c33;font-weight:600;">' + (typeof formatDateDisplay === 'function' ? formatDateDisplay(deadline) : deadline) + '</td></tr>';
 
-                return '<div style="font-family:Inter,sans-serif;max-width:210mm;margin:0 auto;padding:22px;background:#fff;color:#222;font-size:12px;line-height:1.55;border:2px solid #b8860b;border-radius:16px;box-shadow:0 4px 24px rgba(184,134,11,0.12);position:relative;">' +
+                return '<div style="font-family:Inter,sans-serif;width:190mm;max-width:190mm;margin:0 auto;padding:8mm;background:#fff;color:#1f2933;font-size:11.5px;line-height:1.42;border:1.5px solid #12324a;border-radius:12px;box-shadow:none;position:relative;box-sizing:border-box;overflow:hidden;">' +
                     // Decorative top ribbon
-                    '<div style="position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,#b8860b,#d4a935,#b8860b);border-radius:14px 14px 0 0;"></div>' +
-                    '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px double #b8860b;padding:12px 0 14px;margin-bottom:14px;">' +
+                    '<div style="position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,#12324a,#2a6f84,#12324a);border-radius:14px 14px 0 0;"></div>' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px double #12324a;padding:8px 0 8px;margin-bottom:7px;">' +
                     '<div>' + logoHtml + '</div>' +
-                    '<div style="text-align:right;"><div style="font-size:1.7rem;font-weight:700;font-family:\'Playfair Display\',serif;color:#b8860b;letter-spacing:0.5px;">' +
+                    '<div style="text-align:right;"><div style="font-size:1.7rem;font-weight:700;font-family:\'Playfair Display\',serif;color:#12324a;letter-spacing:0.5px;">' +
                     (branding && branding.companyName || 'Plan Holidays') +
                     '</div><div style="font-size:0.9rem;color:#666;font-style:italic;">' + (branding && branding.tagline ||
                         'Luxury Travel Redefined') +
                     '</div><div style="font-size:0.78rem;color:#888;margin-top:3px;">' + (branding && branding
                         .telephone || '') + ' · ' + (branding && branding.email || '') +
                     '</div></div></div>' +
-                    '<div style="text-align:center;margin:4px 0 16px;padding:14px 0;background:linear-gradient(135deg,#fdfbf5,#f9f6f0);border-radius:10px;border:1px solid #ebe1cc;">' +
-                    '<h2 style="font-family:\'Playfair Display\',serif;font-size:2.4rem;color:#b8860b;margin:0;letter-spacing:6px;font-weight:700;">INVOICE</h2>' +
+                    '<div style="text-align:center;margin:3px 0 8px;padding:8px 0;background:linear-gradient(135deg,#f8fafc,#f8fafc);border-radius:10px;border:1px solid #d8e3ea;">' +
+                    '<h2 style="font-family:\'Playfair Display\',serif;font-size:2.4rem;color:#12324a;margin:0;letter-spacing:6px;font-weight:700;">INVOICE</h2>' +
                     '<div style="font-size:0.9rem;color:#666;margin-top:4px;">Invoice <strong>#' + displayInvoiceNumber + '</strong>' + (quote.quoteDate ? ' · Issued ' + (typeof formatDateDisplay === 'function' ? formatDateDisplay(quote.quoteDate) : quote.quoteDate) : '') + '</div>' +
-                    '<div style="margin-top:8px;">' + statusBadge + '</div>' +
+                    '<div style="margin-top:4px;">' + statusBadge + '</div>' +
                     '</div>' +
-                    (custRows ? '<div style="background:linear-gradient(135deg,#fdfbf5,#f5efe0);padding:12px 18px;border-radius:10px;margin-bottom:14px;border-left:4px solid #b8860b;box-shadow:0 1px 3px rgba(0,0,0,0.03);"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;">' + custRows + '</table></div>' : '') +
-                    (flightsHtml ? '<div style="margin-bottom:12px;"><h4 style="font-size:1.05rem;margin:0 0 8px;color:#b8860b;border-bottom:1px solid #eee;padding-bottom:6px;font-family:\'Playfair Display\',serif;">✈️ Flights</h4>' + flightsHtml + '</div>' : '') +
-                    (hotelsHtml ? '<div style="margin-bottom:12px;"><h4 style="font-size:1.05rem;margin:0 0 8px;color:#b8860b;border-bottom:1px solid #eee;padding-bottom:6px;font-family:\'Playfair Display\',serif;">🏨 Hotels</h4>' + hotelsHtml + '</div>' : '') +
-                    (transfersHtml ? '<div style="margin-bottom:12px;"><h4 style="font-size:1.05rem;margin:0 0 8px;color:#b8860b;border-bottom:1px solid #eee;padding-bottom:6px;font-family:\'Playfair Display\',serif;">🚗 Transfers</h4>' + transfersHtml + '</div>' : '') +
+                    (custRows ? '<div style="background:linear-gradient(135deg,#f8fafc,#eef4f8);padding:9px 12px;border-radius:10px;margin-bottom:7px;border-left:4px solid #12324a;box-shadow:0 1px 3px rgba(0,0,0,0.03);"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;">' + custRows + '</table></div>' : '') +
+                    (flightsHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;font-family:\'Playfair Display\',serif;">✈️ Flights</h4>' + flightsHtml + '</div>' : '') +
+                    (hotelsHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;font-family:\'Playfair Display\',serif;">🏨 Hotels</h4>' + hotelsHtml + '</div>' : '') +
+                    (transfersHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;font-family:\'Playfair Display\',serif;">🚗 Transfers</h4>' + transfersHtml + '</div>' : '') +
                     // Payment Summary Grid
-                    '<div style="margin-bottom:12px;"><h4 style="font-size:1.05rem;margin:0 0 8px;color:#b8860b;border-bottom:1px solid #eee;padding-bottom:6px;font-family:\'Playfair Display\',serif;">💳 Payment Summary</h4>' +
-                    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:6px 0 12px;">' +
-                    '<div style="padding:12px;background:linear-gradient(135deg,#fdfbf5,#f5efe0);border-radius:8px;border:1px solid #ebe1cc;text-align:center;"><div style="font-size:0.7rem;color:#8b6914;text-transform:uppercase;letter-spacing:1px;">Total</div><div style="font-size:1.05rem;font-weight:700;color:#333;margin-top:3px;">' + formatCurrency(totalSell, cur) + '</div></div>' +
-                    (pricePerPerson > 0 ? '<div style="padding:12px;background:linear-gradient(135deg,#fdfbf5,#f5efe0);border-radius:8px;border:1px solid #ebe1cc;text-align:center;"><div style="font-size:0.7rem;color:#8b6914;text-transform:uppercase;letter-spacing:1px;">Per Person</div><div style="font-size:1.05rem;font-weight:700;color:#333;margin-top:3px;">' + formatCurrency(pricePerPerson, cur) + '</div></div>' : '<div style="padding:12px;background:linear-gradient(135deg,#fdfbf5,#f5efe0);border-radius:8px;border:1px solid #ebe1cc;text-align:center;"><div style="font-size:0.7rem;color:#8b6914;text-transform:uppercase;letter-spacing:1px;">Currency</div><div style="font-size:1.05rem;font-weight:700;color:#333;margin-top:3px;">' + cur + '</div></div>') +
-                    '<div style="padding:12px;background:linear-gradient(135deg,#eaf7ea,#d5f0d5);border-radius:8px;border:1px solid #b8dcb8;text-align:center;"><div style="font-size:0.7rem;color:#0a5d0a;text-transform:uppercase;letter-spacing:1px;">Paid</div><div style="font-size:1.05rem;font-weight:700;color:#0a5d0a;margin-top:3px;">' + formatCurrency(totalReceived, cur) + '</div></div>' +
-                    '<div style="padding:12px;background:' + (balance <= 0 ? 'linear-gradient(135deg,#eaf7ea,#d5f0d5)' : 'linear-gradient(135deg,#fff0e0,#ffe0c0)') + ';border-radius:8px;border:1px solid ' + (balance <= 0 ? '#b8dcb8' : '#e6c9a0') + ';text-align:center;"><div style="font-size:0.7rem;color:' + (balance <= 0 ? '#0a5d0a' : '#8b4a14') + ';text-transform:uppercase;letter-spacing:1px;">Balance</div><div style="font-size:1.05rem;font-weight:700;color:' + (balance <= 0 ? '#0a5d0a' : '#8b4a14') + ';margin-top:3px;">' + formatCurrency(balance, cur) + '</div></div>' +
+                    '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;font-family:\'Playfair Display\',serif;">💳 Payment Summary</h4>' +
+                    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:3px 0 6px;">' +
+                    '<div style="padding:8px;background:linear-gradient(135deg,#f8fafc,#eef4f8);border-radius:8px;border:1px solid #d8e3ea;text-align:center;"><div style="font-size:0.7rem;color:#0f766e;text-transform:uppercase;letter-spacing:1px;">Total</div><div style="font-size:1.05rem;font-weight:700;color:#333;margin-top:3px;">' + formatCurrency(totalSell, cur) + '</div></div>' +
+                    (pricePerPerson > 0 ? '<div style="padding:8px;background:linear-gradient(135deg,#f8fafc,#eef4f8);border-radius:8px;border:1px solid #d8e3ea;text-align:center;"><div style="font-size:0.7rem;color:#0f766e;text-transform:uppercase;letter-spacing:1px;">Per Person</div><div style="font-size:1.05rem;font-weight:700;color:#333;margin-top:3px;">' + formatCurrency(pricePerPerson, cur) + '</div></div>' : '<div style="padding:8px;background:linear-gradient(135deg,#f8fafc,#eef4f8);border-radius:8px;border:1px solid #d8e3ea;text-align:center;"><div style="font-size:0.7rem;color:#0f766e;text-transform:uppercase;letter-spacing:1px;">Currency</div><div style="font-size:1.05rem;font-weight:700;color:#333;margin-top:3px;">' + cur + '</div></div>') +
+                    '<div style="padding:8px;background:linear-gradient(135deg,#eaf7ea,#d5f0d5);border-radius:8px;border:1px solid #b8dcb8;text-align:center;"><div style="font-size:0.7rem;color:#0a5d0a;text-transform:uppercase;letter-spacing:1px;">Paid</div><div style="font-size:1.05rem;font-weight:700;color:#0a5d0a;margin-top:3px;">' + formatCurrency(totalReceived, cur) + '</div></div>' +
+                    '<div style="padding:8px;background:' + (balance <= 0 ? 'linear-gradient(135deg,#eaf7ea,#d5f0d5)' : 'linear-gradient(135deg,#fff0e0,#ffe0c0)') + ';border-radius:8px;border:1px solid ' + (balance <= 0 ? '#b8dcb8' : '#e6c9a0') + ';text-align:center;"><div style="font-size:0.7rem;color:' + (balance <= 0 ? '#0a5d0a' : '#8b4a14') + ';text-transform:uppercase;letter-spacing:1px;">Balance</div><div style="font-size:1.05rem;font-weight:700;color:' + (balance <= 0 ? '#0a5d0a' : '#8b4a14') + ';margin-top:3px;">' + formatCurrency(balance, cur) + '</div></div>' +
                     '</div>' +
-                    (scheduleHtml ? '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;border:1px solid #eee;"><thead><tr style="background:#f0ebe3;"><th style="padding:8px 12px;border:1px solid #eee;">#</th><th style="padding:8px 12px;border:1px solid #eee;">Due Date</th><th style="padding:8px 12px;border:1px solid #eee;">Amount</th><th style="padding:8px 12px;border:1px solid #eee;">Status</th></tr></thead><tbody>' + scheduleHtml + '</tbody></table>' : '') +
+                    (scheduleHtml ? '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;border:1px solid #dbe5ec;"><thead><tr style="background:#eaf1f6;"><th style="padding:5px 8px;border:1px solid #dbe5ec;">#</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Due Date</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Amount</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Status</th></tr></thead><tbody>' + scheduleHtml + '</tbody></table>' : '') +
                     '</div>' +
                     paymentHistoryHtml +
-                    (conditions ? '<div class="pdf-page-break" style="margin-top:14px;padding:14px 18px;background:linear-gradient(135deg,#fdfbf5,#f9f6f0);border-radius:10px;font-size:0.85rem;color:#333;border:1px solid #eee;page-break-before:always;break-before:page;"><h5 style="margin:0 0 10px;font-size:1rem;color:#b8860b;font-family:\'Playfair Display\',serif;">Booking Conditions</h5><div style="white-space:pre-wrap;line-height:1.6;word-break:break-word;">' + conditions + '</div></div>' : '') +
-                    '<div style="margin-top:14px;border-top:2px double #b8860b;padding-top:10px;text-align:center;font-size:0.75rem;color:#999;">' +
+                    (conditions ? '<div class="pdf-compact-section" style="margin-top:5px;padding:9px 12px;background:linear-gradient(135deg,#f8fafc,#f8fafc);border-radius:10px;font-size:0.85rem;color:#333;border:1px solid #dbe5ec;"><h5 style="margin:0 0 5px;font-size:1rem;color:#12324a;font-family:\'Playfair Display\',serif;">Booking Conditions</h5><div style="white-space:pre-wrap;line-height:1.38;word-break:break-word;">' + conditions + '</div></div>' : '') +
+                    '<div style="margin-top:6px;border-top:2px double #12324a;padding-top:6px;text-align:center;font-size:0.75rem;color:#999;">' +
                     (branding && branding.footer || '&copy; 2026 Plan Holidays UK. All rights reserved.') +
                     '<span style="display:block;margin-top:2px;">' + (branding && branding.website || '') + ' · ' +
                     (branding && branding.telephone || '') + ' · ' + (branding && branding.email || '') +
@@ -5280,7 +5280,7 @@
                 var html = '<h3>Theme Settings</h3>' +
                     '<p class="text-muted text-sm">Choose Light, Dark, or upload a custom wallpaper. Use Save Custom Theme after selecting an image.</p>' +
                     '<div class="theme-choice-grid"><div class="theme-choice" onclick="window._applyTheme(\'light\')"><strong>Light Theme</strong><span class="text-muted text-sm">Clean bright workspace.</span></div><div class="theme-choice" onclick="window._applyTheme(\'dark\')"><strong>Dark Theme</strong><span class="text-muted text-sm">Low-light dashboard.</span></div><div class="theme-choice" onclick="window._applyCustomTheme()"><strong>Custom Wallpaper</strong><span class="text-muted text-sm">Apply saved wallpaper.</span></div></div>' +
-                    '<div class="form-group"><label>Upload Custom Wallpaper</label><input type="file" id="themeImageInput" accept="image/*" /><div class="input-hint">After upload, click Save Custom Theme. Colours will be auto-adjusted for readable transparent panels.</div><div id="themePreview" style="margin-top:8px;"></div></div>' +
+                    '<div class="form-group"><label>Upload Custom Wallpaper</label><input type="file" id="themeImageInput" accept="image/*" /><div class="input-hint">After upload, click Save Custom Theme. Colours will be auto-adjusted for readable transparent panels.</div><div id="themePreview" style="margin-top:4px;"></div></div>' +
                     '<div class="modal-actions"><button class="btn btn-success" id="btnSaveCustomTheme"><i class="fas fa-save"></i> Save Custom Theme</button><button class="btn btn-primary" id="btnApplyCustomTheme"><i class="fas fa-check"></i> Apply Custom</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
                 showModal(html);
                 function updateThemePreview(imgData, label) {
@@ -5749,7 +5749,7 @@
                             'agent') + ')</option>';
                     }).join('');
                     assignHtml =
-                        '<div class="search-bar" style="margin-top:8px;"><span style="font-size:0.85rem;color:var(--text2);">Assign to agent/manager:</span><select id="assignAgentSelect" style="padding:8px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--input-bg);color:var(--text);"><option value="">Select...</option>' +
+                        '<div class="search-bar" style="margin-top:4px;"><span style="font-size:0.85rem;color:var(--text2);">Assign to agent/manager:</span><select id="assignAgentSelect" style="padding:8px 12px;border:1px solid var(--card-border);border-radius:8px;background:var(--input-bg);color:var(--text);"><option value="">Select...</option>' +
                         agentOptions +
                         '</select><button class="btn btn-sm btn-primary" onclick="window._assignSelectedInvoices()"><i class="fas fa-user-check"></i> Assign</button></div>';
                 }
@@ -6340,14 +6340,14 @@
                         (data.currency === 'GBP' ? 'selected' : '') + '>GBP (£)</option><option value="USD" ' +
                         (data.currency === 'USD' ? 'selected' : '') + '>USD ($)</option><option value="EUR" ' +
                         (data.currency === 'EUR' ? 'selected' : '') + '>EUR (€)</option><option value="PKR" ' + (data.currency === 'PKR' ? 'selected' : '') + '>PKR (₨)</option><option value="SAR" ' + (data.currency === 'SAR' ? 'selected' : '') + '>Saudi Riyal (﷼)</option></select></div>' +
-                        '<div class="form-group"><label>Company Logo</label><input type="file" id="brandLogoInput" accept=".jpg,.jpeg,.png,.svg,.gif" /><div class="input-hint">Upload a logo (recommended: 200x80px).</div><div id="brandLogoPreview" style="display:flex;align-items:center;gap:12px;margin-top:8px;"><img id="brandLogoImg" src="' +
+                        '<div class="form-group"><label>Company Logo</label><input type="file" id="brandLogoInput" accept=".jpg,.jpeg,.png,.svg,.gif" /><div class="input-hint">Upload a logo (recommended: 200x80px).</div><div id="brandLogoPreview" style="display:flex;align-items:center;gap:12px;margin-top:4px;"><img id="brandLogoImg" src="' +
                         (data.logo ||
                             'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2250%22 viewBox=%220 0 80 50%22%3E%3Crect width=%2280%22 height=%2250%22 rx=%228%22 fill=%22%23b8860b%22/%3E%3Ctext x=%2218%22 y=%2235%22 font-family=%22serif%22 font-size=%2228%22 fill=%22%23fff%22 font-weight=%22bold%22%3EPH%3C/text%3E%3C/svg%3E'
                             ) +
                         '" style="height:60px;width:auto;border-radius:8px;object-fit:contain;" /></div></div>' +
                         '</div><div class="branding-preview mt-16"><strong>Preview:</strong> <span id="brandPreviewText">' +
                         (data.header || data.companyName || 'Plan Holidays') +
-                        '</span><div style="margin-top:8px;"><img id="brandPreviewLogo" src="' + (data.logo ||
+                        '</span><div style="margin-top:4px;"><img id="brandPreviewLogo" src="' + (data.logo ||
                             'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2250%22 viewBox=%220 0 80 50%22%3E%3Crect width=%2280%22 height=%2250%22 rx=%228%22 fill=%22%23b8860b%22/%3E%3Ctext x=%2218%22 y=%2235%22 font-family=%22serif%22 font-size=%2228%22 fill=%22%23fff%22 font-weight=%22bold%22%3EPH%3C/text%3E%3C/svg%3E'
                             ) +
                         '" style="height:80px;width:auto;border-radius:8px;object-fit:contain;" /></div></div>' +
@@ -6677,7 +6677,7 @@
                               '<span><strong>' + daysWorked + '</strong> days worked</span>' +
                               '<span>Today: ' + (todayShift ? formatTime(todayShift.checkIn) + (todayShift.checkOut ? ' → ' + formatTime(todayShift.checkOut) : ' (active)') : 'No shift') + '</span>' +
                             '</div>' +
-                            '<div style="margin-top:8px;">' + chartSvg + '</div>' +
+                            '<div style="margin-top:4px;">' + chartSvg + '</div>' +
                             '<details style="margin-top:8px;font-size:0.75rem;color:var(--text2);"><summary style="cursor:pointer;">All shifts (' + agentTimes.length + ')</summary>' +
                             '<div style="max-height:180px;overflow-y:auto;margin-top:4px;">' +
                             (agentTimes.map(function(t) {
@@ -6746,7 +6746,7 @@
                 showModal(
                     '<h3><i class="fas fa-database"></i> Backup & Restore</h3>' +
                     '<div class="form-group" style="margin-top:12px;"><label><strong>What do you want to backup?</strong></label>' +
-                    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:8px;">' +
+                    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:4px;">' +
                     '<label><input type="checkbox" class="bkChk" value="all" id="bkAll" checked/> All (single Excel, tabs)</label>' +
                     '<label><input type="checkbox" class="bkChk" value="quotes"/> Quotes History</label>' +
                     '<label><input type="checkbox" class="bkChk" value="invoices"/> Invoices</label>' +
@@ -6785,7 +6785,7 @@
                     '<hr style="margin:16px 0;border:none;border-top:1px solid var(--card-border);" />' +
                     '<h4 style="margin:0 0 8px;color:var(--text);"><i class="fas fa-cloud-upload-alt"></i> Google Sheets Auto-Backup</h4>' +
                     '<p class="text-muted text-sm">Automatically back up new data to Google Sheets every 6 hours via Apps Script.</p>' +
-                    '<div class="form-group" style="margin-top:8px;">' +
+                    '<div class="form-group" style="margin-top:4px;">' +
                     '<label><strong>Apps Script Web App URL</strong></label>' +
                     '<div style="display:flex;gap:8px;margin-top:4px;">' +
                     '<input type="url" id="googleBackupUrl" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--card-border);background:var(--input-bg);color:var(--text);"/>' +
@@ -9161,7 +9161,7 @@
             async function showGroupForm(groupId){if(!isAdmin())return showToast('Only admin can manage groups.','error');var users=await readData('users','ph_users',true)||{},groups=await readData('chatGroups','ph_chat_groups',true)||{},g=groupId?(groups[groupId]||null):null;if(groupId&&!g)return showToast('Group not found.','error');var memberSet={};(g&&g.members||[STATE.currentUser.username]).forEach(function(x){memberSet[x]=true});var boxes=Object.keys(users).map(function(k){if(users[k].role==='readonly')return'';return'<label><input type="checkbox" class="grp-member" value="'+k+'" '+(memberSet[k]?'checked':'')+' /> '+escapeHTML(users[k].name||k)+' <span class="text-muted text-xs">@'+escapeHTML(k)+'</span></label>'}).join('');showModal('<h3><i class="fas fa-users"></i> '+(g?'Edit Group':'New Group')+'</h3><div class="form-group"><label>Group Name</label><input id="grpName" value="'+escapeHTML(g&&g.name||'')+'" /></div><div class="form-group"><label>Add / Remove Agents</label><div class="group-member-grid">'+boxes+'</div></div><div class="modal-actions"><button class="btn btn-primary" id="btnSaveGroup"><i class="fas fa-save"></i> Save Group</button>'+(g?'<button class="btn btn-danger" onclick="window._deleteGroup(\''+groupId+'\')"><i class="fas fa-trash"></i> Delete Group</button>':'')+'<button class="btn btn-outline" onclick="showChatUI()">Back to Chat</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');document.getElementById('btnSaveGroup').onclick=async function(){var name=(document.getElementById('grpName').value||'').trim();if(!name)return showToast('Enter a group name.','warning');var members=Array.from(document.querySelectorAll('.grp-member:checked')).map(function(c){return c.value});if(members.indexOf(STATE.currentUser.username)===-1)members.push(STATE.currentUser.username);var oldMembers=(g&&g.members)||[],added=members.filter(function(x){return oldMembers.indexOf(x)===-1});var id=groupId||genId(),data=Object.assign({},g||{createdAt:getNowISO(),createdBy:STATE.currentUser.username},{id:id,name:name,members:members,updatedAt:getNowISO()});await writeData('chatGroups/'+id,data,'ph_chat_group_'+id);var all=await readData('chatGroups','ph_chat_groups',true)||{};all[id]=data;try{localStorage.setItem('ph_chat_groups',JSON.stringify(all))}catch(_){};if(added.length)await _writeGroupSystemMessage(id,'You were added to group "'+name+'".',members);showToast('Group saved. Added agents will be notified.','success');showChatUI()}}
             window.showGroupForm=showGroupForm;
             window._deleteGroup=async function(groupId){if(!isAdmin())return;if(!confirm('Delete this group? Existing chat history remains saved but the group will disappear from contacts.'))return;await removeData('chatGroups/'+groupId,'ph_chat_group_'+groupId);var all=await readData('chatGroups','ph_chat_groups',true)||{};delete all[groupId];try{localStorage.setItem('ph_chat_groups',JSON.stringify(all))}catch(_){};showToast('Group deleted.','success');showChatUI()};
-            async function showChatThemeSettings(){var set=_chatSettings();var layout=set.layout||'messenger';showModal('<h3><i class="fas fa-palette"></i> Chat Appearance</h3><p class="text-muted text-sm">Upload a chat background. Text and bubble colours auto-adjust for readability.</p><div class="form-group"><label>Chat Background Image</label><input type="file" id="chatBgInput" accept="image/*" /><div id="chatBgPreview" style="margin-top:8px;">'+(set.bg?'<img src="'+set.bg+'" class="theme-preview-img" />':'')+'</div></div>'+(isAdmin()?'<div class="form-group"><label>Admin Layout Preset</label><select id="chatLayoutSelect"><option value="messenger" '+(layout==='messenger'?'selected':'')+'>Messenger</option><option value="whatsapp" '+(layout==='whatsapp'?'selected':'')+'>WhatsApp Style</option><option value="skype" '+(layout==='skype'?'selected':'')+'>Skype Style</option><option value="slack" '+(layout==='slack'?'selected':'')+'>Slack Style</option></select><div class="input-hint">Admin layout is saved for the portal. Background remains personal per browser.</div></div>':'')+'<div class="modal-actions"><button class="btn btn-primary" id="btnSaveChatTheme"><i class="fas fa-save"></i> Save</button><button class="btn btn-outline" id="btnClearChatBg">Clear Background</button><button class="btn btn-outline" onclick="showChatUI()">Back to Chat</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');var pending=set.bg||'',dark=set.bgDark!==false;var inp=document.getElementById('chatBgInput');inp.onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){pending=ev.target.result;document.getElementById('chatBgPreview').innerHTML='<img src="'+pending+'" class="theme-preview-img" />';_analyseImg(pending,function(meta){dark=meta.isDark;showToast('Background ready. Click Save.','success')})};r.readAsDataURL(f)};document.getElementById('btnClearChatBg').onclick=function(){pending='';set.bg='';_saveChatSettings(set);showToast('Chat background cleared.','success');showChatUI()};document.getElementById('btnSaveChatTheme').onclick=async function(){set.bg=pending;set.bgDark=dark;if(isAdmin()){set.layout=document.getElementById('chatLayoutSelect').value;await writeData('settings/chatLayout',{layout:set.layout,updatedAt:getNowISO(),updatedBy:STATE.currentUser.username},'ph_chat_layout')} _saveChatSettings(set);showToast('Chat appearance saved.','success');showChatUI()}}
+            async function showChatThemeSettings(){var set=_chatSettings();var layout=set.layout||'messenger';showModal('<h3><i class="fas fa-palette"></i> Chat Appearance</h3><p class="text-muted text-sm">Upload a chat background. Text and bubble colours auto-adjust for readability.</p><div class="form-group"><label>Chat Background Image</label><input type="file" id="chatBgInput" accept="image/*" /><div id="chatBgPreview" style="margin-top:4px;">'+(set.bg?'<img src="'+set.bg+'" class="theme-preview-img" />':'')+'</div></div>'+(isAdmin()?'<div class="form-group"><label>Admin Layout Preset</label><select id="chatLayoutSelect"><option value="messenger" '+(layout==='messenger'?'selected':'')+'>Messenger</option><option value="whatsapp" '+(layout==='whatsapp'?'selected':'')+'>WhatsApp Style</option><option value="skype" '+(layout==='skype'?'selected':'')+'>Skype Style</option><option value="slack" '+(layout==='slack'?'selected':'')+'>Slack Style</option></select><div class="input-hint">Admin layout is saved for the portal. Background remains personal per browser.</div></div>':'')+'<div class="modal-actions"><button class="btn btn-primary" id="btnSaveChatTheme"><i class="fas fa-save"></i> Save</button><button class="btn btn-outline" id="btnClearChatBg">Clear Background</button><button class="btn btn-outline" onclick="showChatUI()">Back to Chat</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');var pending=set.bg||'',dark=set.bgDark!==false;var inp=document.getElementById('chatBgInput');inp.onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){pending=ev.target.result;document.getElementById('chatBgPreview').innerHTML='<img src="'+pending+'" class="theme-preview-img" />';_analyseImg(pending,function(meta){dark=meta.isDark;showToast('Background ready. Click Save.','success')})};r.readAsDataURL(f)};document.getElementById('btnClearChatBg').onclick=function(){pending='';set.bg='';_saveChatSettings(set);showToast('Chat background cleared.','success');showChatUI()};document.getElementById('btnSaveChatTheme').onclick=async function(){set.bg=pending;set.bgDark=dark;if(isAdmin()){set.layout=document.getElementById('chatLayoutSelect').value;await writeData('settings/chatLayout',{layout:set.layout,updatedAt:getNowISO(),updatedBy:STATE.currentUser.username},'ph_chat_layout')} _saveChatSettings(set);showToast('Chat appearance saved.','success');showChatUI()}}
             window.showChatThemeSettings=showChatThemeSettings;
             loadChatContacts=async function(){var u=STATE.currentUser;if(!u)return;var users=await readData('users','ph_users',true)||{};STATE.users=users;var groups=await readData('chatGroups','ph_chat_groups',true)||{};STATE.chatGroups=groups;var allMsgs=await readData('chatMessages','ph_chat_messages',true)||{},inc=_mrIncoming(allMsgs),unr={};inc.forEach(function(m){var k=m.groupId||m.from;unr[k]=(unr[k]||0)+1});var list=document.getElementById('chatContactsList');if(!list)return;function enc(v){return encodeURIComponent(String(v||''))}function sec(t){return'<div class="chat-contact-section">'+escapeHTML(t)+'</div>'}function key(v){return escapeHTML(String(v||''))}var html='',groupHtml='',directHtml='',pairHtml='';Object.keys(groups).forEach(function(gid){var g=groups[gid]||{};if(!_groupVisible(g,u))return;groupHtml+='<div class="chat-contact" data-key="group_'+key(gid)+'" data-name="'+escapeHTML(g.name||gid).toLowerCase()+'" onclick="window._selectChatContact(null,decodeURIComponent(\''+enc(gid)+'\'),decodeURIComponent(\''+enc(g.name||gid)+'\'),null)"><div class="chat-avatar"><i class="fas fa-users"></i></div><div class="chat-contact-main"><div class="chat-contact-name">'+escapeHTML(g.name||gid)+'</div><div class="chat-contact-sub">Group · '+(g.members||[]).length+' member(s)</div></div>'+(unr[gid]?'<span class="mini-badge">'+unr[gid]+'</span>':'')+(isAdmin()?'<div class="chat-admin-actions"><button title="Manage group" onclick="event.stopPropagation();showGroupForm(\''+escapeHTML(gid)+'\')"><i class="fas fa-pen"></i></button><button title="Delete group" onclick="event.stopPropagation();window._deleteGroup(\''+escapeHTML(gid)+'\')"><i class="fas fa-trash"></i></button></div>':'')+'</div>'});if(groupHtml)html+=sec('Groups')+groupHtml;Object.keys(users).forEach(function(name){if(name===u.username)return;var x=users[name]||{},display=x.name||name;directHtml+='<div class="chat-contact '+(isAdmin()?'admin-chat':'')+'" data-key="user_'+key(name)+'" data-name="'+escapeHTML((display)+' '+name).toLowerCase()+'" onclick="window._selectChatContact(decodeURIComponent(\''+enc(name)+'\'),null,decodeURIComponent(\''+enc(display)+'\'),null)"><div class="chat-avatar">'+_mrInit(display)+'</div><div class="chat-contact-main"><div class="chat-contact-name">'+escapeHTML(display)+'</div><div class="chat-contact-sub">'+(isAdmin()?'Admin chat · ':'')+'@'+escapeHTML(name)+' · '+escapeHTML(x.role||'agent')+'</div></div>'+(unr[name]?'<span class="mini-badge">'+unr[name]+'</span>':'')+'</div>'});if(directHtml)html+=sec(isAdmin()?'Admin chats':'People')+directHtml;if(isAdmin()){var pairs={};_mrVals(allMsgs).forEach(function(m){if(!m||m.deleted||m.groupId||!m.from||!m.to||m.to==='group')return;if(m.from===u.username||m.to===u.username)return;var pk=_chatPairKey(m.from,m.to);pairs[pk]=pairs[pk]||{a:m.from,b:m.to,last:m.timestamp||''};if(new Date(m.timestamp||0)>new Date(pairs[pk].last||0))pairs[pk].last=m.timestamp||''});Object.keys(pairs).sort().forEach(function(pk){var pr=pairs[pk],label=(users[pr.a]&&users[pr.a].name||pr.a)+' ↔ '+(users[pr.b]&&users[pr.b].name||pr.b);pairHtml+='<div class="chat-contact mutual-chat" data-key="pair_'+key(pk)+'" data-name="'+escapeHTML(label).toLowerCase()+'" onclick="window._selectChatContact(null,null,decodeURIComponent(\''+enc(label)+'\'),decodeURIComponent(\''+enc(pk)+'\'))"><div class="chat-avatar"><i class="fas fa-user-friends"></i></div><div class="chat-contact-main"><div class="chat-contact-name">'+escapeHTML(label)+'</div><div class="chat-contact-sub">Agent mutual chat · view/delete</div></div></div>'});if(pairHtml)html+=sec('Agent mutual chats')+pairHtml}list.innerHTML=html||'<div class="text-muted text-sm p-16">No contacts available.</div>';window._selectChatContact=function(username,groupId,display,pairKey){STATE.activeChatUser=username||null;STATE.activeChatGroup=groupId||null;STATE.activeChatPair=pairKey||null;var activeKey=pairKey?'pair_'+pairKey:(groupId?'group_'+groupId:'user_'+username);document.querySelectorAll('.chat-contact').forEach(function(e){e.classList.toggle('active',e.dataset.key===activeKey)});var t=document.getElementById('chatContactName');if(t)t.textContent=display||username||groupId;var a=document.getElementById('chatHeaderAvatar');if(a)a.innerHTML=pairKey?'<i class="fas fa-user-friends"></i>':_mrInit(display||username||groupId);var m=document.getElementById('chatDropZone');if(m){m.classList.toggle('chat-context-mutual',!!pairKey);m.classList.toggle('chat-context-admin',!!username&&isAdmin())}_setChatInputLocked(!!pairKey,'Admin viewing agent mutual chat. Sending is disabled.');loadChatMessages(pairKey?'pair:'+pairKey:(username||groupId))}};
             renderChatMessages=function(messages){var c=document.getElementById('chatMessagesContainer');if(!c)return;var context='';if(STATE.activeChatPair)context='<div class="chat-context-label"><i class="fas fa-user-friends"></i> Agent mutual chat</div>';else if(isAdmin()&&STATE.activeChatUser)context='<div class="chat-context-label"><i class="fas fa-user-shield"></i> Admin direct chat</div>';else if(STATE.activeChatGroup)context='<div class="chat-context-label"><i class="fas fa-users"></i> Group chat</div>';if(!messages||!messages.length){c.innerHTML=context+'<div class="chat-empty"><i class="fas fa-comments" style="font-size:2rem;color:var(--primary);"></i><h4>No messages yet</h4><p>Full chat history will be saved here.</p></div>';return}c.innerHTML=context+messages.map(function(m){var mine=m.from===STATE.currentUser.username,sys=m.type==='system',mid=_chatMessageId(m),content=m.message?'<div>'+escapeHTML(m.message)+'</div>':'';if(m.attachment&&m.attachment.data)content+='<img class="chat-image" src="'+m.attachment.data+'" alt="Shared image" />';var check=(isAdmin()&&mid)?'<label class="chat-delete-select" title="Select message to delete"><input type="checkbox" class="chat-delete-check" value="'+escapeHTML(mid)+'" /></label>':'';return'<div class="bubble-row '+(mine?'mine':'theirs')+' '+(sys?'system':'')+'">'+check+'<div class="chat-avatar">'+(sys?'<i class="fas fa-bell"></i>':_mrInit(mine?'You':m.from))+'</div><div class="bubble"><div class="msg-sender">'+(sys?'Group Notice':(mine?'You':escapeHTML(m.from||'User')))+'</div>'+content+'<div class="bubble-meta">'+formatTime(m.timestamp||'')+'</div></div></div>'}).join('');setTimeout(function(){c.scrollTop=Math.max(0,c.scrollHeight-c.clientHeight)},40)};
@@ -9934,7 +9934,7 @@
                     '<div><label class="text-sm">Status</label><input type="text" class="am-st" placeholder="Pending" value="Pending" /></div>' +
                     '<div><button class="btn btn-sm btn-danger am-del-row" title="Remove row" type="button"><i class="fas fa-times"></i></button></div>' +
                     '</div></div>' +
-                    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">' +
+                    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px;">' +
                     '<button class="btn btn-outline" id="amBtnAddRow" type="button"><i class="fas fa-plus"></i> Add More</button>' +
                     '</div>' +
                     '<div class="am-total-box">Total Margin = <span id="amRunningTotal">\u00A30.00</span></div>' +
@@ -10064,7 +10064,7 @@
                         (canEdit ? '<button class="btn btn-sm btn-outline" onclick="window._amEditRecord(\'' + r.id + '\')"><i class="fas fa-pen"></i> Edit</button>' : '') +
                         (canDel ? '<button class="btn btn-sm btn-danger" onclick="window._amDelRecord(\'' + r.id + '\')"><i class="fas fa-trash"></i></button>' : '') +
                         '</div></div>' +
-                        '<table class="am-table" style="margin-top:8px;"><thead><tr><th>Folder/Invoice No.</th><th>Margin</th><th>Status</th></tr></thead><tbody>' + entryRows + '</tbody></table>' +
+                        '<table class="am-table" style="margin-top:4px;"><thead><tr><th>Folder/Invoice No.</th><th>Margin</th><th>Status</th></tr></thead><tbody>' + entryRows + '</tbody></table>' +
                         '<div style="text-align:right;margin-top:6px;font-weight:700;">Total: ' + _amFmtMoney(r.total) + '</div>' +
                         '</div>';
                 }).join('');
@@ -10130,7 +10130,7 @@
                         '<div class="form-row"><div class="form-group"><label>Agent *</label><select id="amEdAgent">' + agentOpts + '</select></div>' +
                         '<div class="form-group"><label>Month *</label><select id="amEdMonth">' + monthOpts + '</select></div></div>' +
                         '<div id="amEntriesWrap">' + entryRows + '</div>' +
-                        '<div style="margin-top:8px;"><button class="btn btn-outline" id="amBtnAddRow" type="button"><i class="fas fa-plus"></i> Add More</button></div>' +
+                        '<div style="margin-top:4px;"><button class="btn btn-outline" id="amBtnAddRow" type="button"><i class="fas fa-plus"></i> Add More</button></div>' +
                         '<div class="am-total-box">Total Margin = <span id="amRunningTotal">' + _amFmtMoney(r.total) + '</span></div>' +
                         '<div class="modal-actions"><button class="btn btn-primary" id="amBtnUpdateRec">Save Changes</button><button class="btn btn-outline" onclick="window._amBackToRecords()">Back</button><button class="btn btn-close-modal" data-close-modal>Cancel</button></div>');
 
