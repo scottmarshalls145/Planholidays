@@ -3657,12 +3657,35 @@
                             '') : '') + (f.aircraft ? ' · ' + f.aircraft : '') + (f.cabinClass ? ' · ' + f.cabinClass :
                             '') +
                         '</span></div>' + imgHtml +
+                        '<div class="form-row mt-8">' +
+                        '<div class="form-group"><label>Airline Code</label><input type="text" value="' + escapeHTML(f.airlineCode || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'airlineCode\',this.value.toUpperCase())" /></div>' +
+                        '<div class="form-group"><label>Airline Name</label><input type="text" value="' + escapeHTML(f.airlineName || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'airlineName\',this.value)" /></div>' +
+                        '<div class="form-group"><label>Flight Number</label><input type="text" value="' + escapeHTML(f.flightNumber || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'flightNumber\',this.value)" /></div>' +
+                        '<div class="form-group"><label>Origin</label><input type="text" value="' + escapeHTML(f.origin || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'origin\',this.value)" placeholder="e.g. LHR" /></div>' +
+                        '<div class="form-group"><label>Destination</label><input type="text" value="' + escapeHTML(f.destination || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'destination\',this.value)" placeholder="e.g. DXB" /></div>' +
+                        '<div class="form-group"><label>Departure Date</label><input type="date" value="' + escapeHTML(f.departDate || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'departDate\',this.value)" /></div>' +
+                        '<div class="form-group"><label>Departure Time</label><input type="text" value="' + escapeHTML(f.departTime || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'departTime\',this.value)" placeholder="e.g. 14:30" /></div>' +
+                        '<div class="form-group"><label>Arrival Date</label><input type="date" value="' + escapeHTML(f.arriveDate || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'arriveDate\',this.value)" /></div>' +
+                        '<div class="form-group"><label>Arrival Time</label><input type="text" value="' + escapeHTML(f.arriveTime || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'arriveTime\',this.value)" placeholder="e.g. 22:10" /></div>' +
+                        '<div class="form-group"><label>Cabin Class</label><input type="text" value="' + escapeHTML(f.cabinClass || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'cabinClass\',this.value)" placeholder="Economy, Business..." /></div>' +
+                        '<div class="form-group"><label>Aircraft</label><input type="text" value="' + escapeHTML(f.aircraft || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'aircraft\',this.value)" /></div>' +
+                        '</div>' +
                         '<div class="text-xs text-muted mt-8">' + (f.originCity || '') + (f.originCountry ? ' (' + f
                         .originCountry + ')' : '') + ' → ' + (f.destinationCity || '') + (f.destinationCountry ?
                             ' (' + f.destinationCountry + ')' : '') + '</div></div>';
                 });
                 container.innerHTML = html;
                 window._removeFlight = removeFlight;
+                window._updateFlightField = updateFlightField;
+            }
+
+            function updateFlightField(id, field, value) {
+                var flights = STATE.currentQuote.flights || [];
+                var f = flights.find(function(f) { return f.id === id; });
+                if (!f) return;
+                f[field] = value;
+                if (field === 'airlineCode' && !f.airlineName) f.airlineName = getAirlineName(String(value || '').toUpperCase());
+                renderFlights();
             }
 
             function parseGDS(text) {
@@ -4656,13 +4679,27 @@
                     var oldPdfContainerStyle = pdfContainer.getAttribute('style') || '';
                     pdfContainer.innerHTML = html;
                     pdfContainer.style.display = 'block';
-                    pdfContainer.style.width = '190mm';
-                    pdfContainer.style.maxWidth = 'none';
-                    pdfContainer.style.minWidth = '190mm';
-                    pdfContainer.style.margin = '0 auto';
+                    pdfContainer.style.position = 'fixed';
+                    pdfContainer.style.left = '0';
+                    pdfContainer.style.top = '0';
+                    pdfContainer.style.zIndex = '99997';
+                    pdfContainer.style.pointerEvents = 'none';
+                    pdfContainer.style.width = '196mm';
+                    pdfContainer.style.maxWidth = '196mm';
+                    pdfContainer.style.minWidth = '196mm';
+                    pdfContainer.style.margin = '0';
                     pdfContainer.style.padding = '0';
                     pdfContainer.style.background = '#fff';
                     pdfContainer.style.overflow = 'visible';
+                    var pdfPage = pdfContainer.firstElementChild || pdfContainer;
+                    if (pdfPage && pdfPage.style) {
+                        pdfPage.style.width = '196mm';
+                        pdfPage.style.maxWidth = '196mm';
+                        pdfPage.style.minWidth = '196mm';
+                        pdfPage.style.margin = '0';
+                        pdfPage.style.boxSizing = 'border-box';
+                    }
+                    var pageWidthPx = Math.ceil((pdfPage.getBoundingClientRect && pdfPage.getBoundingClientRect().width) || pdfContainer.scrollWidth || 794);
                     var opt = {
                         margin: [7, 7, 7, 7],
                         filename: (isInvoice ? 'Invoice' : 'Quote') + '_' + (quoteData.quoteNumber || quoteData
@@ -4671,15 +4708,17 @@
                         html2canvas: {
                             scale: 2,
                             useCORS: true,
+                            backgroundColor: '#ffffff',
                             scrollX: 0,
                             scrollY: 0,
-                            windowWidth: pdfContainer.scrollWidth
+                            width: pageWidthPx,
+                            windowWidth: pageWidthPx
                         },
                         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
                         pagebreak: { mode: ['css', 'legacy'], before: '.pdf-page-break' }
                     };
                     if (action === 'download') {
-                        await html2pdf().set(opt).from(pdfContainer).save();
+                        await html2pdf().set(opt).from(pdfPage).save();
                         showToast((isInvoice ? 'Invoice' : 'PDF') + ' downloaded.', 'success');
                     } else if (action === 'preview') {
                         var win = window.open('', '_blank', 'width=800,height=900');
@@ -12751,6 +12790,7 @@
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
