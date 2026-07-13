@@ -4684,24 +4684,25 @@
                     pdfContainer.style.top = '0';
                     pdfContainer.style.zIndex = '99997';
                     pdfContainer.style.pointerEvents = 'none';
-                    pdfContainer.style.width = '196mm';
-                    pdfContainer.style.maxWidth = '196mm';
-                    pdfContainer.style.minWidth = '196mm';
+                    pdfContainer.style.width = '210mm';
+                    pdfContainer.style.maxWidth = '210mm';
+                    pdfContainer.style.minWidth = '210mm';
                     pdfContainer.style.margin = '0';
                     pdfContainer.style.padding = '0';
                     pdfContainer.style.background = '#fff';
                     pdfContainer.style.overflow = 'visible';
                     var pdfPage = pdfContainer.firstElementChild || pdfContainer;
                     if (pdfPage && pdfPage.style) {
-                        pdfPage.style.width = '196mm';
-                        pdfPage.style.maxWidth = '196mm';
-                        pdfPage.style.minWidth = '196mm';
+                        pdfPage.style.width = '210mm';
+                        pdfPage.style.maxWidth = '210mm';
+                        pdfPage.style.minWidth = '210mm';
                         pdfPage.style.margin = '0';
+                        pdfPage.style.padding = '10mm';
                         pdfPage.style.boxSizing = 'border-box';
                     }
                     var pageWidthPx = Math.ceil((pdfPage.getBoundingClientRect && pdfPage.getBoundingClientRect().width) || pdfContainer.scrollWidth || 794);
                     var opt = {
-                        margin: [7, 7, 7, 7],
+                        margin: 0,
                         filename: (isInvoice ? 'Invoice' : 'Quote') + '_' + (quoteData.quoteNumber || quoteData
                             .invoiceNumber || 'draft') + '.pdf',
                         image: { type: 'jpeg', quality: 0.98 },
@@ -12790,6 +12791,7 @@
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
