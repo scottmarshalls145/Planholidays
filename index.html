@@ -12632,9 +12632,101 @@
                 try { if (_confInCall()) _confRenderRoster(); } catch(_){}
             })();
 
+            // ================================================================
+            // MuleRun live incoming-call safety listener
+            // Ensures agents already logged in get conference popup/notification immediately.
+            // ================================================================
+            (function(){
+                var _mrLiveCallRef = null;
+                var _mrLiveCallPoll = null;
+                var _mrLiveCallUser = null;
+                var _mrLiveCallShown = {};
+
+                function _mrLiveMe(){ return STATE.currentUser && STATE.currentUser.username; }
+                function _mrLiveHasMember(call, me){ return ((call && call.members) || []).indexOf(me) !== -1; }
+                function _mrLiveNotify(title, body, tag){
+                    try{
+                        if(!('Notification' in window)) return;
+                        var send = function(){
+                            if(Notification.permission !== 'granted') return;
+                            var n = new Notification(title, { body: body || '', tag: tag || title, renotify: true, requireInteraction: true });
+                            n.onclick = function(){ try{ window.focus(); }catch(_){} try{ n.close(); }catch(_){} };
+                        };
+                        if(Notification.permission === 'granted') send();
+                        else if(Notification.permission === 'default') Notification.requestPermission().then(function(p){ if(p === 'granted') send(); });
+                    }catch(_){}
+                }
+                function _mrLiveHandleCalls(all){
+                    try{
+                        var me = _mrLiveMe();
+                        if(!me || !all) return;
+                        Object.keys(all).forEach(function(id){
+                            var c = all[id] || {};
+                            if(c.status !== 'ringing') return;
+                            if(c.from === me) return;
+                            if(!_mrLiveHasMember(c, me)) return;
+                            if(c.accepted && c.accepted[me]) return;
+                            if(_mrVoice && _mrVoice.callId === id) return;
+                            if(document.getElementById('voicePanel')) return;
+                            if(_mrLiveCallShown[id]) return;
+                            _mrLiveCallShown[id] = true;
+                            try { showToast('Incoming conference from ' + (c.from || 'user'), 'info', 8000); } catch(_){}
+                            try { showVoicePanel('Incoming conference from ' + (c.from || 'user'), true, id); } catch(_){}
+                            _mrLiveNotify('Join conference call', (c.from || 'User') + ' invited you to join a conference call', 'live_call_' + id);
+                        });
+                    }catch(_){}
+                }
+                function _mrStartLiveCallListener(){
+                    try{
+                        var me = _mrLiveMe();
+                        if(!me) return;
+                        if(_mrLiveCallUser !== me){
+                            _mrLiveCallShown = {};
+                            _mrLiveCallUser = me;
+                            if(_mrLiveCallRef && _mrLiveCallRef.off) try{ _mrLiveCallRef.off(); }catch(_){}
+                            if(_mrLiveCallPoll) clearInterval(_mrLiveCallPoll);
+                            _mrLiveCallRef = null;
+                            _mrLiveCallPoll = null;
+                        }
+                        if(_mrLiveCallRef || _mrLiveCallPoll) return;
+                        if(firebaseConnected && db){
+                            _mrLiveCallRef = db.ref('voiceCalls');
+                            _mrLiveCallRef.on('value', function(snap){ _mrLiveHandleCalls(snap.val() || {}); });
+                        } else {
+                            _mrLiveCallPoll = setInterval(async function(){
+                                try { _mrLiveHandleCalls(await readData('voiceCalls', null, true) || {}); } catch(_){}
+                            }, 2500);
+                            readData('voiceCalls', null, true).then(function(x){ _mrLiveHandleCalls(x || {}); }).catch(function(){});
+                        }
+                    }catch(_){}
+                }
+                window._mrStartLiveCallListener = _mrStartLiveCallListener;
+
+                if(typeof afterLogin === 'function'){
+                    var _mrPrevAfterLoginForLiveCalls = afterLogin;
+                    afterLogin = async function(user){
+                        var result = await _mrPrevAfterLoginForLiveCalls.apply(this, arguments);
+                        setTimeout(_mrStartLiveCallListener, 100);
+                        setTimeout(_mrStartLiveCallListener, 1200);
+                        return result;
+                    };
+                }
+                if(typeof attachVoiceCallListener === 'function'){
+                    var _mrPrevAttachVoiceForLiveCalls = attachVoiceCallListener;
+                    attachVoiceCallListener = function(){
+                        var result = _mrPrevAttachVoiceForLiveCalls.apply(this, arguments);
+                        setTimeout(_mrStartLiveCallListener, 100);
+                        return result;
+                    };
+                    window.attachVoiceCallListener = attachVoiceCallListener;
+                }
+                setInterval(function(){ try { if(STATE.currentUser) _mrStartLiveCallListener(); } catch(_){} }, 3000);
+            })();
+
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
