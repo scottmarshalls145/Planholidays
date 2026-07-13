@@ -3614,7 +3614,7 @@
             // --------------------------------------------------------------
             function addFlightToQuote(flightData) {
                 var flights = STATE.currentQuote.flights || [];
-                var entry = { id: genId(), ...flightData };
+                var entry = { id: genId(), segmentType: 'Outbound', airlineCode: '', flightNumber: '', airlineName: '', origin: '', destination: '', ...flightData };
                 flights.push(entry);
                 STATE.currentQuote.flights = flights;
                 renderFlights();
@@ -3626,6 +3626,24 @@
                 renderFlights();
             }
 
+            function isFlightImageEntry(f) {
+                if (!f) return false;
+                if (f.flightImage) return true;
+                var noManualRoute = !(f.flightNumber || f.origin || f.destination || f.departDate || f.departTime || f.arriveDate || f.arriveTime);
+                return !!(f.airlineLogo && ((f.airlineCode || '').toUpperCase() === 'IMG' || (f.airlineName || '') === 'Flight Image' || noManualRoute));
+            }
+
+            function getFlightImageSource(f) {
+                return f && (f.flightImage || (isFlightImageEntry(f) ? f.airlineLogo : ''));
+            }
+
+            function updateFlightField(id, field, value) {
+                var flights = STATE.currentQuote.flights || [];
+                var f = flights.find(function(item) { return item.id === id; });
+                if (f) f[field] = value;
+                renderFlights();
+            }
+
             function renderFlights() {
                 var container = document.getElementById('flightsContainer');
                 var flights = STATE.currentQuote.flights || [];
@@ -3634,35 +3652,48 @@
                         '<p class="text-muted text-sm">No flights added yet. Use the "Add Flight" button or parse a GDS itinerary.</p>';
                     return;
                 }
+                function v(value) { return escapeHTML(value || ''); }
+                function selected(current, option) { return (current || 'Outbound') === option ? ' selected' : ''; }
                 var html = '';
                 flights.forEach(function(f, idx) {
-                    var imgHtml = f.airlineLogo ?
-                        '<div style="margin:8px 0;"><img src="' + f.airlineLogo +
-                        '" style="max-width:100%;max-height:120px;border-radius:6px;border:1px solid #eee;object-fit:contain;" /></div>' :
-                        '';
+                    var flightImage = getFlightImageSource(f);
+                    if (flightImage) {
+                        html += '<div class="item-card"><div class="item-header"><h4><i class="fas fa-image" style="color:var(--primary);"></i> Flight Itinerary Image <span class="item-index">#' + (idx + 1) + '</span></h4><div><button class="btn btn-danger btn-xs" onclick="window._removeFlight(\'' + f.id + '\')"><i class="fas fa-trash"></i></button></div></div>' +
+                            '<div style="margin:8px 0;"><img src="' + flightImage + '" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--card-border);object-fit:contain;background:#fff;" /></div>' +
+                            '<p class="text-xs text-muted">This uploaded itinerary image will appear on the invoice/PDF.</p></div>';
+                        return;
+                    }
                     html +=
                         '<div class="item-card"><div class="item-header"><h4><i class="fas fa-plane" style="color:var(--primary);"></i> ' +
-                        (f.airlineName || f.airlineCode || 'Flight') + ' ' + (f.flightNumber || '') +
-                        ' <span class="item-index">#' + (idx + 1) +
-                        '</span></h4><div><button class="btn btn-danger btn-xs" onclick="window._removeFlight(\'' + f
-                        .id + '\')"><i class="fas fa-trash"></i></button></div></div>' +
+                        (v(f.airlineName || f.airlineCode || 'Manual Flight')) + ' ' + v(f.flightNumber || '') +
+                        ' <span class="item-index">#' + (idx + 1) + '</span></h4><div><button class="btn btn-danger btn-xs" onclick="window._removeFlight(\'' + f.id + '\')"><i class="fas fa-trash"></i></button></div></div>' +
                         '<div class="flight-timeline"><div class="leg">' +
-                        (f.airlineLogo ? '<img src="' + f.airlineLogo +
-                            '" style="width:28px;height:28px;border-radius:50%;object-fit:contain;" />' :
-                            '<span class="airline-icon">' + (f.airlineCode || 'FL').slice(0, 2) + '</span>') +
-                        '<span><strong>' + (f.origin || '?') + '</strong> → <strong>' + (f.destination || '?') +
-                        '</strong></span></div>' +
-                        '<span class="flight-detail">' + (f.departDate ? formatDate(f.departDate) : '') + ' ' + (f
-                        .departTime || '') + (f.arriveDate ? ' → ' + formatDate(f.arriveDate) + ' ' + (f.arriveTime ||
-                            '') : '') + (f.aircraft ? ' · ' + f.aircraft : '') + (f.cabinClass ? ' · ' + f.cabinClass :
-                            '') +
-                        '</span></div>' + imgHtml +
-                        '<div class="text-xs text-muted mt-8">' + (f.originCity || '') + (f.originCountry ? ' (' + f
-                        .originCountry + ')' : '') + ' → ' + (f.destinationCity || '') + (f.destinationCountry ?
-                            ' (' + f.destinationCountry + ')' : '') + '</div></div>';
+                        '<span class="airline-icon">' + v((f.airlineCode || 'FL').slice(0, 2)) + '</span>' +
+                        '<span><strong>' + v(f.origin || '?') + '</strong> → <strong>' + v(f.destination || '?') + '</strong></span></div>' +
+                        '<span class="flight-detail">' + (f.departDate ? v(formatDate(f.departDate)) : '') + ' ' + v(f.departTime || '') + (f.arriveDate ? ' → ' + v(formatDate(f.arriveDate)) + ' ' + v(f.arriveTime || '') : '') + (f.duration ? ' · ' + v(f.duration) : '') + (f.cabinClass ? ' · ' + v(f.cabinClass) : '') + '</span></div>' +
+                        '<div class="form-row">' +
+                        '<div class="form-group"><label>Journey Section</label><select onchange="window._updateFlightField(\'' + f.id + '\',\'segmentType\',this.value)"><option value="Outbound"' + selected(f.segmentType, 'Outbound') + '>Outbound</option><option value="Return"' + selected(f.segmentType, 'Return') + '>Return</option><option value="Domestic"' + selected(f.segmentType, 'Domestic') + '>Domestic</option><option value="Other"' + selected(f.segmentType, 'Other') + '>Other</option></select></div>' +
+                        '<div class="form-group"><label>Section Duration</label><input type="text" value="' + v(f.segmentDuration || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'segmentDuration\',this.value)" placeholder="e.g. 12h 20m" /></div>' +
+                        '<div class="form-group"><label>Airline Code</label><input type="text" value="' + v(f.airlineCode || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'airlineCode\',this.value.toUpperCase())" placeholder="QR" /></div>' +
+                        '<div class="form-group"><label>Airline Name</label><input type="text" value="' + v(f.airlineName || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'airlineName\',this.value)" placeholder="Qatar Airways" /></div>' +
+                        '<div class="form-group"><label>Flight Number</label><input type="text" value="' + v(f.flightNumber || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'flightNumber\',this.value)" placeholder="24" /></div>' +
+                        '<div class="form-group"><label>Flight Duration</label><input type="text" value="' + v(f.duration || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'duration\',this.value)" placeholder="6h 45m" /></div>' +
+                        '<div class="form-group"><label>From Code</label><input type="text" value="' + v(f.origin || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'origin\',this.value.toUpperCase())" placeholder="MAN" /></div>' +
+                        '<div class="form-group"><label>From City</label><input type="text" value="' + v(f.originCity || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'originCity\',this.value)" placeholder="Manchester" /></div>' +
+                        '<div class="form-group"><label>From Airport</label><input type="text" value="' + v(f.originAirport || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'originAirport\',this.value)" placeholder="Manchester Airport" /></div>' +
+                        '<div class="form-group"><label>To Code</label><input type="text" value="' + v(f.destination || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'destination\',this.value.toUpperCase())" placeholder="DOH" /></div>' +
+                        '<div class="form-group"><label>To City</label><input type="text" value="' + v(f.destinationCity || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'destinationCity\',this.value)" placeholder="Doha" /></div>' +
+                        '<div class="form-group"><label>To Airport</label><input type="text" value="' + v(f.destinationAirport || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'destinationAirport\',this.value)" placeholder="Doha Hamad Intl Airport" /></div>' +
+                        '<div class="form-group"><label>Depart Date</label><input type="date" value="' + v(f.departDate || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'departDate\',this.value)" /></div>' +
+                        '<div class="form-group"><label>Depart Time</label><input type="text" value="' + v(f.departTime || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'departTime\',this.value)" placeholder="21:30" /></div>' +
+                        '<div class="form-group"><label>Arrive Date</label><input type="date" value="' + v(f.arriveDate || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'arriveDate\',this.value)" /></div>' +
+                        '<div class="form-group"><label>Arrive Time</label><input type="text" value="' + v(f.arriveTime || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'arriveTime\',this.value)" placeholder="07:15" /></div>' +
+                        '<div class="form-group full"><label>Layover After This Flight</label><input type="text" value="' + v(f.layoverAfter || '') + '" onchange="window._updateFlightField(\'' + f.id + '\',\'layoverAfter\',this.value)" placeholder="---- 0h, 55m layover at DOH ----" /></div>' +
+                        '</div></div>';
                 });
                 container.innerHTML = html;
                 window._removeFlight = removeFlight;
+                window._updateFlightField = updateFlightField;
             }
 
             function parseGDS(text) {
@@ -4698,6 +4729,129 @@
                 showLoading(false);
             }
 
+            function invoiceFlightDateShort(value, includeWeekday) {
+                if (!value) return '';
+                var d = new Date(String(value).slice(0, 10) + 'T00:00:00Z');
+                if (isNaN(d.getTime())) return String(value);
+                var days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                return (includeWeekday ? days[d.getUTCDay()] + ' ' : '') + d.getUTCDate() + ' ' + months[d.getUTCMonth()];
+            }
+
+            function invoiceFlightCityLabel(f, side) {
+                var city = side === 'origin' ? (f.originCity || '') : (f.destinationCity || '');
+                var code = side === 'origin' ? (f.origin || '') : (f.destination || '');
+                return city || code || '';
+            }
+
+            function invoiceFlightAirportLabel(f, side) {
+                var airport = side === 'origin' ? (f.originAirport || '') : (f.destinationAirport || '');
+                var city = side === 'origin' ? (f.originCity || '') : (f.destinationCity || '');
+                var code = side === 'origin' ? (f.origin || '') : (f.destination || '');
+                var label = airport || city || code || '';
+                if (label && code && label.toUpperCase() !== code.toUpperCase() && label.toUpperCase().indexOf('(' + code.toUpperCase() + ')') === -1) {
+                    label += ' (' + code.toUpperCase() + ')';
+                }
+                return label;
+            }
+
+            function invoiceFlightNumberLabel(f) {
+                var code = String(f.airlineCode || '').trim().toUpperCase();
+                var num = String(f.flightNumber || '').trim().toUpperCase();
+                if (!num) return code;
+                if (code && num.indexOf(code) !== 0) return code + num;
+                return num;
+            }
+
+            function invoiceFlightAirlineMark(f) {
+                if (f.airlineLogo && !isFlightImageEntry(f)) {
+                    return '<img src="' + f.airlineLogo + '" style="max-width:58px;max-height:28px;object-fit:contain;display:block;" />';
+                }
+                var code = String(f.airlineCode || '').trim().toUpperCase();
+                var name = f.airlineName || (code ? getAirlineName(code) : '') || 'Airline';
+                if (code === 'QR' || /qatar/i.test(name)) {
+                    return '<div style="width:58px;color:#7a174d;font-family:Arial,Helvetica,sans-serif;line-height:1;text-align:left;"><div style="font-size:10px;font-weight:700;letter-spacing:.2px;">QATAR</div><div style="font-size:5.5px;letter-spacing:.8px;">AIRWAYS</div></div>';
+                }
+                var shortName = String(name).split(/\s+/).slice(0, 2).join(' ').toUpperCase();
+                return '<div style="width:58px;color:#555;font-family:Arial,Helvetica,sans-serif;font-size:8px;font-weight:700;line-height:1.1;text-align:left;">' + escapeHTML(shortName) + '</div>';
+            }
+
+            function invoiceFlightLayoverText(value) {
+                value = String(value || '').trim();
+                if (!value) return '';
+                return /-{2,}/.test(value) ? value : '---- ' + value + ' ----';
+            }
+
+            function invoiceFlightRouteTitle(quote, flights) {
+                if (quote && quote.route) return quote.route;
+                var stops = [];
+                flights.forEach(function(f, idx) {
+                    var origin = invoiceFlightCityLabel(f, 'origin');
+                    var dest = invoiceFlightCityLabel(f, 'destination');
+                    if (idx === 0 && origin) stops.push(origin);
+                    if (dest && stops[stops.length - 1] !== dest) stops.push(dest);
+                });
+                return stops.join(' → ');
+            }
+
+            function buildInvoiceFlightItineraryPDFHTML(quote) {
+                var flights = quote.flights || [];
+                if (!flights.length) return '';
+                var imageEntries = flights.filter(function(f) { return getFlightImageSource(f); });
+                var manualFlights = flights.filter(function(f) { return !getFlightImageSource(f); });
+                var imageHtml = imageEntries.map(function(f) {
+                    var src = getFlightImageSource(f);
+                    return '<div style="margin:4px 0;text-align:center;"><img src="' + src + '" class="flight-image-large" style="max-width:100%;width:100%;height:auto;border-radius:0;border:0;object-fit:contain;" /></div>';
+                }).join('');
+                if (!manualFlights.length) return imageHtml;
+
+                var groups = [];
+                manualFlights.forEach(function(f) {
+                    var key = f.segmentType || f.journeySection || 'Outbound';
+                    var last = groups[groups.length - 1];
+                    if (!last || last.key !== key) groups.push({ key: key, flights: [] });
+                    groups[groups.length - 1].flights.push(f);
+                });
+
+                var routeTitle = invoiceFlightRouteTitle(quote, manualFlights);
+                var body = '<div style="font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff;font-size:12px;line-height:1.35;margin:2px 0 8px;">';
+                if (routeTitle) body += '<div style="font-weight:700;margin:0 0 18px;">Flight Itinerary: ' + escapeHTML(routeTitle) + '</div>';
+
+                groups.forEach(function(group) {
+                    var first = group.flights[0] || {};
+                    var lastFlight = group.flights[group.flights.length - 1] || {};
+                    var from = invoiceFlightCityLabel(first, 'origin');
+                    var to = invoiceFlightCityLabel(lastFlight, 'destination');
+                    var duration = first.segmentDuration || group.flights.map(function(f) { return f.segmentDuration || ''; }).filter(Boolean)[0] || '';
+                    var label = group.key || 'Flights';
+                    body += '<div style="background:#eee;padding:3px 4px;margin:0 0 6px;font-weight:700;">' +
+                        '<span style="text-decoration:underline;">' + escapeHTML(label + ': ' + from + (from || to ? ' → ' : '') + to) + '</span>' +
+                        (duration ? '<span style="margin-left:10px;">' + escapeHTML(duration) + '</span>' : '') + '</div>';
+
+                    group.flights.forEach(function(f) {
+                        var flightNo = invoiceFlightNumberLabel(f);
+                        var dateText = invoiceFlightDateShort(f.departDate || f.date || '', true);
+                        var durationText = f.duration || f.flightDuration || '';
+                        var departAirport = invoiceFlightAirportLabel(f, 'origin');
+                        var arriveAirport = invoiceFlightAirportLabel(f, 'destination');
+                        var arriveNote = (f.arriveDate && f.departDate && String(f.arriveDate).slice(0, 10) !== String(f.departDate).slice(0, 10)) ? ' (On ' + invoiceFlightDateShort(f.arriveDate, false) + ')' : '';
+                        var heading = [dateText, flightNo, durationText].filter(Boolean).join(' - ');
+                        body += '<table style="width:100%;border-collapse:collapse;margin:2px 0 4px;"><tr>' +
+                            '<td style="width:66px;vertical-align:middle;padding:0 8px 0 0;">' + invoiceFlightAirlineMark(f) + '</td>' +
+                            '<td style="vertical-align:top;padding:0;">' +
+                            (heading ? '<div style="font-weight:700;font-size:13px;margin:0 0 3px;">' + escapeHTML(heading) + '</div>' : '') +
+                            ((f.departTime || departAirport) ? '<div>Departs: ' + escapeHTML(f.departTime || '') + (departAirport ? ' from ' + escapeHTML(departAirport) : '') + ',</div>' : '') +
+                            ((f.arriveTime || arriveAirport) ? '<div>Arrives: ' + escapeHTML(f.arriveTime || '') + escapeHTML(arriveNote) + (arriveAirport ? ' at ' + escapeHTML(arriveAirport) : '') + '</div>' : '') +
+                            (f.layoverAfter ? '<div style="font-weight:700;color:#555;margin:3px 0 4px;">' + escapeHTML(invoiceFlightLayoverText(f.layoverAfter)) + '</div>' : '') +
+                            '</td></tr></table>';
+                    });
+                    body += '<div style="height:8px;"></div>';
+                });
+
+                body += '</div>';
+                return body + imageHtml;
+            }
+
             // Quote PDF — larger logo (120px) and beautiful borders
             function buildQuotePDFHTML(quote, branding, conditions) {
                 var logoHtml = branding && branding.logo ?
@@ -4843,18 +4997,7 @@
                     '" style="height:155px;max-width:285px;width:auto;border-radius:14px;object-fit:contain;" />' :
                     '<h1 style="font-family:\'Playfair Display\',serif;font-size:2.2rem;color:#12324a;">Plan Holidays</h1>';
 
-                var flightsHtml = (quote.flights || []).map(function(f) {
-                    var imgHtml = f.airlineLogo ?
-                        '<div style="margin:4px 0;text-align:center;"><img src="' + f.airlineLogo +
-                        '" class="flight-image-large" style="max-width:100%;width:100%;height:auto;border-radius:8px;border:1px solid #dbe5ec;object-fit:contain;" /></div>' :
-                        '';
-                    return '<div style="padding:6px 9px;border:1px solid #dbe5ec;border-radius:8px;margin:2px 0;background:#f8fafc;"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;"><span><strong>' +
-                        (f.airlineName || f.airlineCode || 'Flight') + '</strong> ' + (f.flightNumber || '') +
-                        '</span><span>' + (f.origin || '') + ' → ' + (f.destination || '') +
-                        '</span><span style="color:#666;font-size:0.8rem;">' + (f.departDate || '') + ' ' + (f
-                            .departTime || '') + (f.arriveDate ? ' → ' + f.arriveDate : '') +
-                        '</span></div>' + imgHtml + '</div>';
-                }).join('');
+                var flightsHtml = buildInvoiceFlightItineraryPDFHTML(quote);
 
                 var hotelsHtml = (quote.hotels || []).map(function(h) {
                     var imgs = (h.images || []).map(function(img) {
@@ -4968,7 +5111,7 @@
                     '<div style="margin-top:4px;">' + statusBadge + '</div>' +
                     '</div>' +
                     (custRows ? '<div style="background:linear-gradient(135deg,#f8fafc,#eef4f8);padding:9px 12px;border-radius:10px;margin-bottom:7px;border-left:4px solid #12324a;box-shadow:0 1px 3px rgba(0,0,0,0.03);"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;">' + custRows + '</table></div>' : '') +
-                    (flightsHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;font-family:\'Playfair Display\',serif;">✈️ Flights</h4>' + flightsHtml + '</div>' : '') +
+                    (flightsHtml ? '<div style="margin-bottom:5px;">' + flightsHtml + '</div>' : '') +
                     (hotelsHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;font-family:\'Playfair Display\',serif;">🏨 Hotels</h4>' + hotelsHtml + '</div>' : '') +
                     (transfersHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;font-family:\'Playfair Display\',serif;">🚗 Transfers</h4>' + transfersHtml + '</div>' : '') +
                     // Payment Summary Grid
@@ -8200,7 +8343,7 @@
                     var reader = new FileReader();
                     reader.onload = function(ev) {
                         addFlightToQuote({ airlineCode: 'IMG', airlineName: 'Flight Image',
-                            airlineLogo: ev.target.result });
+                            airlineLogo: ev.target.result, flightImage: ev.target.result });
                         showToast('Flight image added.', 'success');
                     };
                     reader.readAsDataURL(file);
@@ -12726,6 +12869,7 @@
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
