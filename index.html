@@ -3626,6 +3626,17 @@
                 renderFlights();
             }
 
+            function getDayName(dateStr) {
+                if (!dateStr) return '';
+                var dt = new Date(dateStr);
+                if (isNaN(dt.getTime())) return '';
+                return dt.toLocaleDateString('en-GB', { weekday: 'long' });
+            }
+
+            function _esc(s) {
+                return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            }
+
             function renderFlights() {
                 var container = document.getElementById('flightsContainer');
                 var flights = STATE.currentQuote.flights || [];
@@ -3640,29 +3651,54 @@
                         '<div style="margin:8px 0;"><img src="' + f.airlineLogo +
                         '" style="max-width:100%;max-height:120px;border-radius:6px;border:1px solid #eee;object-fit:contain;" /></div>' :
                         '';
+                    var upd = "window._updateFlightField('" + f.id + "',";
                     html +=
                         '<div class="item-card"><div class="item-header"><h4><i class="fas fa-plane" style="color:var(--primary);"></i> ' +
-                        (f.airlineName || f.airlineCode || 'Flight') + ' ' + (f.flightNumber || '') +
+                        _esc(f.airlineName || f.airlineCode || 'Flight') + ' ' + _esc(f.flightNumber || '') +
                         ' <span class="item-index">#' + (idx + 1) +
                         '</span></h4><div><button class="btn btn-danger btn-xs" onclick="window._removeFlight(\'' + f
                         .id + '\')"><i class="fas fa-trash"></i></button></div></div>' +
-                        '<div class="flight-timeline"><div class="leg">' +
-                        (f.airlineLogo ? '<img src="' + f.airlineLogo +
-                            '" style="width:28px;height:28px;border-radius:50%;object-fit:contain;" />' :
-                            '<span class="airline-icon">' + (f.airlineCode || 'FL').slice(0, 2) + '</span>') +
-                        '<span><strong>' + (f.origin || '?') + '</strong> → <strong>' + (f.destination || '?') +
-                        '</strong></span></div>' +
-                        '<span class="flight-detail">' + (f.departDate ? formatDate(f.departDate) : '') + ' ' + (f
-                        .departTime || '') + (f.arriveDate ? ' → ' + formatDate(f.arriveDate) + ' ' + (f.arriveTime ||
-                            '') : '') + (f.aircraft ? ' · ' + f.aircraft : '') + (f.cabinClass ? ' · ' + f.cabinClass :
-                            '') +
-                        '</span></div>' + imgHtml +
-                        '<div class="text-xs text-muted mt-8">' + (f.originCity || '') + (f.originCountry ? ' (' + f
-                        .originCountry + ')' : '') + ' → ' + (f.destinationCity || '') + (f.destinationCountry ?
-                            ' (' + f.destinationCountry + ')' : '') + '</div></div>';
+                        '<div class="form-row">' +
+                        '<div class="form-group"><label>Airline Name</label><input type="text" value="' + _esc(f.airlineName || '') + '" onchange="' + upd + '\'airlineName\',this.value)" placeholder="Emirates, British Airways..." /></div>' +
+                        '<div class="form-group"><label>Airline Code</label><input type="text" value="' + _esc(f.airlineCode || '') + '" onchange="' + upd + '\'airlineCode\',this.value)" placeholder="EK, BA..." /></div>' +
+                        '<div class="form-group"><label>Flight Number</label><input type="text" value="' + _esc(f.flightNumber || '') + '" onchange="' + upd + '\'flightNumber\',this.value)" placeholder="EK 623" /></div>' +
+                        '<div class="form-group"><label>Cabin Class</label><input type="text" value="' + _esc(f.cabinClass || '') + '" onchange="' + upd + '\'cabinClass\',this.value)" placeholder="Economy, Business..." /></div>' +
+                        '</div>' +
+                        '<h5 style="margin:10px 0 6px;color:var(--primary);font-size:.9rem;"><i class="fas fa-plane-departure"></i> Departure</h5>' +
+                        '<div class="form-row">' +
+                        '<div class="form-group"><label>Departure Airport Name</label><input type="text" value="' + _esc(f.originAirportName || '') + '" onchange="' + upd + '\'originAirportName\',this.value)" placeholder="London Heathrow Airport" /></div>' +
+                        '<div class="form-group"><label>Airport Code</label><input type="text" value="' + _esc(f.origin || '') + '" onchange="' + upd + '\'origin\',this.value)" placeholder="LHR" /></div>' +
+                        '<div class="form-group"><label>City</label><input type="text" value="' + _esc(f.originCity || '') + '" onchange="' + upd + '\'originCity\',this.value)" placeholder="London" /></div>' +
+                        '<div class="form-group"><label>Country</label><input type="text" value="' + _esc(f.originCountry || '') + '" onchange="' + upd + '\'originCountry\',this.value)" placeholder="United Kingdom" /></div>' +
+                        '<div class="form-group"><label>Departure Date</label><input type="date" value="' + _esc(f.departDate || '') + '" onchange="' + upd + '\'departDate\',this.value)" /></div>' +
+                        '<div class="form-group"><label>Day</label><input type="text" value="' + _esc(f.departDay || getDayName(f.departDate) || '') + '" onchange="' + upd + '\'departDay\',this.value)" placeholder="Friday" /></div>' +
+                        '<div class="form-group"><label>Departure Time</label><input type="time" value="' + _esc(f.departTime || '') + '" onchange="' + upd + '\'departTime\',this.value)" /></div>' +
+                        '</div>' +
+                        '<h5 style="margin:10px 0 6px;color:var(--primary);font-size:.9rem;"><i class="fas fa-plane-arrival"></i> Arrival</h5>' +
+                        '<div class="form-row">' +
+                        '<div class="form-group"><label>Arrival Airport Name</label><input type="text" value="' + _esc(f.destinationAirportName || '') + '" onchange="' + upd + '\'destinationAirportName\',this.value)" placeholder="Dubai International Airport" /></div>' +
+                        '<div class="form-group"><label>Airport Code</label><input type="text" value="' + _esc(f.destination || '') + '" onchange="' + upd + '\'destination\',this.value)" placeholder="DXB" /></div>' +
+                        '<div class="form-group"><label>City</label><input type="text" value="' + _esc(f.destinationCity || '') + '" onchange="' + upd + '\'destinationCity\',this.value)" placeholder="Dubai" /></div>' +
+                        '<div class="form-group"><label>Country</label><input type="text" value="' + _esc(f.destinationCountry || '') + '" onchange="' + upd + '\'destinationCountry\',this.value)" placeholder="United Arab Emirates" /></div>' +
+                        '<div class="form-group"><label>Arrival Date</label><input type="date" value="' + _esc(f.arriveDate || '') + '" onchange="' + upd + '\'arriveDate\',this.value)" /></div>' +
+                        '<div class="form-group"><label>Day</label><input type="text" value="' + _esc(f.arriveDay || getDayName(f.arriveDate) || '') + '" onchange="' + upd + '\'arriveDay\',this.value)" placeholder="Friday" /></div>' +
+                        '<div class="form-group"><label>Arrival Time</label><input type="time" value="' + _esc(f.arriveTime || '') + '" onchange="' + upd + '\'arriveTime\',this.value)" /></div>' +
+                        '<div class="form-group"><label>Flight Duration</label><input type="text" value="' + _esc(f.duration || '') + '" onchange="' + upd + '\'duration\',this.value)" placeholder="6h 40m" /></div>' +
+                        '</div>' +
+                        imgHtml +
+                        '</div>';
                 });
                 container.innerHTML = html;
                 window._removeFlight = removeFlight;
+                window._updateFlightField = function(id, field, value) {
+                    var flights = STATE.currentQuote.flights || [];
+                    var f = flights.find(function(x) { return x.id === id; });
+                    if (!f) return;
+                    f[field] = value;
+                    if (field === 'departDate') f.departDay = getDayName(value);
+                    if (field === 'arriveDate') f.arriveDay = getDayName(value);
+                    renderFlights();
+                };
             }
 
             function parseGDS(text) {
@@ -4698,6 +4734,79 @@
                 showLoading(false);
             }
 
+            // Flight card — matches the styled itinerary layout used on quotes/invoices
+            function buildFlightCardHTML(f, idx) {
+                var esc = function(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+                var fmtD = function(d){ try { return d ? (typeof formatDateDisplay === 'function' ? formatDateDisplay(d) : d) : ''; } catch(e){ return d || ''; } };
+                var fmtT = function(t){
+                    if (!t) return '';
+                    var m = /^(\d{1,2}):(\d{2})/.exec(t);
+                    if (!m) return t;
+                    var h = parseInt(m[1],10), mm = m[2];
+                    var ampm = h >= 12 ? 'PM' : 'AM';
+                    var h12 = h % 12; if (h12 === 0) h12 = 12;
+                    return (h12 < 10 ? '0'+h12 : h12) + ':' + mm + ' ' + ampm;
+                };
+                var dayFrom = function(d){ if(!d) return ''; var dt=new Date(d); if(isNaN(dt.getTime())) return ''; return dt.toLocaleDateString('en-GB',{weekday:'long'}); };
+                var airlineDisplay = esc(f.airlineName || f.airlineCode || 'Flight');
+                var flightNo = esc(f.flightNumber || '');
+                var originAp = esc(f.originAirportName || (f.originCity ? (f.originCity + ' Airport') : (f.origin || '')));
+                var originSub = [f.originCity, f.originCountry].filter(Boolean).join(', ');
+                if (f.origin) originSub += (originSub ? ' (' : '(') + f.origin + ')';
+                var destAp = esc(f.destinationAirportName || (f.destinationCity ? (f.destinationCity + ' Airport') : (f.destination || '')));
+                var destSub = [f.destinationCity, f.destinationCountry].filter(Boolean).join(', ');
+                if (f.destination) destSub += (destSub ? ' (' : '(') + f.destination + ')';
+                var depDate = fmtD(f.departDate);
+                var depDay  = esc(f.departDay || dayFrom(f.departDate) || '');
+                var depTime = fmtT(f.departTime || '');
+                var arrDate = fmtD(f.arriveDate);
+                var arrDay  = esc(f.arriveDay || dayFrom(f.arriveDate) || '');
+                var arrTime = fmtT(f.arriveTime || '');
+                var duration = esc(f.duration || '');
+                var logoImg = f.airlineLogo ?
+                    '<img src="' + f.airlineLogo + '" style="max-width:88px;max-height:60px;object-fit:contain;" />' :
+                    '<div style="font-size:12px;font-weight:700;color:#0b2a49;letter-spacing:.4px;">' + airlineDisplay + '</div>';
+                var headerLabel = 'FLIGHT ' + ((idx != null ? (idx + 1) : '')) + ': ITINERARY';
+
+                var infoCell = function(label, value, iconColor) {
+                    return '<div style="flex:1;min-width:80px;padding:6px 4px;">' +
+                        '<div style="display:flex;align-items:center;gap:5px;font-size:9.5px;font-weight:700;color:' + iconColor + ';letter-spacing:.5px;">' +
+                        '<span style="display:inline-block;width:10px;height:10px;background:' + iconColor + ';opacity:.15;border-radius:2px;"></span>' + label +
+                        '</div><div style="font-size:11px;font-weight:600;color:#1f2933;margin-top:3px;">' + value + '</div></div>';
+                };
+
+                var side = function(kind, ap, sub, date, day, time) {
+                    var color = kind === 'DEPARTURE' ? '#1d4ed8' : '#059669';
+                    return '<div style="flex:1;min-width:220px;padding:10px 12px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;">' +
+                        '<div style="font-size:11px;font-weight:800;color:' + color + ';letter-spacing:1px;margin-bottom:4px;">' + kind + '</div>' +
+                        '<div style="font-size:13px;font-weight:700;color:#0b2a49;line-height:1.2;">' + ap + '</div>' +
+                        '<div style="font-size:10.5px;color:#556575;margin-bottom:6px;">' + esc(sub) + '</div>' +
+                        '<div style="display:flex;flex-wrap:wrap;border-top:1px solid #eef2f6;padding-top:4px;">' +
+                        infoCell('DATE', date || '—', color) +
+                        infoCell('DAY', day || '—', color) +
+                        infoCell('TIME', time || '—', color) +
+                        '</div></div>';
+                };
+
+                return '<div style="border:1px solid #dbe5ec;border-radius:10px;overflow:hidden;margin:6px 0;background:#f8fafc;">' +
+                    '<div style="background:#0b2a49;color:#fff;padding:6px 12px;font-size:11px;font-weight:700;letter-spacing:.6px;display:flex;justify-content:space-between;align-items:center;">' +
+                    '<span>' + headerLabel + '</span>' +
+                    '<span style="opacity:.85;">' + (flightNo ? 'Flight No: ' + flightNo : '') + '</span>' +
+                    '</div>' +
+                    '<div style="display:flex;flex-wrap:wrap;gap:8px;padding:10px;align-items:stretch;">' +
+                    '<div style="width:110px;min-width:110px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px;">' +
+                        logoImg +
+                        '<div style="font-size:9px;color:#7a8794;margin-top:6px;letter-spacing:.5px;">AIRLINE</div>' +
+                        '<div style="font-size:11px;font-weight:700;color:#0b2a49;">' + airlineDisplay + '</div>' +
+                        (flightNo ? '<div style="font-size:9px;color:#7a8794;margin-top:4px;letter-spacing:.5px;">FLIGHT NO.</div><div style="font-size:11px;font-weight:700;color:#0b2a49;">' + flightNo + '</div>' : '') +
+                    '</div>' +
+                    side('DEPARTURE', originAp, originSub, depDate, depDay, depTime) +
+                    side('ARRIVAL',   destAp,   destSub,   arrDate, arrDay, arrTime) +
+                    '</div>' +
+                    (duration ? '<div style="background:#059669;color:#fff;padding:5px 12px;font-size:10.5px;font-weight:700;text-align:center;letter-spacing:.5px;">FLIGHT DURATION: ' + duration + '</div>' : '') +
+                    '</div>';
+            }
+
             // Quote PDF — larger logo (120px) and beautiful borders
             function buildQuotePDFHTML(quote, branding, conditions) {
                 var logoHtml = branding && branding.logo ?
@@ -4705,17 +4814,13 @@
                     '" style="height:155px;max-width:285px;width:auto;border-radius:14px;object-fit:contain;" />' :
                     '<h1 style="font-family:\'Playfair Display\',serif;font-size:2.2rem;color:#12324a;">Plan Holidays</h1>';
 
-                var flightsHtml = (quote.flights || []).map(function(f) {
-                    var imgHtml = f.airlineLogo ?
-                        '<div style="margin:4px 0;text-align:center;"><img src="' + f.airlineLogo +
-                        '" class="flight-image-large" style="max-width:100%;width:100%;height:auto;border-radius:8px;border:1px solid #dbe5ec;object-fit:contain;" /></div>' :
-                        '';
-                    return '<div style="padding:6px 9px;border:1px solid #dbe5ec;border-radius:8px;margin:2px 0;background:#f8fafc;"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;"><span><strong>' +
-                        (f.airlineName || f.airlineCode || 'Flight') + '</strong> ' + (f.flightNumber || '') +
-                        '</span><span>' + (f.origin || '') + ' → ' + (f.destination || '') +
-                        '</span><span style="color:#666;font-size:0.8rem;">' + (f.departDate || '') + ' ' + (f
-                            .departTime || '') + (f.arriveDate ? ' → ' + f.arriveDate : '') +
-                        '</span></div>' + imgHtml + '</div>';
+                var flightsHtml = (quote.flights || []).map(function(f, idx) {
+                    var imgOnly = f.airlineLogo && !f.airlineName && !f.origin && !f.destination && !f.departDate;
+                    if (imgOnly) {
+                        return '<div style="margin:4px 0;text-align:center;"><img src="' + f.airlineLogo +
+                            '" class="flight-image-large" style="max-width:100%;width:100%;height:auto;border-radius:8px;border:1px solid #dbe5ec;object-fit:contain;" /></div>';
+                    }
+                    return buildFlightCardHTML(f, idx);
                 }).join('');
 
                 var hotelsHtml = (quote.hotels || []).map(function(h) {
@@ -4843,17 +4948,13 @@
                     '" style="height:155px;max-width:285px;width:auto;border-radius:14px;object-fit:contain;" />' :
                     '<h1 style="font-family:\'Playfair Display\',serif;font-size:2.2rem;color:#12324a;">Plan Holidays</h1>';
 
-                var flightsHtml = (quote.flights || []).map(function(f) {
-                    var imgHtml = f.airlineLogo ?
-                        '<div style="margin:4px 0;text-align:center;"><img src="' + f.airlineLogo +
-                        '" class="flight-image-large" style="max-width:100%;width:100%;height:auto;border-radius:8px;border:1px solid #dbe5ec;object-fit:contain;" /></div>' :
-                        '';
-                    return '<div style="padding:6px 9px;border:1px solid #dbe5ec;border-radius:8px;margin:2px 0;background:#f8fafc;"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;"><span><strong>' +
-                        (f.airlineName || f.airlineCode || 'Flight') + '</strong> ' + (f.flightNumber || '') +
-                        '</span><span>' + (f.origin || '') + ' → ' + (f.destination || '') +
-                        '</span><span style="color:#666;font-size:0.8rem;">' + (f.departDate || '') + ' ' + (f
-                            .departTime || '') + (f.arriveDate ? ' → ' + f.arriveDate : '') +
-                        '</span></div>' + imgHtml + '</div>';
+                var flightsHtml = (quote.flights || []).map(function(f, idx) {
+                    var imgOnly = f.airlineLogo && !f.airlineName && !f.origin && !f.destination && !f.departDate;
+                    if (imgOnly) {
+                        return '<div style="margin:4px 0;text-align:center;"><img src="' + f.airlineLogo +
+                            '" class="flight-image-large" style="max-width:100%;width:100%;height:auto;border-radius:8px;border:1px solid #dbe5ec;object-fit:contain;" /></div>';
+                    }
+                    return buildFlightCardHTML(f, idx);
                 }).join('');
 
                 var hotelsHtml = (quote.hotels || []).map(function(h) {
@@ -8178,9 +8279,14 @@
 
                 // Flights
                 document.getElementById('btnAddFlight').addEventListener('click', function() {
-                    addFlightToQuote({ airlineCode: '', flightNumber: '', airlineName: '', origin: '',
-                        destination: '' });
-                    showToast('Flight added.', 'info');
+                    addFlightToQuote({
+                        airlineCode: '', flightNumber: '', airlineName: '', cabinClass: '',
+                        origin: '', originAirportName: '', originCity: '', originCountry: '',
+                        departDate: '', departDay: '', departTime: '',
+                        destination: '', destinationAirportName: '', destinationCity: '', destinationCountry: '',
+                        arriveDate: '', arriveDay: '', arriveTime: '', duration: ''
+                    });
+                    showToast('Flight added. Fill in the details below.', 'info');
                 });
                 document.getElementById('btnParseGDS').addEventListener('click', function() {
                     var text = document.getElementById('gdsPasteArea').value;
@@ -12726,6 +12832,7 @@
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
