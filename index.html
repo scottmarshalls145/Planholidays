@@ -3231,7 +3231,17 @@
                 var user = STATE.currentUser;
                 if (!user) return null;
                 var now = getNowISO();
-                var data = { ...quoteData, updatedAt: now, createdBy: user.username };
+                var data = { ...quoteData, updatedAt: now };
+                if (!data.id) {
+                    data.createdBy = user.username;
+                } else if (!data.createdBy) {
+                    try {
+                        var existingQuotesForOwner = await readData('quotes', 'ph_quotes_list', true) || {};
+                        data.createdBy = (existingQuotesForOwner[data.id] && existingQuotesForOwner[data.id].createdBy) || user.username;
+                    } catch (_) {
+                        data.createdBy = user.username;
+                    }
+                }
                 if (!data.id) {
                     data.id = genId();
                     data.createdAt = now;
@@ -3242,7 +3252,7 @@
                 }
                 try {
                     await writeData('quotes/' + data.id, data, 'ph_quotes');
-                    var allQuotes = await readData('quotes', 'ph_quotes_list') || {};
+                    var allQuotes = await readData('quotes', 'ph_quotes_list', true) || {};
                     allQuotes[data.id] = data;
                     await writeData('quotes', allQuotes, 'ph_quotes_list');
                     STATE.quotes = Object.values(allQuotes);
@@ -3255,15 +3265,15 @@
                 }
             }
 
-            async function loadQuotes() {
-                var allQuotes = await readData('quotes', 'ph_quotes_list') || {};
+            async function loadQuotes(bypassCache) {
+                var allQuotes = await readData('quotes', 'ph_quotes_list', bypassCache !== false) || {};
                 STATE.quotes = Object.values(allQuotes);
                 updateQuoteCount();
                 return STATE.quotes;
             }
 
             async function deleteQuote(id) {
-                var allQuotes = await readData('quotes', 'ph_quotes_list') || {};
+                var allQuotes = await readData('quotes', 'ph_quotes_list', true) || {};
                 if (!allQuotes[id]) { showToast('Quote not found.', 'error'); return false; }
                 delete allQuotes[id];
                 await writeData('quotes', allQuotes, 'ph_quotes_list');
@@ -3276,7 +3286,7 @@
 
             async function deleteMultipleQuotes(ids) {
                 if (!ids || !ids.length) { showToast('No quotes selected.', 'warning'); return; }
-                var allQuotes = await readData('quotes', 'ph_quotes_list') || {};
+                var allQuotes = await readData('quotes', 'ph_quotes_list', true) || {};
                 var deleted = 0;
                 for (var i = 0; i < ids.length; i++) {
                     var id = ids[i];
@@ -13338,9 +13348,147 @@
                 document.addEventListener('DOMContentLoaded', function(){ setTimeout(ensureProfileDashboardCard, 700); });
             })();
 
+
+
+            // MuleRun targeted fix: per-conversation chat wallpapers + fresh admin quote history.
+            (function(){
+                function _mrActiveChatThemeKey(){
+                    if (STATE.activeChatPair) return 'pair_' + STATE.activeChatPair;
+                    if (STATE.activeChatGroup) return 'group_' + STATE.activeChatGroup;
+                    if (STATE.activeChatUser) return 'user_' + STATE.activeChatUser;
+                    return 'default';
+                }
+                function _mrActiveChatThemeLabel(){
+                    var t = document.getElementById('chatContactName');
+                    var name = t ? (t.textContent || '').trim() : '';
+                    return (name && name !== 'Select a contact') ? name : 'Default chat';
+                }
+                function _mrChatThemeFromSettings(set, key){
+                    set = set || {};
+                    var map = set.conversationThemes || {};
+                    if (map[key] && map[key].bg) return map[key];
+                    if (key !== 'default' && map.default && map.default.bg) return map.default;
+                    if (set.bg) return { bg: set.bg, bgDark: set.bgDark };
+                    return null;
+                }
+                function _mrApplyChatThemeToMessenger(theme){
+                    var m = document.querySelector('.messenger');
+                    if (!m) return;
+                    ['--chat-user-bg','--chat-readable','--chat-readable-soft','--chat-bubble-bg','--chat-bubble-border','--chat-bg-overlay'].forEach(function(v){ m.style.removeProperty(v); });
+                    if (!theme || !theme.bg) {
+                        m.classList.remove('chat-bg-custom');
+                        return;
+                    }
+                    var dark = theme.bgDark !== false;
+                    m.classList.add('chat-bg-custom');
+                    m.style.setProperty('--chat-user-bg', 'url(' + theme.bg + ')');
+                    m.style.setProperty('--chat-readable', dark ? '#ffffff' : '#151515');
+                    m.style.setProperty('--chat-readable-soft', dark ? 'rgba(255,255,255,.84)' : 'rgba(18,18,22,.78)');
+                    m.style.setProperty('--chat-bubble-bg', dark ? 'rgba(0,0,0,.58)' : 'rgba(255,255,255,.78)');
+                    m.style.setProperty('--chat-bubble-border', dark ? 'rgba(255,255,255,.26)' : 'rgba(0,0,0,.18)');
+                    m.style.setProperty('--chat-bg-overlay', dark ? 'rgba(0,0,0,.40)' : 'rgba(255,255,255,.24)');
+                }
+                if (typeof _applyChatAppearance === 'function') {
+                    var _mrPrevApplyChatAppearance = _applyChatAppearance;
+                    _applyChatAppearance = async function(){
+                        var result = await _mrPrevApplyChatAppearance.apply(this, arguments);
+                        var set = _chatSettings();
+                        _mrApplyChatThemeToMessenger(_mrChatThemeFromSettings(set, _mrActiveChatThemeKey()));
+                        return result;
+                    };
+                }
+                if (typeof loadChatMessages === 'function') {
+                    var _mrPrevLoadChatMessages = loadChatMessages;
+                    loadChatMessages = async function(){
+                        var result = await _mrPrevLoadChatMessages.apply(this, arguments);
+                        setTimeout(function(){ if (typeof _applyChatAppearance === 'function') _applyChatAppearance(); }, 0);
+                        return result;
+                    };
+                }
+                if (typeof showChatUI === 'function') {
+                    var _mrPrevShowChatUI = showChatUI;
+                    showChatUI = function(){
+                        var result = _mrPrevShowChatUI.apply(this, arguments);
+                        setTimeout(function(){ if (typeof _applyChatAppearance === 'function') _applyChatAppearance(); }, 80);
+                        return result;
+                    };
+                }
+                if (typeof showChatThemeSettings === 'function') {
+                    showChatThemeSettings = async function(){
+                        var set = _chatSettings();
+                        set.conversationThemes = set.conversationThemes || {};
+                        var key = _mrActiveChatThemeKey();
+                        var label = _mrActiveChatThemeLabel();
+                        var active = _mrChatThemeFromSettings(set, key) || {};
+                        var layout = set.layout || 'messenger';
+                        var selectedUser = STATE.activeChatUser, selectedGroup = STATE.activeChatGroup, selectedPair = STATE.activeChatPair, selectedLabel = label;
+                        function backToChat(){
+                            showChatUI();
+                            setTimeout(function(){
+                                if (typeof window._selectChatContact === 'function' && (selectedUser || selectedGroup || selectedPair)) {
+                                    window._selectChatContact(selectedUser || null, selectedGroup || null, selectedLabel || '', selectedPair || null);
+                                }
+                            }, 160);
+                        }
+                        showModal('<h3><i class="fas fa-palette"></i> Chat Appearance</h3><p class="text-muted text-sm">Upload a background for <strong>' + escapeHTML(label) + '</strong>. Each contact/group can have its own image and text colours auto-adjust for readability.</p><div class="form-group"><label>Chat Background Image</label><input type="file" id="chatBgInput" accept="image/*" /><div id="chatBgPreview" style="margin-top:4px;">' + (active.bg ? '<img src="' + active.bg + '" class="theme-preview-img" />' : '') + '</div></div>' + (isAdmin() ? '<div class="form-group"><label>Admin Layout Preset</label><select id="chatLayoutSelect"><option value="messenger" ' + (layout === 'messenger' ? 'selected' : '') + '>Messenger</option><option value="whatsapp" ' + (layout === 'whatsapp' ? 'selected' : '') + '>WhatsApp Style</option><option value="skype" ' + (layout === 'skype' ? 'selected' : '') + '>Skype Style</option><option value="slack" ' + (layout === 'slack' ? 'selected' : '') + '>Slack Style</option></select><div class="input-hint">Layout is portal-wide for admin. Background images are saved separately per chat on this browser.</div></div>' : '') + '<div class="modal-actions"><button class="btn btn-primary" id="btnSaveChatTheme"><i class="fas fa-save"></i> Save</button><button class="btn btn-outline" id="btnClearChatBg">Clear Background</button><button class="btn btn-outline" id="btnBackToChat">Back to Chat</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');
+                        var pending = active.bg || '', dark = active.bgDark !== false;
+                        var inp = document.getElementById('chatBgInput');
+                        if (inp) inp.onchange = function(e){
+                            var f = e.target.files[0];
+                            if (!f) return;
+                            if (!f.type || f.type.indexOf('image/') !== 0) return showToast('Please choose an image file.', 'warning');
+                            var r = new FileReader();
+                            r.onload = function(ev){
+                                pending = ev.target.result;
+                                var preview = document.getElementById('chatBgPreview');
+                                if (preview) preview.innerHTML = '<img src="' + pending + '" class="theme-preview-img" />';
+                                _analyseImg(pending, function(meta){ dark = meta.isDark; showToast('Background ready. Click Save.', 'success'); });
+                            };
+                            r.readAsDataURL(f);
+                        };
+                        document.getElementById('btnClearChatBg').onclick = function(){
+                            if (key === 'default') { set.bg = ''; set.bgDark = true; delete set.conversationThemes.default; }
+                            else delete set.conversationThemes[key];
+                            _saveChatSettings(set);
+                            showToast('Chat background cleared.', 'success');
+                            backToChat();
+                        };
+                        document.getElementById('btnBackToChat').onclick = backToChat;
+                        document.getElementById('btnSaveChatTheme').onclick = async function(){
+                            if (key === 'default') {
+                                set.bg = pending;
+                                set.bgDark = dark;
+                                if (pending) set.conversationThemes.default = { bg: pending, bgDark: dark };
+                                else delete set.conversationThemes.default;
+                            } else if (pending) {
+                                set.conversationThemes[key] = { bg: pending, bgDark: dark };
+                            } else {
+                                delete set.conversationThemes[key];
+                            }
+                            if (isAdmin()) {
+                                set.layout = document.getElementById('chatLayoutSelect').value;
+                                await writeData('settings/chatLayout', { layout: set.layout, updatedAt: getNowISO(), updatedBy: STATE.currentUser.username }, 'ph_chat_layout');
+                            }
+                            _saveChatSettings(set);
+                            showToast('Chat appearance saved.', 'success');
+                            backToChat();
+                        };
+                    };
+                    window.showChatThemeSettings = showChatThemeSettings;
+                }
+                if (typeof showQuoteHistory === 'function') {
+                    var _mrPrevShowQuoteHistory = showQuoteHistory;
+                    showQuoteHistory = async function(){
+                        try { await loadQuotes(true); } catch (_) {}
+                        return _mrPrevShowQuoteHistory.apply(this, arguments);
+                    };
+                }
+            })();
+
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
