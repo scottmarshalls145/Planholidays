@@ -12874,9 +12874,474 @@
                 setInterval(function(){ try { if(STATE.currentUser) _mrStartLiveCallListener(); } catch(_){} }, 3000);
             })();
 
+            // ================================================================
+            // MuleRun profile hub: editable personal profiles, public status,
+            // hidden telephone visibility, and profile photos in chat.
+            // Additive only: existing dashboard/chat flows remain unchanged.
+            // ================================================================
+            (function(){
+                var _profilePendingPhoto = null;
+
+                function _profileInjectStyles(){
+                    if (document.getElementById('mr-profile-styles')) return;
+                    var s = document.createElement('style');
+                    s.id = 'mr-profile-styles';
+                    s.textContent = [
+                        '.profile-card-lite{display:flex;gap:14px;align-items:center;padding:14px;border:1px solid var(--card-border);border-radius:18px;background:var(--input-bg);margin:10px 0;}',
+                        '.profile-photo-lg{width:88px;height:88px;border-radius:28px;background:linear-gradient(135deg,var(--primary),var(--primary2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.35rem;overflow:hidden;flex:0 0 auto;box-shadow:0 14px 34px rgba(0,0,0,.14);}',
+                        '.profile-photo-lg img,.profile-avatar img{width:100%;height:100%;object-fit:cover;display:block;}',
+                        '.profile-avatar{overflow:hidden;background:linear-gradient(135deg,var(--primary),var(--primary2));}',
+                        '.profile-avatar img{border-radius:inherit;}',
+                        '.profile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}',
+                        '.profile-team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:12px;}',
+                        '.profile-team-card{border:1px solid var(--card-border);border-radius:18px;background:var(--card);padding:14px;display:flex;gap:12px;align-items:flex-start;}',
+                        '.profile-team-main{min-width:0;flex:1;}',
+                        '.profile-name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+                        '.profile-meta{font-size:.78rem;color:var(--text2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+                        '.profile-status-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:.72rem;font-weight:800;background:rgba(41,128,185,.13);color:var(--info);margin-top:6px;}',
+                        '.profile-status-pill.online{background:rgba(39,174,96,.16);color:#1e8449;}',
+                        '.profile-status-pill.offline{background:rgba(127,140,141,.16);color:var(--text2);}',
+                        '.profile-status-dot{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;}',
+                        '.profile-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px;border-bottom:1px solid var(--card-border);padding-bottom:10px;}',
+                        '.profile-preview-row{display:flex;align-items:center;gap:12px;margin-top:8px;}',
+                        '.profile-mini-btn{width:28px;height:28px;border-radius:9px;border:1px solid var(--card-border);background:var(--input-bg);color:var(--text);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;}',
+                        '.profile-mini-btn:hover{border-color:var(--primary);color:var(--primary);}',
+                        '.chat-contact .profile-mini-btn{margin-left:2px;}',
+                        '.bubble-row .chat-avatar.profile-avatar{width:32px;height:32px;border-radius:12px;font-size:.78rem;}',
+                        '.messenger-title .chat-avatar.profile-avatar{width:38px;height:38px;border-radius:14px;}',
+                        '.user-badge .profile-avatar{width:24px;height:24px;border-radius:50%;font-size:.68rem;}',
+                        '@media(max-width:640px){.profile-card-lite{align-items:flex-start;}.profile-photo-lg{width:72px;height:72px;border-radius:22px;}.profile-team-grid{grid-template-columns:1fr;}}'
+                    ].join('');
+                    document.head.appendChild(s);
+                }
+
+                function _profileInitials(name){
+                    if (typeof _mrInit === 'function') return _mrInit(name);
+                    name = String(name || '?').trim();
+                    return name.split(/\s+/).slice(0, 2).map(function(x){ return x[0] ? x[0].toUpperCase() : ''; }).join('') || '?';
+                }
+
+                function _profileNames(user, fallback){
+                    user = user || {};
+                    var first = user.firstName || '';
+                    var last = user.lastName || '';
+                    if ((!first && !last) && user.name) {
+                        var parts = String(user.name).trim().split(/\s+/);
+                        first = parts.shift() || '';
+                        last = parts.join(' ');
+                    }
+                    return {
+                        first: first,
+                        last: last,
+                        display: String((first + ' ' + last).trim() || user.name || fallback || user.username || 'User')
+                    };
+                }
+
+                function _profileStatus(user){
+                    var raw = String((user && user.profileStatus) || (user && user.status) || 'Offline').trim() || 'Offline';
+                    var low = raw.toLowerCase();
+                    return { text: raw, cls: low === 'online' ? 'online' : low === 'offline' ? 'offline' : 'custom' };
+                }
+
+                function _profileStatusHtml(user){
+                    var s = _profileStatus(user);
+                    return '<span class="profile-status-pill ' + s.cls + '"><span class="profile-status-dot"></span>' + escapeHTML(s.text) + '</span>';
+                }
+
+                function _profilePhoto(user){
+                    return (user && (user.profilePhoto || user.photoData || user.avatar || user.dp)) || '';
+                }
+
+                function _profileAvatarHtml(username, displayName, sizeClass){
+                    var users = STATE.users || {};
+                    var user = username && users[username] ? users[username] : {};
+                    var display = displayName || _profileNames(user, username).display;
+                    var photo = _profilePhoto(user);
+                    var cls = sizeClass || 'chat-avatar';
+                    if (photo) return '<div class="' + cls + ' profile-avatar" title="' + escapeHTML(display) + '"><img src="' + escapeHTML(photo) + '" alt="' + escapeHTML(display) + '" /></div>';
+                    return '<div class="' + cls + ' profile-avatar" title="' + escapeHTML(display) + '">' + escapeHTML(_profileInitials(display)) + '</div>';
+                }
+
+                function _profileLargePhoto(user, fallback){
+                    var display = _profileNames(user, fallback).display;
+                    var photo = _profilePhoto(user);
+                    if (photo) return '<div class="profile-photo-lg"><img src="' + escapeHTML(photo) + '" alt="' + escapeHTML(display) + '" /></div>';
+                    return '<div class="profile-photo-lg">' + escapeHTML(_profileInitials(display)) + '</div>';
+                }
+
+                function _profileSyncCurrentUser(user){
+                    if (!STATE.currentUser || !user) return;
+                    STATE.currentUser = Object.assign({}, STATE.currentUser, user, { username: STATE.currentUser.username });
+                    try { saveSession(STATE.currentUser); } catch (_) {}
+                    try {
+                        var names = _profileNames(STATE.currentUser, STATE.currentUser.username);
+                        var n = document.getElementById('userNameDisplay');
+                        var w = document.getElementById('dashWelcomeName');
+                        if (n) n.textContent = names.display;
+                        if (w) w.textContent = names.display;
+                    } catch (_) {}
+                }
+
+                function _profileCompressImage(file, done){
+                    if (!file || !file.type || file.type.indexOf('image/') !== 0) {
+                        showToast('Please choose an image file.', 'warning');
+                        return;
+                    }
+                    var reader = new FileReader();
+                    reader.onload = function(ev){
+                        var img = new Image();
+                        img.onload = function(){
+                            var max = 420;
+                            var ratio = Math.min(1, max / Math.max(img.width || max, img.height || max));
+                            var canvas = document.createElement('canvas');
+                            canvas.width = Math.max(1, Math.round((img.width || max) * ratio));
+                            canvas.height = Math.max(1, Math.round((img.height || max) * ratio));
+                            var ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            done(canvas.toDataURL('image/jpeg', 0.78));
+                        };
+                        img.onerror = function(){ showToast('Could not read that image.', 'error'); };
+                        img.src = ev.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+
+                function ensureProfileDashboardCard(){
+                    _profileInjectStyles();
+                    try {
+                        var grid = document.getElementById('dashGrid');
+                        if (!grid || grid.querySelector('.dash-card[data-action="profile"]')) return;
+                        var card = document.createElement('div');
+                        card.className = 'dash-card';
+                        card.dataset.action = 'profile';
+                        card.innerHTML = '<i class="fas fa-id-badge"></i><h4>Profile</h4><p>Edit profile, status &amp; photo</p>';
+                        card.addEventListener('click', function(){ showProfileCenter('mine'); });
+                        var chat = grid.querySelector('.dash-card[data-action="chat"]');
+                        if (chat) grid.insertBefore(card, chat); else grid.appendChild(card);
+                    } catch (_) {}
+                }
+
+                async function _profileLoadUsers(){
+                    var users = await readData('users', 'ph_users', true) || {};
+                    STATE.users = users;
+                    return users;
+                }
+
+                function _profileTabs(active){
+                    return '<div class="profile-tabs">' +
+                        '<button class="btn btn-sm ' + (active === 'mine' ? 'btn-primary' : 'btn-outline') + '" onclick="window._profileSwitchTab(\'mine\')"><i class="fas fa-user-pen"></i> My Profile</button>' +
+                        '<button class="btn btn-sm ' + (active === 'team' ? 'btn-primary' : 'btn-outline') + '" onclick="window._profileSwitchTab(\'team\')"><i class="fas fa-users"></i> Team Profiles</button>' +
+                        '</div>';
+                }
+
+                function _profileMineHtml(user){
+                    var names = _profileNames(user, STATE.currentUser && STATE.currentUser.username);
+                    var status = _profileStatus(user);
+                    _profilePendingPhoto = _profilePhoto(user);
+                    return _profileTabs('mine') +
+                        '<div class="profile-card-lite">' +
+                        '<div id="profilePhotoPreview">' + _profileLargePhoto(user, names.display) + '</div>' +
+                        '<div style="min-width:0;flex:1;"><div class="profile-name">' + escapeHTML(names.display) + '</div>' +
+                        '<div class="profile-meta">@' + escapeHTML((STATE.currentUser && STATE.currentUser.username) || '') + ' · ' + escapeHTML(user.role || 'agent') + '</div>' +
+                        _profileStatusHtml(user) +
+                        '<div class="profile-preview-row"><input type="file" id="profilePhotoInput" accept="image/*" />' +
+                        '<button class="btn btn-sm btn-outline" id="btnClearProfilePhoto" type="button"><i class="fas fa-image-slash"></i> Clear Photo</button></div>' +
+                        '<div class="input-hint">Profile photos are compressed before saving and appear in team chat.</div></div></div>' +
+                        '<div class="profile-grid">' +
+                        '<div class="form-group"><label>First Name</label><input type="text" id="profileFirstName" value="' + escapeHTML(names.first) + '" /></div>' +
+                        '<div class="form-group"><label>Last Name</label><input type="text" id="profileLastName" value="' + escapeHTML(names.last) + '" /></div>' +
+                        '<div class="form-group"><label>Telephone Number</label><input type="tel" id="profileTelephone" value="' + escapeHTML(user.telephone || user.phone || '') + '" /></div>' +
+                        '<div class="form-group"><label>Email</label><input type="email" id="profileEmail" value="' + escapeHTML(user.email || '') + '" /></div>' +
+                        '<div class="form-group"><label>Designation</label><input type="text" id="profileDesignation" value="' + escapeHTML(user.designation || '') + '" placeholder="Travel Consultant" /></div>' +
+                        '<div class="form-group"><label>Status</label><select id="profileStatusPreset">' +
+                        '<option value="Online" ' + (status.text.toLowerCase() === 'online' ? 'selected' : '') + '>Online</option>' +
+                        '<option value="Offline" ' + (status.text.toLowerCase() === 'offline' ? 'selected' : '') + '>Offline</option>' +
+                        '<option value="custom" ' + (status.text.toLowerCase() !== 'online' && status.text.toLowerCase() !== 'offline' ? 'selected' : '') + '>Custom</option>' +
+                        '</select></div>' +
+                        '<div class="form-group"><label>Custom Status</label><input type="text" id="profileStatusCustom" value="' + (status.text.toLowerCase() !== 'online' && status.text.toLowerCase() !== 'offline' ? escapeHTML(status.text) : '') + '" placeholder="e.g. In meeting, On leave" /></div>' +
+                        '</div>' +
+                        '<div class="modal-actions"><button class="btn btn-primary" id="btnSaveProfile"><i class="fas fa-save"></i> Save Profile</button><button class="btn btn-outline" onclick="window._profileSwitchTab(\'team\')"><i class="fas fa-users"></i> View Team Profiles</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
+                }
+
+                function _profileTeamHtml(users){
+                    var me = STATE.currentUser && STATE.currentUser.username;
+                    var keys = Object.keys(users || {}).sort(function(a, b){
+                        var an = _profileNames(users[a], a).display.toLowerCase();
+                        var bn = _profileNames(users[b], b).display.toLowerCase();
+                        return an.localeCompare(bn);
+                    });
+                    var cards = keys.map(function(key){
+                        var u = users[key] || {};
+                        var names = _profileNames(u, key);
+                        var designation = u.designation ? escapeHTML(u.designation) : escapeHTML(u.role || 'agent');
+                        return '<div class="profile-team-card">' + _profileAvatarHtml(key, names.display, 'profile-photo-lg') +
+                            '<div class="profile-team-main"><div class="profile-name">' + escapeHTML(names.display) + (key === me ? ' <span class="text-xs text-muted">(You)</span>' : '') + '</div>' +
+                            '<div class="profile-meta">@' + escapeHTML(key) + ' · ' + designation + '</div>' +
+                            '<div class="profile-meta">' + escapeHTML(u.email || 'No email added') + '</div>' +
+                            _profileStatusHtml(u) +
+                            '<div style="margin-top:10px;"><button class="btn btn-sm btn-outline" onclick="window._viewAgentProfile(\'' + escapeHTML(key) + '\')"><i class="fas fa-eye"></i> View Profile</button></div></div></div>';
+                    }).join('');
+                    return _profileTabs('team') +
+                        '<p class="text-muted text-sm">Everyone can view team profile details and statuses. Telephone numbers are hidden from other users.</p>' +
+                        '<div class="profile-team-grid">' + (cards || '<p class="text-muted">No users found.</p>') + '</div>' +
+                        '<div class="modal-actions"><button class="btn btn-outline" onclick="window._profileSwitchTab(\'mine\')"><i class="fas fa-user-pen"></i> My Profile</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
+                }
+
+                async function showProfileCenter(tab){
+                    if (!STATE.currentUser) return;
+                    _profileInjectStyles();
+                    tab = tab || 'mine';
+                    var users = await _profileLoadUsers();
+                    var me = STATE.currentUser.username;
+                    var user = Object.assign({}, users[me] || {}, STATE.currentUser || {});
+                    var html = '<h3><i class="fas fa-id-badge"></i> Profile</h3>' + (tab === 'team' ? _profileTeamHtml(users) : _profileMineHtml(user));
+                    showModal(html);
+                    if (tab !== 'mine') return;
+                    var photoInput = document.getElementById('profilePhotoInput');
+                    if (photoInput) photoInput.addEventListener('change', function(e){
+                        var file = e.target.files && e.target.files[0];
+                        if (!file) return;
+                        _profileCompressImage(file, function(data){
+                            _profilePendingPhoto = data;
+                            var prev = document.getElementById('profilePhotoPreview');
+                            if (prev) prev.innerHTML = '<div class="profile-photo-lg"><img src="' + escapeHTML(data) + '" alt="Profile photo" /></div>';
+                            showToast('Photo ready. Click Save Profile.', 'success');
+                        });
+                    });
+                    var clearBtn = document.getElementById('btnClearProfilePhoto');
+                    if (clearBtn) clearBtn.addEventListener('click', function(){
+                        _profilePendingPhoto = '';
+                        var names = _profileNames(user, me);
+                        var prev = document.getElementById('profilePhotoPreview');
+                        if (prev) prev.innerHTML = '<div class="profile-photo-lg">' + escapeHTML(_profileInitials(names.display)) + '</div>';
+                    });
+                    var saveBtn = document.getElementById('btnSaveProfile');
+                    if (saveBtn) saveBtn.addEventListener('click', _profileSaveMine);
+                }
+
+                async function _profileSaveMine(){
+                    if (!STATE.currentUser) return;
+                    var me = STATE.currentUser.username;
+                    var first = (document.getElementById('profileFirstName').value || '').trim();
+                    var last = (document.getElementById('profileLastName').value || '').trim();
+                    var email = (document.getElementById('profileEmail').value || '').trim();
+                    var telephone = (document.getElementById('profileTelephone').value || '').trim();
+                    var designation = (document.getElementById('profileDesignation').value || '').trim();
+                    var preset = document.getElementById('profileStatusPreset').value;
+                    var custom = (document.getElementById('profileStatusCustom').value || '').trim();
+                    var status = preset === 'custom' ? (custom || 'Available') : preset;
+                    var displayName = (first + ' ' + last).trim() || (STATE.currentUser.name || me);
+                    var users = await _profileLoadUsers();
+                    var old = users[me] || {};
+                    var next = Object.assign({}, old, {
+                        firstName: first,
+                        lastName: last,
+                        name: displayName,
+                        email: email,
+                        telephone: telephone,
+                        phone: telephone,
+                        designation: designation,
+                        profileStatus: status,
+                        status: status,
+                        profilePhoto: _profilePendingPhoto == null ? _profilePhoto(old) : _profilePendingPhoto,
+                        updatedAt: getNowISO(),
+                        updatedBy: me
+                    });
+                    users[me] = next;
+                    await writeData('users', users, 'ph_users');
+                    await writeData('users/' + me, next, 'ph_user_' + me);
+                    STATE.users = users;
+                    STATE._cache['users_ph_users'] = users;
+                    _profileSyncCurrentUser(next);
+                    showToast('Profile saved.', 'success');
+                    showProfileCenter('mine');
+                }
+
+                async function showAgentPublicProfile(username){
+                    if (!STATE.currentUser || !username) return;
+                    var users = await _profileLoadUsers();
+                    var user = users[username];
+                    if (!user) { showToast('Profile not found.', 'error'); return; }
+                    var names = _profileNames(user, username);
+                    var isSelf = username === STATE.currentUser.username;
+                    var phoneHtml = isSelf ?
+                        '<div class="profile-meta"><strong>Telephone:</strong> ' + escapeHTML(user.telephone || user.phone || 'Not added') + '</div>' :
+                        '<div class="profile-meta"><strong>Telephone:</strong> Hidden from other users</div>';
+                    showModal(
+                        '<h3><i class="fas fa-id-card"></i> Agent Profile</h3>' +
+                        '<div class="profile-card-lite">' + _profileLargePhoto(user, names.display) +
+                        '<div style="min-width:0;flex:1;"><div class="profile-name">' + escapeHTML(names.display) + '</div>' +
+                        '<div class="profile-meta">@' + escapeHTML(username) + ' · ' + escapeHTML(user.designation || user.role || 'agent') + '</div>' +
+                        _profileStatusHtml(user) + '</div></div>' +
+                        '<div class="profile-grid">' +
+                        '<div class="profile-card-lite" style="display:block;"><div class="profile-meta"><strong>Email:</strong> ' + escapeHTML(user.email || 'Not added') + '</div>' + phoneHtml + '</div>' +
+                        '<div class="profile-card-lite" style="display:block;"><div class="profile-meta"><strong>Designation:</strong> ' + escapeHTML(user.designation || 'Not added') + '</div><div class="profile-meta"><strong>Status:</strong> ' + escapeHTML(_profileStatus(user).text) + '</div></div>' +
+                        '</div><div class="modal-actions">' +
+                        (isSelf ? '<button class="btn btn-primary" onclick="window._profileSwitchTab(\'mine\')"><i class="fas fa-user-pen"></i> Edit My Profile</button>' : '') +
+                        '<button class="btn btn-outline" onclick="window._profileSwitchTab(\'team\')"><i class="fas fa-users"></i> Team Profiles</button>' +
+                        '<button class="btn btn-close-modal" data-close-modal>Close</button></div>'
+                    );
+                }
+
+                function _profilePatchChat(){
+                    if (typeof loadChatContacts === 'function') {
+                        loadChatContacts = async function(){
+                            var u = STATE.currentUser;
+                            if (!u) return;
+                            var users = await readData('users', 'ph_users', true) || {};
+                            STATE.users = users;
+                            var groups = await readData('chatGroups', 'ph_chat_groups', true) || {};
+                            STATE.chatGroups = groups;
+                            var allMsgs = await readData('chatMessages', 'ph_chat_messages', true) || {};
+                            var inc = _mrIncoming(allMsgs), unr = {};
+                            inc.forEach(function(m){ var k = m.groupId || m.from; unr[k] = (unr[k] || 0) + 1; });
+                            var list = document.getElementById('chatContactsList');
+                            if (!list) return;
+                            function enc(v){ return encodeURIComponent(String(v || '')); }
+                            function sec(t){ return '<div class="chat-contact-section">' + escapeHTML(t) + '</div>'; }
+                            function key(v){ return escapeHTML(String(v || '')); }
+                            var html = '', groupHtml = '', directHtml = '', pairHtml = '';
+                            Object.keys(groups).forEach(function(gid){
+                                var g = groups[gid] || {};
+                                if (!_groupVisible(g, u)) return;
+                                groupHtml += '<div class="chat-contact" data-key="group_' + key(gid) + '" data-name="' + escapeHTML(g.name || gid).toLowerCase() + '" onclick="window._selectChatContact(null,decodeURIComponent(\'' + enc(gid) + '\'),decodeURIComponent(\'' + enc(g.name || gid) + '\'),null)"><div class="chat-avatar"><i class="fas fa-users"></i></div><div class="chat-contact-main"><div class="chat-contact-name">' + escapeHTML(g.name || gid) + '</div><div class="chat-contact-sub">Group · ' + (g.members || []).length + ' member(s)</div></div>' + (unr[gid] ? '<span class="mini-badge">' + unr[gid] + '</span>' : '') + (isAdmin() ? '<div class="chat-admin-actions"><button title="Manage group" onclick="event.stopPropagation();showGroupForm(\'' + escapeHTML(gid) + '\')"><i class="fas fa-pen"></i></button><button title="Delete group" onclick="event.stopPropagation();window._deleteGroup(\'' + escapeHTML(gid) + '\')"><i class="fas fa-trash"></i></button></div>' : '') + '</div>';
+                            });
+                            if (groupHtml) html += sec('Groups') + groupHtml;
+                            Object.keys(users).forEach(function(name){
+                                if (name === u.username) return;
+                                var x = users[name] || {};
+                                var display = _profileNames(x, name).display;
+                                var st = _profileStatus(x).text;
+                                var sub = (isAdmin() ? 'Admin chat · ' : '') + '@' + escapeHTML(name) + ' · ' + escapeHTML(x.role || 'agent') + (x.designation ? ' · ' + escapeHTML(x.designation) : '') + ' · ' + escapeHTML(st);
+                                directHtml += '<div class="chat-contact ' + (isAdmin() ? 'admin-chat' : '') + '" data-key="user_' + key(name) + '" data-name="' + escapeHTML((display) + ' ' + name + ' ' + st).toLowerCase() + '" onclick="window._selectChatContact(decodeURIComponent(\'' + enc(name) + '\'),null,decodeURIComponent(\'' + enc(display) + '\'),null)">' + _profileAvatarHtml(name, display, 'chat-avatar') + '<div class="chat-contact-main"><div class="chat-contact-name">' + escapeHTML(display) + '</div><div class="chat-contact-sub">' + sub + '</div></div>' + (unr[name] ? '<span class="mini-badge">' + unr[name] + '</span>' : '') + '<button class="profile-mini-btn" title="View profile" onclick="event.stopPropagation();window._viewAgentProfile(decodeURIComponent(\'' + enc(name) + '\'))"><i class="fas fa-id-card"></i></button></div>';
+                            });
+                            if (directHtml) html += sec(isAdmin() ? 'Admin chats' : 'People') + directHtml;
+                            if (isAdmin()) {
+                                var pairs = {};
+                                _mrVals(allMsgs).forEach(function(m){
+                                    if (!m || m.deleted || m.groupId || !m.from || !m.to || m.to === 'group') return;
+                                    if (m.from === u.username || m.to === u.username) return;
+                                    var pk = _chatPairKey(m.from, m.to);
+                                    pairs[pk] = pairs[pk] || { a: m.from, b: m.to, last: m.timestamp || '' };
+                                    if (new Date(m.timestamp || 0) > new Date(pairs[pk].last || 0)) pairs[pk].last = m.timestamp || '';
+                                });
+                                Object.keys(pairs).sort().forEach(function(pk){
+                                    var pr = pairs[pk], label = _profileNames(users[pr.a], pr.a).display + ' ↔ ' + _profileNames(users[pr.b], pr.b).display;
+                                    pairHtml += '<div class="chat-contact mutual-chat" data-key="pair_' + key(pk) + '" data-name="' + escapeHTML(label).toLowerCase() + '" onclick="window._selectChatContact(null,null,decodeURIComponent(\'' + enc(label) + '\'),decodeURIComponent(\'' + enc(pk) + '\'))"><div class="chat-avatar"><i class="fas fa-user-friends"></i></div><div class="chat-contact-main"><div class="chat-contact-name">' + escapeHTML(label) + '</div><div class="chat-contact-sub">Agent mutual chat · view/delete</div></div></div>';
+                                });
+                                if (pairHtml) html += sec('Agent mutual chats') + pairHtml;
+                            }
+                            list.innerHTML = html || '<div class="text-muted text-sm p-16">No contacts available.</div>';
+                            window._selectChatContact = function(username, groupId, display, pairKey){
+                                STATE.activeChatUser = username || null;
+                                STATE.activeChatGroup = groupId || null;
+                                STATE.activeChatPair = pairKey || null;
+                                var activeKey = pairKey ? 'pair_' + pairKey : (groupId ? 'group_' + groupId : 'user_' + username);
+                                document.querySelectorAll('.chat-contact').forEach(function(e){ e.classList.toggle('active', e.dataset.key === activeKey); });
+                                var t = document.getElementById('chatContactName');
+                                if (t) t.textContent = display || username || groupId;
+                                var a = document.getElementById('chatHeaderAvatar');
+                                if (a) {
+                                    if (pairKey) {
+                                        a.className = 'chat-avatar';
+                                        a.innerHTML = '<i class="fas fa-user-friends"></i>';
+                                    } else if (groupId) {
+                                        a.className = 'chat-avatar';
+                                        a.innerHTML = '<i class="fas fa-users"></i>';
+                                    } else {
+                                        var hu = (STATE.users || {})[username] || {};
+                                        var hd = display || _profileNames(hu, username).display;
+                                        var hp = _profilePhoto(hu);
+                                        a.className = 'chat-avatar profile-avatar';
+                                        a.title = hd;
+                                        a.innerHTML = hp ? '<img src="' + escapeHTML(hp) + '" alt="' + escapeHTML(hd) + '" />' : escapeHTML(_profileInitials(hd));
+                                    }
+                                }
+                                var m = document.getElementById('chatDropZone');
+                                if (m) {
+                                    m.classList.toggle('chat-context-mutual', !!pairKey);
+                                    m.classList.toggle('chat-context-admin', !!username && isAdmin());
+                                }
+                                _setChatInputLocked(!!pairKey, 'Admin viewing agent mutual chat. Sending is disabled.');
+                                loadChatMessages(pairKey ? 'pair:' + pairKey : (username || groupId));
+                            };
+                        };
+                    }
+
+                    if (typeof renderChatMessages === 'function') {
+                        renderChatMessages = function(messages){
+                            var c = document.getElementById('chatMessagesContainer');
+                            if (!c) return;
+                            var context = '';
+                            if (STATE.activeChatPair) context = '<div class="chat-context-label"><i class="fas fa-user-friends"></i> Agent mutual chat</div>';
+                            else if (isAdmin() && STATE.activeChatUser) context = '<div class="chat-context-label"><i class="fas fa-user-shield"></i> Admin direct chat</div>';
+                            else if (STATE.activeChatGroup) context = '<div class="chat-context-label"><i class="fas fa-users"></i> Group chat</div>';
+                            if (!messages || !messages.length) {
+                                c.innerHTML = context + '<div class="chat-empty"><i class="fas fa-comments" style="font-size:2rem;color:var(--primary);"></i><h4>No messages yet</h4><p>Full chat history will be saved here.</p></div>';
+                                return;
+                            }
+                            c.innerHTML = context + messages.map(function(m){
+                                var mine = m.from === STATE.currentUser.username, sys = m.type === 'system', mid = _chatMessageId(m);
+                                var senderUser = (STATE.users || {})[m.from] || {};
+                                var senderName = mine ? 'You' : _profileNames(senderUser, m.from).display;
+                                var content = m.message ? '<div>' + escapeHTML(m.message) + '</div>' : '';
+                                if (m.attachment && m.attachment.data) content += '<img class="chat-image" src="' + m.attachment.data + '" alt="Shared image" />';
+                                var check = (isAdmin() && mid) ? '<label class="chat-delete-select" title="Select message to delete"><input type="checkbox" class="chat-delete-check" value="' + escapeHTML(mid) + '" /></label>' : '';
+                                var avatar = sys ? '<div class="chat-avatar"><i class="fas fa-bell"></i></div>' : _profileAvatarHtml(m.from, senderName, 'chat-avatar');
+                                return '<div class="bubble-row ' + (mine ? 'mine' : 'theirs') + ' ' + (sys ? 'system' : '') + '">' + check + avatar + '<div class="bubble"><div class="msg-sender">' + (sys ? 'Group Notice' : escapeHTML(senderName)) + '</div>' + content + '<div class="bubble-meta">' + formatTime(m.timestamp || '') + '</div></div></div>';
+                            }).join('');
+                            setTimeout(function(){ c.scrollTop = Math.max(0, c.scrollHeight - c.clientHeight); }, 40);
+                        };
+                    }
+                }
+
+                window._profileSwitchTab = function(tab){ showProfileCenter(tab); };
+                window._viewAgentProfile = function(username){ showAgentPublicProfile(username); };
+                window.showProfileCenter = showProfileCenter;
+
+                _profileInjectStyles();
+                _profilePatchChat();
+
+                if (typeof showDashboard === 'function') {
+                    var _profilePrevShowDashboard = showDashboard;
+                    showDashboard = function(){
+                        var result = _profilePrevShowDashboard.apply(this, arguments);
+                        ensureProfileDashboardCard();
+                        return result;
+                    };
+                }
+
+                if (typeof handleDashAction === 'function') {
+                    var _profilePrevHandleDashAction = handleDashAction;
+                    handleDashAction = function(action){
+                        if (action === 'profile') {
+                            showProfileCenter('mine');
+                            return;
+                        }
+                        return _profilePrevHandleDashAction.apply(this, arguments);
+                    };
+                }
+
+                if (typeof afterLogin === 'function') {
+                    var _profilePrevAfterLogin = afterLogin;
+                    afterLogin = async function(user){
+                        var result = await _profilePrevAfterLogin.apply(this, arguments);
+                        ensureProfileDashboardCard();
+                        try {
+                            var users = await _profileLoadUsers();
+                            if (STATE.currentUser && users[STATE.currentUser.username]) _profileSyncCurrentUser(users[STATE.currentUser.username]);
+                        } catch (_) {}
+                        return result;
+                    };
+                }
+
+                document.addEventListener('DOMContentLoaded', function(){ setTimeout(ensureProfileDashboardCard, 700); });
+            })();
+
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
