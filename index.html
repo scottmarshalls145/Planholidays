@@ -12968,8 +12968,9 @@
                     var display = displayName || _profileNames(user, username).display;
                     var photo = _profilePhoto(user);
                     var cls = sizeClass || 'chat-avatar';
-                    if (photo) return '<div class="' + cls + ' profile-avatar" title="' + escapeHTML(display) + '"><img src="' + escapeHTML(photo) + '" alt="' + escapeHTML(display) + '" /></div>';
-                    return '<div class="' + cls + ' profile-avatar" title="' + escapeHTML(display) + '">' + escapeHTML(_profileInitials(display)) + '</div>';
+                    var click = username ? ' onclick="event.stopPropagation();window._viewAgentProfile(decodeURIComponent(\'' + encodeURIComponent(String(username || '')) + '\'))" style="cursor:pointer;"' : '';
+                    if (photo) return '<div class="' + cls + ' profile-avatar" title="View profile: ' + escapeHTML(display) + '"' + click + '><img src="' + escapeHTML(photo) + '" alt="' + escapeHTML(display) + '" /></div>';
+                    return '<div class="' + cls + ' profile-avatar" title="View profile: ' + escapeHTML(display) + '"' + click + '>' + escapeHTML(_profileInitials(display)) + '</div>';
                 }
 
                 function _profileLargePhoto(user, fallback){
@@ -13040,7 +13041,7 @@
                 function _profileTabs(active){
                     return '<div class="profile-tabs">' +
                         '<button class="btn btn-sm ' + (active === 'mine' ? 'btn-primary' : 'btn-outline') + '" onclick="window._profileSwitchTab(\'mine\')"><i class="fas fa-user-pen"></i> My Profile</button>' +
-                        '<button class="btn btn-sm ' + (active === 'team' ? 'btn-primary' : 'btn-outline') + '" onclick="window._profileSwitchTab(\'team\')"><i class="fas fa-users"></i> Team Profiles</button>' +
+                        (isAdmin() ? '<button class="btn btn-sm ' + (active === 'team' ? 'btn-primary' : 'btn-outline') + '" onclick="window._profileSwitchTab(\'team\')"><i class="fas fa-users"></i> Team Profiles</button>' : '') +
                         '</div>';
                 }
 
@@ -13074,6 +13075,7 @@
                 }
 
                 function _profileTeamHtml(users){
+                    if (!isAdmin()) return _profileMineHtml((users || {})[(STATE.currentUser && STATE.currentUser.username) || ''] || STATE.currentUser || {});
                     var me = STATE.currentUser && STATE.currentUser.username;
                     var keys = Object.keys(users || {}).sort(function(a, b){
                         var an = _profileNames(users[a], a).display.toLowerCase();
@@ -13087,12 +13089,13 @@
                         return '<div class="profile-team-card">' + _profileAvatarHtml(key, names.display, 'profile-photo-lg') +
                             '<div class="profile-team-main"><div class="profile-name">' + escapeHTML(names.display) + (key === me ? ' <span class="text-xs text-muted">(You)</span>' : '') + '</div>' +
                             '<div class="profile-meta">@' + escapeHTML(key) + ' · ' + designation + '</div>' +
-                            '<div class="profile-meta">' + escapeHTML(u.email || 'No email added') + '</div>' +
+                            '<div class="profile-meta"><strong>Email:</strong> ' + escapeHTML(u.email || 'Not added') + '</div>' +
+                            '<div class="profile-meta"><strong>Telephone:</strong> ' + escapeHTML(u.telephone || u.phone || 'Not added') + '</div>' +
                             _profileStatusHtml(u) +
                             '<div style="margin-top:10px;"><button class="btn btn-sm btn-outline" onclick="window._viewAgentProfile(\'' + escapeHTML(key) + '\')"><i class="fas fa-eye"></i> View Profile</button></div></div></div>';
                     }).join('');
                     return _profileTabs('team') +
-                        '<p class="text-muted text-sm">Everyone can view team profile details and statuses. Telephone numbers are hidden from other users.</p>' +
+                        '<p class="text-muted text-sm">Admin can view every agent profile with full contact details.</p>' +
                         '<div class="profile-team-grid">' + (cards || '<p class="text-muted">No users found.</p>') + '</div>' +
                         '<div class="modal-actions"><button class="btn btn-outline" onclick="window._profileSwitchTab(\'mine\')"><i class="fas fa-user-pen"></i> My Profile</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
                 }
@@ -13101,6 +13104,7 @@
                     if (!STATE.currentUser) return;
                     _profileInjectStyles();
                     tab = tab || 'mine';
+                    if (tab === 'team' && !isAdmin()) tab = 'mine';
                     var users = await _profileLoadUsers();
                     var me = STATE.currentUser.username;
                     var user = Object.assign({}, users[me] || {}, STATE.currentUser || {});
@@ -13174,9 +13178,13 @@
                     if (!user) { showToast('Profile not found.', 'error'); return; }
                     var names = _profileNames(user, username);
                     var isSelf = username === STATE.currentUser.username;
-                    var phoneHtml = isSelf ?
+                    var canSeeContact = isSelf || isAdmin();
+                    var emailHtml = canSeeContact ?
+                        '<div class="profile-meta"><strong>Email:</strong> ' + escapeHTML(user.email || 'Not added') + '</div>' :
+                        '<div class="profile-meta"><strong>Email:</strong> Hidden from other agents</div>';
+                    var phoneHtml = canSeeContact ?
                         '<div class="profile-meta"><strong>Telephone:</strong> ' + escapeHTML(user.telephone || user.phone || 'Not added') + '</div>' :
-                        '<div class="profile-meta"><strong>Telephone:</strong> Hidden from other users</div>';
+                        '<div class="profile-meta"><strong>Telephone:</strong> Hidden from other agents</div>';
                     showModal(
                         '<h3><i class="fas fa-id-card"></i> Agent Profile</h3>' +
                         '<div class="profile-card-lite">' + _profileLargePhoto(user, names.display) +
@@ -13184,7 +13192,7 @@
                         '<div class="profile-meta">@' + escapeHTML(username) + ' · ' + escapeHTML(user.designation || user.role || 'agent') + '</div>' +
                         _profileStatusHtml(user) + '</div></div>' +
                         '<div class="profile-grid">' +
-                        '<div class="profile-card-lite" style="display:block;"><div class="profile-meta"><strong>Email:</strong> ' + escapeHTML(user.email || 'Not added') + '</div>' + phoneHtml + '</div>' +
+                        '<div class="profile-card-lite" style="display:block;">' + emailHtml + phoneHtml + '</div>' +
                         '<div class="profile-card-lite" style="display:block;"><div class="profile-meta"><strong>Designation:</strong> ' + escapeHTML(user.designation || 'Not added') + '</div><div class="profile-meta"><strong>Status:</strong> ' + escapeHTML(_profileStatus(user).text) + '</div></div>' +
                         '</div><div class="modal-actions">' +
                         (isSelf ? '<button class="btn btn-primary" onclick="window._profileSwitchTab(\'mine\')"><i class="fas fa-user-pen"></i> Edit My Profile</button>' : '') +
@@ -13263,7 +13271,9 @@
                                         var hd = display || _profileNames(hu, username).display;
                                         var hp = _profilePhoto(hu);
                                         a.className = 'chat-avatar profile-avatar';
-                                        a.title = hd;
+                                        a.title = 'View profile: ' + hd;
+                                        a.style.cursor = 'pointer';
+                                        a.onclick = function(ev){ ev.stopPropagation(); window._viewAgentProfile(username); };
                                         a.innerHTML = hp ? '<img src="' + escapeHTML(hp) + '" alt="' + escapeHTML(hd) + '" />' : escapeHTML(_profileInitials(hd));
                                     }
                                 }
@@ -13373,14 +13383,17 @@
                 }
                 function _mrApplyChatThemeToMessenger(theme){
                     var m = document.querySelector('.messenger');
+                    var shell = document.querySelector('.chat-shell');
                     if (!m) return;
                     ['--chat-user-bg','--chat-readable','--chat-readable-soft','--chat-bubble-bg','--chat-bubble-border','--chat-bg-overlay'].forEach(function(v){ m.style.removeProperty(v); });
+                    if (shell) { shell.style.backgroundImage = ''; shell.style.backgroundSize = ''; shell.style.backgroundPosition = ''; }
                     if (!theme || !theme.bg) {
                         m.classList.remove('chat-bg-custom');
                         return;
                     }
                     var dark = theme.bgDark !== false;
                     m.classList.add('chat-bg-custom');
+                    if (shell) { shell.style.backgroundImage = (dark ? 'linear-gradient(rgba(0,0,0,.30),rgba(0,0,0,.30)), ' : 'linear-gradient(rgba(255,255,255,.18),rgba(255,255,255,.18)), ') + 'url(' + theme.bg + ')'; shell.style.backgroundSize = 'cover'; shell.style.backgroundPosition = 'center'; }
                     m.style.setProperty('--chat-user-bg', 'url(' + theme.bg + ')');
                     m.style.setProperty('--chat-readable', dark ? '#ffffff' : '#151515');
                     m.style.setProperty('--chat-readable-soft', dark ? 'rgba(255,255,255,.84)' : 'rgba(18,18,22,.78)');
