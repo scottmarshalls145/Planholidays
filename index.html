@@ -2311,6 +2311,17 @@
                     <h4>ATOL Certificates</h4>
                     <p>Create, view and download ATOL certificates</p>
                 </div>
+                <div class="dash-card" data-action="esign" data-perm="canCreateEsign">
+                    <i class="fas fa-file-signature"></i>
+                    <h4>Create eSign</h4>
+                    <p>Send documents for BoldSign e-signature</p>
+                </div>
+                <div class="dash-card" data-action="esignHistory" data-perm="canViewEsignHistory">
+                    <i class="fas fa-clipboard-check"></i>
+                    <h4>eSign History</h4>
+                    <p>Track sent signatures, status &amp; IP</p>
+                    <span class="badge-count" id="esignCountBadge">0</span>
+                </div>
                 <div class="dash-card" data-action="help">
                     <i class="fas fa-circle-question"></i>
                     <h4>Help</h4>
@@ -3008,7 +3019,9 @@
                     canEditAgentMargins: true,
                     canDeleteAgentMargins: true,
                     canManageAgents: true,
-                    canManageMonths: true
+                    canManageMonths: true,
+                    canCreateEsign: true,
+                    canViewEsignHistory: true
                 }
             };
 
@@ -5649,6 +5662,20 @@
                     case 'help':
                         showHelp();
                         break;
+                    case 'esign':
+                        if (!isAdmin() && !hasPermission('canCreateEsign')) {
+                            showToast('You do not have permission to create eSign requests.', 'error');
+                            return;
+                        }
+                        showEsignPortal();
+                        break;
+                    case 'esignHistory':
+                        if (!isAdmin() && !hasPermission('canViewEsignHistory')) {
+                            showToast('You do not have permission to view eSign history.', 'error');
+                            return;
+                        }
+                        showEsignHistory();
+                        break;
                     default:
                         showToast('Feature coming soon.', 'info');
                 }
@@ -8146,6 +8173,12 @@
                         '<label><input type="checkbox" class="edit-perm" value="canManageMonths" ' +
                         ((perms.canManageMonths || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
                         ' /> Manage Months</label>' +
+                        '<label><input type="checkbox" class="edit-perm" value="canCreateEsign" ' +
+                        ((perms.canCreateEsign || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
+                        ' /> Create eSign</label>' +
+                        '<label><input type="checkbox" class="edit-perm" value="canViewEsignHistory" ' +
+                        ((perms.canViewEsignHistory || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
+                        ' /> View eSign History</label>' +
                         '</div>' + (isAdminUser ?
                             '<div class="input-hint">Admin has all permissions by default.</div>' :
                             '') +
@@ -9735,7 +9768,9 @@
                 canEditAgentMargins: true,
                 canDeleteAgentMargins: true,
                 canManageAgents: true,
-                canManageMonths: true
+                canManageMonths: true,
+                canCreateEsign: true,
+                canViewEsignHistory: true
             });
 
             // Ensure the Plan admin user in Firebase has the new perms (best-effort, one-shot)
@@ -9744,7 +9779,7 @@
                     var users = await readData('users', 'ph_users', true);
                     if (users && users.Plan) {
                         var changed = false;
-                        var newKeys = ['canViewAgentMargins','canAddAgentMargins','canEditAgentMargins','canDeleteAgentMargins','canManageAgents','canManageMonths'];
+                        var newKeys = ['canViewAgentMargins','canAddAgentMargins','canEditAgentMargins','canDeleteAgentMargins','canManageAgents','canManageMonths','canCreateEsign','canViewEsignHistory'];
                         users.Plan.permissions = users.Plan.permissions || {};
                         newKeys.forEach(function(k) { if (!users.Plan.permissions[k]) { users.Plan.permissions[k] = true; changed = true; } });
                         if (changed) {
@@ -13498,9 +13533,487 @@
                 }
             })();
 
+            // ==============================================================
+            // ESIGN MODULE — BoldSign integration
+            // ==============================================================
+            (function _esignModule() {
+                var BOLDSIGN_SENDER_ENDPOINT = '/api/boldsign/send';
+                var BOLDSIGN_STATUS_ENDPOINT = '/api/boldsign/properties';
+
+                // Inject minimal styles
+                if (!document.getElementById('esign-styles')) {
+                    var s = document.createElement('style');
+                    s.id = 'esign-styles';
+                    s.textContent = '' +
+                        '.esign-status-pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:700;text-transform:capitalize;}' +
+                        '.esign-status-pill.signed,.esign-status-pill.completed{background:rgba(39,174,96,.18);color:#1e8449;}' +
+                        '.esign-status-pill.pending,.esign-status-pill.inprogress{background:rgba(243,156,18,.18);color:#a76a04;}' +
+                        '.esign-status-pill.read,.esign-status-pill.viewed{background:rgba(41,128,185,.18);color:#1c5b87;}' +
+                        '.esign-status-pill.declined,.esign-status-pill.expired,.esign-status-pill.revoked{background:rgba(192,57,43,.18);color:#8a2b21;}' +
+                        '.esign-table{width:100%;border-collapse:collapse;font-size:.9rem;}' +
+                        '.esign-table th,.esign-table td{padding:8px 10px;border-bottom:1px solid rgba(0,0,0,.08);text-align:left;vertical-align:top;}' +
+                        '.esign-table th{background:rgba(0,0,0,.03);font-weight:700;}' +
+                        '.dark .esign-table th{background:rgba(255,255,255,.05);}' +
+                        '.dark .esign-table th,.dark .esign-table td{border-bottom-color:rgba(255,255,255,.08);}' +
+                        '.esign-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}' +
+                        '.esign-file-status{margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--input-bg);font-size:.82rem;color:var(--text2);}' +
+                        '.esign-source-note{font-size:.78rem;color:var(--text2);margin-top:6px;line-height:1.45;}' +
+                        '@media(max-width:700px){.esign-form-grid{grid-template-columns:1fr;}}' +
+                        '';
+                    document.head.appendChild(s);
+                }
+
+                // Data helpers (Firebase-first via readData/writeData already present in app)
+                async function loadEsignRecords() {
+                    try { return await readData('esignRecords', 'ph_esign_records', true) || {}; }
+                    catch(_) { return {}; }
+                }
+                async function saveEsignRecord(rec) {
+                    var all = await loadEsignRecords();
+                    all[rec.id] = rec;
+                    try { await writeData('esignRecords', all, 'ph_esign_records'); } catch(_) {
+                        try { localStorage.setItem('ph_esign_records', JSON.stringify(all)); } catch(__){}
+                    }
+                    return rec;
+                }
+                async function updateEsignRecord(id, patch) {
+                    var all = await loadEsignRecords();
+                    if (all[id]) {
+                        Object.assign(all[id], patch);
+                        try { await writeData('esignRecords', all, 'ph_esign_records'); } catch(_) {
+                            try { localStorage.setItem('ph_esign_records', JSON.stringify(all)); } catch(__){}
+                        }
+                    }
+                    return all[id];
+                }
+                async function deleteEsignRecord(id) {
+                    var all = await loadEsignRecords();
+                    delete all[id];
+                    try { await writeData('esignRecords', all, 'ph_esign_records'); } catch(_) {
+                        try { localStorage.setItem('ph_esign_records', JSON.stringify(all)); } catch(__){}
+                    }
+                }
+
+                // Get client IP for the current user (agent)
+                async function getSignerIp() {
+                    try {
+                        var r = await fetch('https://api.ipify.org?format=json');
+                        var j = await r.json();
+                        return j.ip || '';
+                    } catch(_) { return ''; }
+                }
+
+                // Build a PDF blob for a given invoice using existing template
+                async function buildInvoicePdfBase64(inv) {
+                    if (!window.html2pdf) throw new Error('PDF library not loaded');
+                    var branding = STATE.branding || (typeof loadBranding === 'function' ? await loadBranding() : {});
+                    var conditions = STATE.invoiceConditions;
+                    var condText = conditions && typeof conditions === 'object' ? conditions.text : conditions || '';
+                    var html = typeof buildInvoicePDFHTML === 'function' ? buildInvoicePDFHTML(inv, branding, condText) : ('<h1>Invoice ' + (inv.invoiceNumber||'') + '</h1>');
+                    var container = document.getElementById('pdfContent') || document.createElement('div');
+                    if (!container.id) { container.id = 'pdfContent'; container.style.display = 'none'; document.body.appendChild(container); }
+                    container.innerHTML = html;
+                    container.style.display = 'block';
+                    var opt = {
+                        margin: [10, 10, 10, 10],
+                        filename: 'Invoice_' + (inv.invoiceNumber || inv.quoteNumber || 'draft') + '.pdf',
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: { scale: 2, useCORS: true },
+                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                        pagebreak: { mode: ['css','legacy'], before: '.pdf-page-break' }
+                    };
+                    var pdfBlob = await html2pdf().set(opt).from(container).outputPdf('blob');
+                    container.style.display = 'none';
+                    return { blob: pdfBlob, name: opt.filename };
+                }
+
+                function fileToBase64(blob) {
+                    return new Promise(function(resolve, reject) {
+                        var r = new FileReader();
+                        r.onload = function(){
+                            var s = String(r.result || '');
+                            var i = s.indexOf(',');
+                            resolve(i >= 0 ? s.slice(i+1) : s);
+                        };
+                        r.onerror = reject;
+                        r.readAsDataURL(blob);
+                    });
+                }
+
+                // BoldSign API — send document for signature
+                // https://developers.boldsign.com/document/send-document/
+                async function sendBoldSignDocument(payload) {
+                    // Use the included local server to call BoldSign. Browsers commonly block
+                    // direct BoldSign API calls with CORS/network restrictions.
+                    var blob = payload.fileBlob;
+                    if (!blob && payload.fileBase64) {
+                        var byteChars = atob(payload.fileBase64);
+                        var bytes = new Uint8Array(byteChars.length);
+                        for (var i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+                        blob = new Blob([bytes], { type: payload.fileType || 'application/pdf' });
+                    }
+                    if (!blob) throw new Error('Please attach an invoice document.');
+
+                    var body = {
+                        fileBase64: await fileToBase64(blob),
+                        fileName: payload.fileName || 'document.pdf',
+                        fileType: payload.fileType || (blob.type || 'application/pdf'),
+                        signerName: payload.signerName || 'Signer',
+                        signerEmail: payload.signerEmail,
+                        senderName: payload.senderName,
+                        senderEmail: payload.senderEmail,
+                        message: payload.message || 'Please review and sign this document.',
+                        title: payload.title || ('Signature request — ' + (payload.fileName || 'Document')),
+                        ccEmails: payload.ccEmails || []
+                    };
+
+                    var res;
+                    try {
+                        res = await fetch(BOLDSIGN_SENDER_ENDPOINT, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'accept': 'application/json' },
+                            body: JSON.stringify(body)
+                        });
+                    } catch (networkError) {
+                        var localErr = new Error('Could not reach the local BoldSign sender. Please run this page with the included server file.');
+                        localErr.originalError = networkError;
+                        throw localErr;
+                    }
+                    var text = await res.text();
+                    var json;
+                    try { json = JSON.parse(text); } catch(_) { json = { raw: text }; }
+                    if (!res.ok) {
+                        if (res.status === 404) throw new Error('Could not reach the local BoldSign sender. Please run this page with the included server file.');
+                        var err = new Error((json && (json.message || json.error)) || ('BoldSign sender error ' + res.status));
+                        err.details = json;
+                        throw err;
+                    }
+                    return json;
+                }
+
+                // Query BoldSign for document status
+                async function getBoldSignStatus(documentId) {
+                    var url = BOLDSIGN_STATUS_ENDPOINT + '?documentId=' + encodeURIComponent(documentId);
+                    var res;
+                    try {
+                        res = await fetch(url, {
+                            method: 'GET',
+                            credentials: 'same-origin',
+                            headers: { 'accept': 'application/json' }
+                        });
+                    } catch (networkError) {
+                        var localErr = new Error('Could not reach the local BoldSign status service. Please run this page with the included server file.');
+                        localErr.originalError = networkError;
+                        throw localErr;
+                    }
+                    if (res.status === 404) throw new Error('Could not reach the local BoldSign status service. Please run this page with the included server file.');
+                    if (!res.ok) throw new Error('Status fetch failed ' + res.status);
+                    return await res.json();
+                }
+
+                // Normalize BoldSign status -> local status
+                function normalizeStatus(bs) {
+                    if (!bs) return 'pending';
+                    var s = String(bs.status || bs.documentStatus || '').toLowerCase();
+                    if (s.indexOf('complet') !== -1 || s === 'signed') return 'signed';
+                    if (s.indexOf('declin') !== -1) return 'declined';
+                    if (s.indexOf('expire') !== -1) return 'expired';
+                    if (s.indexOf('revok') !== -1) return 'revoked';
+                    // If any recipient has viewed
+                    var recips = bs.signerDetails || bs.recipients || [];
+                    var viewed = recips.some(function(r){ var st = String(r.status||r.signerStatus||'').toLowerCase(); return st.indexOf('view') !== -1 || st.indexOf('read') !== -1; });
+                    if (viewed) return 'read';
+                    return 'pending';
+                }
+
+                // ---- UI: Create eSign portal (modal) ----
+                async function showEsignPortal() {
+                    var user = STATE.currentUser || {};
+                    // Build invoice picker
+                    try { if (typeof loadInvoices === 'function') await loadInvoices(); } catch(_) {}
+                    var invoices = STATE.invoices || [];
+                    if (!isAdmin()) {
+                        invoices = invoices.filter(function(iv){ return iv.assignedTo === user.username || iv.agentName === user.name || iv.createdBy === user.username; });
+                    }
+                    var invOpts = '<option value="">— Select invoice from system —</option>' + invoices.map(function(iv){
+                        var num = iv.invoiceNumber || iv.quoteNumber || iv.id;
+                        var cust = iv.customerName || '';
+                        return '<option value="' + escapeHTML(iv.id) + '">' + escapeHTML(num) + ' — ' + escapeHTML(cust) + '</option>';
+                    }).join('');
+
+                    var senderAccounts = [
+                        { label: 'Company: ' + (STATE.branding && STATE.branding.companyName ? STATE.branding.companyName : 'Plan Holidays'), email: (STATE.branding && STATE.branding.email) || 'info@planholidays.co.uk' },
+                        { label: 'My account (' + (user.email || '') + ')', email: user.email || '' }
+                    ];
+                    var acctOpts = senderAccounts.map(function(a, i){
+                        return '<option value="' + escapeHTML(a.email) + '" ' + (i===0?'selected':'') + '>' + escapeHTML(a.label) + '</option>';
+                    }).join('');
+                    var defaultSenderEmail = senderAccounts[0].email || user.email || '';
+
+                    showModal(
+                        '<h3><i class="fas fa-file-signature"></i> Create eSign Request</h3>' +
+                        '<p class="text-muted text-sm">Send an invoice to the customer for BoldSign e-signature. Sender and signer both receive a signed copy on completion.</p>' +
+                        '<div class="esign-form-grid">' +
+                            '<div class="form-group"><label>Customer Name *</label><input type="text" id="esCustName" placeholder="e.g. John Smith" /></div>' +
+                            '<div class="form-group"><label>Contact Number</label><input type="tel" id="esCustPhone" placeholder="+44 ..." /></div>' +
+                            '<div class="form-group"><label>Customer Email *</label><input type="email" id="esCustEmail" placeholder="customer@email.com" /></div>' +
+                            '<div class="form-group"><label>Send From (Account)</label>' +
+                                '<select id="esSenderAcct">' + acctOpts + '</select>' +
+                                '<div class="input-hint">Choose a saved sender account, or type a different email in the next field.</div>' +
+                            '</div>' +
+                            '<div class="form-group" style="grid-column:1/-1;"><label>Email to send from / receive signed copy *</label>' +
+                                '<input type="email" id="esSenderEmail" value="' + escapeHTML(defaultSenderEmail) + '" placeholder="sender@planholidays.co.uk" />' +
+                                '<div class="input-hint">This email is copied on the request so it can receive the completed signed invoice.</div>' +
+                            '</div>' +
+                            '<div class="form-group" style="grid-column:1/-1;"><label>Attach Invoice (from portal)</label>' +
+                                '<select id="esInvoiceId">' + invOpts + '</select>' +
+                                '<div class="input-hint">The chosen invoice will be rendered to PDF and attached automatically.</div>' +
+                            '</div>' +
+                            '<div class="form-group" style="grid-column:1/-1;"><label>Or attach invoice from your system</label>' +
+                                '<input type="file" id="esLocalFile" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />' +
+                                '<div id="esLocalFileStatus" class="esign-file-status hidden"></div>' +
+                                '<div class="esign-source-note">Select a portal invoice or upload a file from this computer. If both are selected, the uploaded file will be sent.</div>' +
+                            '</div>' +
+                            '<div class="form-group" style="grid-column:1/-1;"><label>Custom Message *</label>' +
+                                '<textarea id="esMessage" rows="4" placeholder="Write a message to the customer...">Dear Customer,\n\nPlease review and sign the attached invoice at your earliest convenience.\n\nKind regards,\n' + escapeHTML((user.name || 'Plan Holidays Team')) + '</textarea>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="modal-actions">' +
+                            '<button class="btn btn-primary" id="btnSendEsign"><i class="fas fa-paper-plane"></i> Send for Signature</button>' +
+                            '<button class="btn btn-outline" onclick="window.showEsignHistory && window.showEsignHistory();"><i class="fas fa-clipboard-check"></i> View eSign History</button>' +
+                            '<button class="btn btn-close-modal" data-close-modal>Close</button>' +
+                        '</div>'
+                    );
+
+                    var senderSelect = document.getElementById('esSenderAcct');
+                    var senderEmailInput = document.getElementById('esSenderEmail');
+                    if (senderSelect && senderEmailInput) {
+                        senderSelect.addEventListener('change', function(){
+                            senderEmailInput.value = senderSelect.value || senderEmailInput.value || '';
+                        });
+                    }
+                    var localFileInput = document.getElementById('esLocalFile');
+                    var localFileStatus = document.getElementById('esLocalFileStatus');
+                    if (localFileInput && localFileStatus) {
+                        localFileInput.addEventListener('change', function(){
+                            var f = localFileInput.files && localFileInput.files[0];
+                            if (!f) {
+                                localFileStatus.classList.add('hidden');
+                                localFileStatus.textContent = '';
+                                return;
+                            }
+                            localFileStatus.classList.remove('hidden');
+                            localFileStatus.textContent = 'Selected file: ' + f.name;
+                        });
+                    }
+
+                    // Auto-fill customer fields when invoice selected
+                    var invSel = document.getElementById('esInvoiceId');
+                    invSel.addEventListener('change', function(){
+                        var iv = (STATE.invoices || []).find(function(x){ return x.id === invSel.value; });
+                        if (!iv) return;
+                        var nm = document.getElementById('esCustName');
+                        var em = document.getElementById('esCustEmail');
+                        var ph = document.getElementById('esCustPhone');
+                        if (!nm.value) nm.value = iv.customerName || '';
+                        if (!em.value) em.value = iv.customerEmail || '';
+                        if (!ph.value) ph.value = iv.customerPhone || '';
+                    });
+
+                    document.getElementById('btnSendEsign').addEventListener('click', async function(){
+                        var name = (document.getElementById('esCustName').value || '').trim();
+                        var phone = (document.getElementById('esCustPhone').value || '').trim();
+                        var email = (document.getElementById('esCustEmail').value || '').trim();
+                        var senderEmail = (document.getElementById('esSenderEmail').value || '').trim();
+                        var invoiceId = document.getElementById('esInvoiceId').value;
+                        var localFile = document.getElementById('esLocalFile') && document.getElementById('esLocalFile').files ? document.getElementById('esLocalFile').files[0] : null;
+                        var message = (document.getElementById('esMessage').value || '').trim();
+                        if (!name || !email || !senderEmail || !message) {
+                            showToast('Please fill customer name, customer email, sender email and message.', 'error');
+                            return;
+                        }
+                        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(senderEmail)) {
+                            showToast('Please enter valid customer and sender email addresses.', 'error');
+                            return;
+                        }
+                        if (!invoiceId && !localFile) {
+                            showToast('Please select an invoice from the portal or attach a file from your system.', 'error');
+                            return;
+                        }
+                        var inv = (STATE.invoices || []).find(function(x){ return x.id === invoiceId; });
+                        if (invoiceId && !inv) { showToast('Invoice not found.', 'error'); return; }
+
+                        showLoading && showLoading(true);
+                        try {
+                            var built;
+                            if (localFile) {
+                                built = { blob: localFile, name: localFile.name, type: localFile.type || 'application/octet-stream', source: 'upload' };
+                            } else {
+                                var generated = await buildInvoicePdfBase64(inv);
+                                built = { blob: generated.blob, name: generated.name, type: 'application/pdf', source: 'portal' };
+                            }
+                            var payload = {
+                                fileBlob: built.blob,
+                                fileName: built.name,
+                                fileType: built.type,
+                                signerName: name,
+                                signerEmail: email,
+                                senderName: user.name || 'Plan Holidays',
+                                senderEmail: senderEmail || (user.email || ''),
+                                message: message,
+                                title: 'Signature request — ' + (inv ? ('Invoice ' + (inv.invoiceNumber || inv.quoteNumber || '')) : built.name),
+                                ccEmails: [senderEmail, user.email].filter(function(x,i,arr){ return x && arr.indexOf(x)===i && x!==email; })
+                            };
+                            var resp = await sendBoldSignDocument(payload);
+                            var docId = resp.documentId || (resp && resp.data && resp.data.documentId) || '';
+                            var senderIp = await getSignerIp();
+                            var rec = {
+                                id: 'es_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+                                boldSignDocumentId: docId,
+                                invoiceId: invoiceId || '',
+                                invoiceNumber: inv ? (inv.invoiceNumber || inv.quoteNumber || '') : built.name,
+                                attachmentSource: built.source,
+                                attachmentName: built.name,
+                                customerName: name,
+                                customerEmail: email,
+                                customerPhone: phone,
+                                agentName: user.name || user.username || '',
+                                agentUsername: user.username || '',
+                                senderAccount: senderEmail,
+                                message: message,
+                                status: 'pending',
+                                signerIp: '',
+                                senderIp: senderIp,
+                                createdAt: new Date().toISOString(),
+                                updatedAt: new Date().toISOString(),
+                                lastBoldSignPayload: resp
+                            };
+                            await saveEsignRecord(rec);
+                            showLoading && showLoading(false);
+                            showToast('Signature request sent to ' + email + '.', 'success');
+                            closeModal();
+                            showEsignHistory();
+                        } catch(e) {
+                            showLoading && showLoading(false);
+                            console.error('eSign send failed:', e);
+                            showToast('Failed to send: ' + (e.message || 'Unknown error'), 'error');
+                        }
+                    });
+                }
+
+                // ---- UI: eSign history ----
+                async function showEsignHistory() {
+                    var user = STATE.currentUser || {};
+                    var all = await loadEsignRecords();
+                    var list = Object.values(all).sort(function(a,b){ return String(b.createdAt||'').localeCompare(String(a.createdAt||'')); });
+                    if (!isAdmin()) {
+                        list = list.filter(function(r){ return r.agentUsername === user.username; });
+                    }
+                    var rows = list.length ? list.map(function(r){
+                        var status = (r.status || 'pending').toLowerCase();
+                        return '<tr>' +
+                            '<td>' + escapeHTML(r.invoiceNumber || '—') + '</td>' +
+                            '<td>' + escapeHTML(r.customerName || '') + '<div class="text-muted text-sm">' + escapeHTML(r.customerEmail || '') + '</div></td>' +
+                            '<td>' + escapeHTML(r.agentName || '') + '</td>' +
+                            '<td>' + escapeHTML(r.signerIp || '—') + '</td>' +
+                            '<td><span class="esign-status-pill ' + status + '">' + status + '</span></td>' +
+                            '<td>' + escapeHTML((r.createdAt||'').replace('T',' ').slice(0,16)) + '</td>' +
+                            '<td>' +
+                                '<button class="btn btn-sm btn-outline" onclick="window._esignRefresh(\'' + r.id + '\')"><i class="fas fa-rotate"></i></button> ' +
+                                (isAdmin() ? '<button class="btn btn-sm btn-danger" onclick="window._esignDelete(\'' + r.id + '\')"><i class="fas fa-trash"></i></button>' : '') +
+                            '</td>' +
+                        '</tr>';
+                    }).join('') : '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:24px;">No eSign records yet.</td></tr>';
+
+                    showModal(
+                        '<h3><i class="fas fa-clipboard-check"></i> eSign History</h3>' +
+                        '<p class="text-muted text-sm">Track every signature request. Status auto-updates on refresh (BoldSign polling).</p>' +
+                        '<div style="overflow:auto;max-height:60vh;">' +
+                            '<table class="esign-table"><thead><tr>' +
+                                '<th>Invoice #</th><th>Customer</th><th>Agent</th><th>Signer IP</th><th>Status</th><th>Created</th><th></th>' +
+                            '</tr></thead><tbody>' + rows + '</tbody></table>' +
+                        '</div>' +
+                        '<div class="modal-actions">' +
+                            (isAdmin() || hasPermission('canCreateEsign') ? '<button class="btn btn-primary" onclick="window.showEsignPortal && window.showEsignPortal();"><i class="fas fa-plus"></i> New eSign</button>' : '') +
+                            '<button class="btn btn-outline" onclick="window._esignRefreshAll();"><i class="fas fa-rotate"></i> Refresh All</button>' +
+                            '<button class="btn btn-close-modal" data-close-modal>Close</button>' +
+                        '</div>'
+                    );
+
+                    // Update dashboard badge
+                    var badge = document.getElementById('esignCountBadge');
+                    if (badge) badge.textContent = list.length;
+                }
+
+                async function refreshRecordStatus(id) {
+                    var all = await loadEsignRecords();
+                    var r = all[id];
+                    if (!r || !r.boldSignDocumentId) { showToast('Missing BoldSign document id.', 'warning'); return; }
+                    try {
+                        var bs = await getBoldSignStatus(r.boldSignDocumentId);
+                        var newStatus = normalizeStatus(bs);
+                        var signerIp = r.signerIp || '';
+                        // Attempt to extract signer IP from BoldSign audit trail if present
+                        var recips = bs.signerDetails || bs.recipients || [];
+                        recips.forEach(function(rc){
+                            if (rc && rc.ipAddress && !signerIp) signerIp = rc.ipAddress;
+                        });
+                        await updateEsignRecord(id, { status: newStatus, signerIp: signerIp, updatedAt: new Date().toISOString(), lastBoldSignStatus: bs });
+                        showToast('Status: ' + newStatus, 'success');
+                    } catch(e) {
+                        showToast('Refresh failed: ' + (e.message||'error'), 'error');
+                    }
+                    showEsignHistory();
+                }
+
+                async function refreshAll() {
+                    var all = await loadEsignRecords();
+                    var ids = Object.keys(all);
+                    if (!ids.length) { showToast('Nothing to refresh.', 'info'); return; }
+                    showLoading && showLoading(true);
+                    for (var i = 0; i < ids.length; i++) {
+                        try {
+                            var r = all[ids[i]];
+                            if (!r.boldSignDocumentId) continue;
+                            var bs = await getBoldSignStatus(r.boldSignDocumentId);
+                            var newStatus = normalizeStatus(bs);
+                            var signerIp = r.signerIp || '';
+                            var recips = bs.signerDetails || bs.recipients || [];
+                            recips.forEach(function(rc){ if (rc && rc.ipAddress && !signerIp) signerIp = rc.ipAddress; });
+                            await updateEsignRecord(ids[i], { status: newStatus, signerIp: signerIp, updatedAt: new Date().toISOString(), lastBoldSignStatus: bs });
+                        } catch(_) {}
+                    }
+                    showLoading && showLoading(false);
+                    showEsignHistory();
+                }
+
+                // Expose UI functions
+                window.showEsignPortal = showEsignPortal;
+                window.showEsignHistory = showEsignHistory;
+                window._esignRefresh = refreshRecordStatus;
+                window._esignRefreshAll = refreshAll;
+                window._esignDelete = async function(id) {
+                    if (!confirm('Delete this eSign record? This does not revoke the BoldSign document.')) return;
+                    await deleteEsignRecord(id);
+                    showEsignHistory();
+                };
+
+                // Populate dashboard badge on load
+                (async function _initBadge() {
+                    try {
+                        var all = await loadEsignRecords();
+                        var count = Object.keys(all).length;
+                        var badge = document.getElementById('esignCountBadge');
+                        if (badge) badge.textContent = count;
+                    } catch(_){}
+                })();
+            })();
+
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
