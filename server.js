@@ -6,7 +6,7 @@ const { URL } = require('url');
 const PORT = Number(process.env.PORT || 3000);
 const ROOT = __dirname;
 const BOLDSIGN_BASE = 'https://api.boldsign.com';
-const FALLBACK_KEY_B64 = 'FMzUyZjcxNWUtMmNjYi00ODY1LTkxZmQtY2I5ZTUyMDk4NmRj';
+const FALLBACK_KEY_B64 = 'MzUyZjcxNWUtMmNjYi00ODY1LTkxZmQtY2I5ZTUyMDk4NmRj';
 function resolveBoldSignApiKey(value) {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -90,15 +90,30 @@ async function handleSend(req, res) {
     fd.append('Files', new Blob([buffer], { type: payload.fileType || 'application/pdf' }), payload.fileName || 'document.pdf');
     addBoldSignFields(fd, payload);
 
-    const upstream = await fetch(`${BOLDSIGN_BASE}/v1/document/send`, {
-      method: 'POST',
-      headers: { 'X-API-KEY': BOLDSIGN_API_KEY, 'accept': 'application/json' },
-      body: fd
-    });
-    const text = await upstream.text();
-    let data;
-    try { data = JSON.parse(text); } catch { data = { raw: text }; }
-    send(res, upstream.status, data);
+    const endpoints = [
+      `${BOLDSIGN_BASE}/v1/document/send`,
+      `${BOLDSIGN_BASE}/v1/document/senddocument`,
+      `${BOLDSIGN_BASE}/v1/document/send-document`
+    ];
+    let last = null;
+    for (const endpoint of endpoints) {
+      const attemptFd = new FormData();
+      attemptFd.append('Files', new Blob([buffer], { type: payload.fileType || 'application/pdf' }), payload.fileName || 'document.pdf');
+      addBoldSignFields(attemptFd, payload);
+      const upstream = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'X-API-KEY': BOLDSIGN_API_KEY, 'accept': 'application/json' },
+        body: attemptFd
+      });
+      const text = await upstream.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = { raw: text }; }
+      last = { status: upstream.status, data, endpoint };
+      if (upstream.ok) return send(res, upstream.status, data);
+      if (upstream.status !== 404 && upstream.status !== 405) break;
+    }
+    const message = (last && last.data && (last.data.message || last.data.error || last.data.raw)) || `BoldSign rejected the send request with status ${last ? last.status : 500}.`;
+    send(res, last ? last.status : 500, { message, endpoint: last && last.endpoint, details: last && last.data });
   } catch (err) {
     send(res, 500, { message: err.message || 'BoldSign sender failed.' });
   }
