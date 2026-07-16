@@ -2280,11 +2280,16 @@
                     <h4>Chat</h4>
                     <p>Private chat with image upload</p>
                 </div>
-                <div class="dash-card" data-action="calls">
-                    <i class="fas fa-phone-volume"></i>
-                    <h4>Calls</h4>
-                    <p>Online agents &amp; call logs</p>
+                <div class="dash-card" data-action="agentsOnline">
+                    <i class="fas fa-users"></i>
+                    <h4>Agents Online</h4>
+                    <p>See which agents are online</p>
                     <span class="badge-count" id="onlineAgentsBadge">0</span>
+                </div>
+                <div class="dash-card" data-action="callLogs">
+                    <i class="fas fa-clock-rotate-left"></i>
+                    <h4>Call Logs</h4>
+                    <p>Review previous call logs</p>
                 </div>
                 <div class="dash-card" data-action="theme">
                     <i class="fas fa-palette"></i>
@@ -5627,6 +5632,12 @@
                         break;
                     case 'calls':
                         try { showCallsCenter(); } catch(e){ showToast('Calls module not ready.','error'); }
+                        break;
+                    case 'agentsOnline':
+                        try { showCallsCenter('online'); } catch(e){ showToast('Calls module not ready.','error'); }
+                        break;
+                    case 'callLogs':
+                        try { showCallsCenter('logs'); } catch(e){ showToast('Calls module not ready.','error'); }
                         break;
                     case 'calendar':
                         showCalendar();
@@ -12155,15 +12166,21 @@
 
                 // ---------- UI: CALLS CENTER ----------
                 var _ccTab = 'online';
+                var _ccOnlineRefreshTimer = null;
 
-                window.showCallsCenter = function(){
+                window.showCallsCenter = function(initialTab){
                     if(!STATE.currentUser){ showToast('Please login first.','warning'); return; }
                     _attachCallLogListener();
-                    var html = '<h3><i class="fas fa-phone-volume"></i> Calls Center</h3>'+
+                    _ccTab = (initialTab === 'logs') ? 'logs' : 'online';
+                    var onlineActive = _ccTab === 'online' ? ' class="active"' : '';
+                    var logsActive = _ccTab === 'logs' ? ' class="active"' : '';
+                    var headerTitle = _ccTab === 'logs' ? 'Call Logs' : 'Agents Online';
+                    var headerIcon = _ccTab === 'logs' ? 'fa-clock-rotate-left' : 'fa-users';
+                    var html = '<h3><i class="fas '+headerIcon+'"></i> '+headerTitle+'</h3>'+
                         '<p class="text-muted text-sm">See which agents are online and click to start a voice call. Admin can review all call logs.</p>'+
                         '<div class="cc-tabs">'+
-                            '<button data-cc-tab="online" class="active"><i class="fas fa-users"></i> Online Agents</button>'+
-                            '<button data-cc-tab="logs"><i class="fas fa-clock-rotate-left"></i> Call Logs</button>'+
+                            '<button data-cc-tab="online"'+onlineActive+'><i class="fas fa-users"></i> Online Agents</button>'+
+                            '<button data-cc-tab="logs"'+logsActive+'><i class="fas fa-clock-rotate-left"></i> Call Logs</button>'+
                         '</div>'+
                         '<div id="ccPanel"></div>'+
                         '<div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
@@ -12177,6 +12194,18 @@
                         };
                     });
                     _renderCCPanel();
+                    // Refresh the online agents list every 5s while the modal is open
+                    if(_ccOnlineRefreshTimer) clearInterval(_ccOnlineRefreshTimer);
+                    _ccOnlineRefreshTimer = setInterval(function(){
+                        var stillOpen = document.getElementById('ccPanel');
+                        if(!stillOpen){
+                            clearInterval(_ccOnlineRefreshTimer);
+                            _ccOnlineRefreshTimer = null;
+                            return;
+                        }
+                        _updateOnlineBadge();
+                        if(document.getElementById('ccOnlineList')) _renderOnlineAgents();
+                    }, 5000);
                 };
 
                 function _renderCCPanel(){
@@ -12369,7 +12398,13 @@
                 setTimeout(_kickoff, 1500);
                 setInterval(function(){
                     if(STATE.currentUser && !_presenceHeartbeat) _kickoff();
+                    // Refresh presence map (localStorage fallback) and badge every 5s
+                    try{
+                        if(!firebaseConnected || !db){ _attachPresenceListener(); }
+                    }catch(_){}
                     _updateOnlineBadge();
+                    // Live-refresh the Calls Center online list if it's currently visible
+                    if(document.getElementById('ccOnlineList')) _renderOnlineAgents();
                 }, 5000);
             })();
 
@@ -13501,6 +13536,7 @@
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
