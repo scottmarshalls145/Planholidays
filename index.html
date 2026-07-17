@@ -13831,6 +13831,8 @@
                         '.bubble-row.theirs .chat-msg-edit-btn:hover{background:rgba(0,0,0,.12)}' +
                         '.chat-edit-audit{margin-top:8px;padding:8px 10px;border-radius:12px;background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.22);font-size:.76rem;line-height:1.35}' +
                         '.chat-edit-audit strong{display:inline-block;min-width:58px}' +
+                        '.chat-edit-audit-title{font-weight:800;margin-bottom:5px}' +
+                        '.chat-edit-audit-item{padding-top:6px;margin-top:6px;border-top:1px solid rgba(41,128,185,.18)}' +
                         '.chat-edited-note{opacity:.72;font-size:.68rem;margin-left:4px}' +
                         '#editChatMessageText{width:100%;min-height:120px;resize:vertical}';
                     document.head.appendChild(st);
@@ -14038,10 +14040,14 @@
                             if (m.attachment && m.attachment.data) content += '<img class="chat-image" src="' + m.attachment.data + '" alt="Shared image" />';
                             var adminAudit = '';
                             if (isAdmin() && m.editedAt) {
-                                var original = m.originalMessage != null ? m.originalMessage : ((m.editHistory && m.editHistory[0] && m.editHistory[0].from) || '');
-                                adminAudit = '<div class="chat-edit-audit"><div><strong>Original:</strong> ' + escapeHTML(original || '(empty)') + '</div>' +
-                                    '<div><strong>Edited:</strong> ' + escapeHTML(m.message || '(empty)') + '</div>' +
-                                    '<div><strong>When:</strong> ' + formatDateTime(m.editedAt || '') + '</div></div>';
+                                var edits = Array.isArray(m.editHistory) ? m.editHistory : [];
+                                if (!edits.length) edits = [{ from: (m.originalMessage != null ? m.originalMessage : ''), to: (m.message || ''), at: m.editedAt || '', by: m.editedBy || '' }];
+                                adminAudit = '<div class="chat-edit-audit"><div class="chat-edit-audit-title">Edit history visible to admin only</div>' +
+                                    edits.map(function(e, idx){
+                                        return '<div class="chat-edit-audit-item"><div><strong>Edit #' + (idx + 1) + ':</strong> ' + formatDateTime(e.at || '') + (e.by ? ' by ' + escapeHTML(e.by) : '') + '</div>' +
+                                            '<div><strong>Before:</strong> ' + escapeHTML((e.from || '') || '(empty)') + '</div>' +
+                                            '<div><strong>After:</strong> ' + escapeHTML((e.to || '') || '(empty)') + '</div></div>';
+                                    }).join('') + '</div>';
                             }
                             var check = (isAdmin() && mid) ? '<label class="chat-delete-select" title="Select message to delete"><input type="checkbox" class="chat-delete-check" value="' + escapeHTML(mid) + '" /></label>' : '';
                             var editBtn = (mine && !sys && mid) ? '<button type="button" class="chat-msg-edit-btn" data-msg-id="' + escapeHTML(mid) + '" title="Edit message"><i class="fas fa-pen"></i></button>' : '';
