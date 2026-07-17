@@ -14069,9 +14069,162 @@
                 _mrInjectEditAndRingStyles();
             })();
 
+            // MuleRun requested addition: WhatsApp-style emoji picker for chat messages only.
+            (function(){
+                var MR_EMOJI_STYLE_ID = 'mr-whatsapp-emoji-picker-style';
+                function injectWhatsappEmojiStyles(){
+                    if (document.getElementById(MR_EMOJI_STYLE_ID)) return;
+                    var style = document.createElement('style');
+                    style.id = MR_EMOJI_STYLE_ID;
+                    style.textContent = '.messenger-input.has-whatsapp-emoji{position:relative}.mr-whatsapp-emoji-btn{font-size:1.08rem}.mr-whatsapp-emoji-panel{position:absolute;left:14px;right:64px;bottom:66px;z-index:50;display:none;max-width:520px;background:var(--bg2);color:var(--text);border:1px solid var(--card-border);border-radius:18px;box-shadow:0 22px 70px rgba(0,0,0,.28);overflow:hidden;backdrop-filter:blur(18px)}.mr-whatsapp-emoji-panel.open{display:block}.mr-whatsapp-emoji-head{display:flex;gap:6px;align-items:center;overflow-x:auto;padding:9px;border-bottom:1px solid var(--card-border);background:rgba(37,211,102,.08)}.mr-whatsapp-emoji-tab{border:0;background:transparent;color:var(--text);width:34px;height:32px;border-radius:10px;font-size:1.05rem;cursor:pointer;flex:0 0 auto}.mr-whatsapp-emoji-tab.active,.mr-whatsapp-emoji-tab:hover{background:rgba(37,211,102,.18)}.mr-whatsapp-emoji-body{max-height:260px;overflow:auto;padding:10px;background:var(--card)}.mr-whatsapp-emoji-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:4px}.mr-whatsapp-emoji-cell{height:34px;border:0;border-radius:9px;background:transparent;font-size:1.32rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}.mr-whatsapp-emoji-cell:hover{background:rgba(37,211,102,.20);transform:scale(1.08)}.mr-whatsapp-emoji-title{font-size:.72rem;font-weight:800;color:var(--text2);padding:2px 4px 9px;text-transform:uppercase;letter-spacing:.08em}.theme-custom .mr-whatsapp-emoji-panel{background:var(--custom-panel-bg)!important;color:var(--custom-readable)!important;border-color:var(--custom-border)!important}.theme-custom .mr-whatsapp-emoji-title{color:var(--custom-readable-soft)!important}@media(max-width:780px){.mr-whatsapp-emoji-panel{left:8px;right:8px;bottom:62px;max-width:none}.mr-whatsapp-emoji-body{max-height:220px}.mr-whatsapp-emoji-cell{height:32px;font-size:1.22rem}}';
+                    document.head.appendChild(style);
+                }
+                function cpRange(start, end){
+                    var out = [];
+                    for (var i = start; i <= end; i++) {
+                        if (i >= 0xD800 && i <= 0xDFFF) continue;
+                        out.push(String.fromCodePoint(i));
+                    }
+                    return out;
+                }
+                function words(str){ return String(str || '').trim().split(/\s+/).filter(Boolean); }
+                function unique(list){
+                    var seen = {}, out = [];
+                    list.forEach(function(e){ if (e && !seen[e]) { seen[e] = true; out.push(e); } });
+                    return out;
+                }
+                function addSkinTones(list){
+                    var tones = words('🏻 🏼 🏽 🏾 🏿'), out = list.slice();
+                    list.forEach(function(e){ tones.forEach(function(t){ out.push(e + t); }); });
+                    return out;
+                }
+                function flagFromCode(code){
+                    return code.replace(/[A-Z]/g, function(ch){ return String.fromCodePoint(0x1F1E6 + ch.charCodeAt(0) - 65); });
+                }
+                function allFlags(){
+                    var codes = words('AC AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CP CR CU CV CW CX CY CZ DE DG DJ DK DM DO DZ EA EC EE EG EH ER ES ET EU FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU IC ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TA TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM UN US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW');
+                    return codes.map(flagFromCode).concat(words('🏳️ 🏴 🏁 🚩 🏳️‍🌈 🏳️‍⚧️ 🏴‍☠️'));
+                }
+                function whatsappEmojiCategories(){
+                    var handBases = words('👋 🤚 🖐️ ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 🖕 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 🫶 👐 🤲 🤝 🙏 ✍️ 💅 🤳 💪 🦾 🦿 🦵 🦶 👂 🦻 👃');
+                    var peopleBases = words('👶 🧒 👦 👧 🧑 👱 👨 🧔 🧔‍♂️ 🧔‍♀️ 👩 🧓 👴 👵 🙍 🙎 🙅 🙆 💁 🙋 🧏 🙇 🤦 🤷 👮 🕵️ 💂 🥷 👷 🫅 🤴 👸 👳 👲 🧕 🤵 👰 🤰 🫃 🫄 🤱 👩‍🍼 👨‍🍼 🧑‍🍼 👼 🎅 🤶 🧑‍🎄 🦸 🦹 🧙 🧚 🧛 🧜 🧝 🧞 🧟 💆 💇 🚶 🧍 🧎 🏃 💃 🕺 🕴️ 👯 🧖 🧗 🤺 🏇 ⛷️ 🏂 🏌️ 🏄 🚣 🏊 ⛹️ 🏋️ 🚴 🚵 🤸 🤼 🤽 🤾 🤹 🧘 🛀 🛌');
+                    var family = words('👭 👫 👬 💏 👩‍❤️‍💋‍👨 👨‍❤️‍💋‍👨 👩‍❤️‍💋‍👩 💑 👩‍❤️‍👨 👨‍❤️‍👨 👩‍❤️‍👩 👪 👨‍👩‍👦 👨‍👩‍👧 👨‍👩‍👧‍👦 👨‍👩‍👦‍👦 👨‍👩‍👧‍👧 👨‍👨‍👦 👨‍👨‍👧 👨‍👨‍👧‍👦 👨‍👨‍👦‍👦 👨‍👨‍👧‍👧 👩‍👩‍👦 👩‍👩‍👧 👩‍👩‍👧‍👦 👩‍👩‍👦‍👦 👩‍👩‍👧‍👧 👨‍👦 👨‍👦‍👦 👨‍👧 👨‍👧‍👦 👨‍👧‍👧 👩‍👦 👩‍👦‍👦 👩‍👧 👩‍👧‍👦 👩‍👧‍👧');
+                    var categories = [
+                        { name: 'Smileys', icon: '🙂', emojis: unique(cpRange(0x1F600,0x1F64F).concat(cpRange(0x1FAE0,0x1FAEF), words('☺️ ☹️ ☠️ ❣️ ❤️‍🔥 ❤️‍🩹')))},
+                        { name: 'People', icon: '👋', emojis: unique(addSkinTones(handBases).concat(addSkinTones(peopleBases), family, cpRange(0x1F9B0,0x1F9B3)))},
+                        { name: 'Animals', icon: '🐻', emojis: unique(cpRange(0x1F400,0x1F43F).concat(cpRange(0x1F980,0x1F9AE), words('🐾 🪶 🪸 🪼 🪿 🫎 🫏')))},
+                        { name: 'Food', icon: '🍔', emojis: unique(cpRange(0x1F32D,0x1F37F).concat(words('🫐 🫒 🫑 🫓 🫔 🫕 🧄 🧅 🥐 🥑 🥒 🥓 🥔 🥕 🥖 🥗 🥘 🥙 🥚 🥛 🥜 🥝 🥞 🥟 🥠 🥡 🥢 🥣 🥤 🥥 🥦 🥧 🥨 🥩 🥪 🥫 🥬 🥭 🥮 🥯 🧇 🧈 🧉 🧃 🧆 🧊 🫚 🫛 🫜')))},
+                        { name: 'Travel', icon: '🚗', emojis: unique(cpRange(0x1F680,0x1F6FF).concat(cpRange(0x1F300,0x1F320), words('⌚ ⌛ ⏩ ⏪ ⏫ ⏬ ⏰ ⏱️ ⏲️ 🕰️ 🗺️ 🗿 🛕 🛖 🛻 🛞 🛟 🛝 🛤️ 🛣️ 🏔️ 🏕️ 🏖️ 🏜️ 🏝️ 🏞️ 🏟️ 🏛️ 🏗️ 🏘️ 🏚️ 🏠 🏡 🏢 🏣 🏤 🏥 🏦 🏨 🏩 🏪 🏫 🏬 🏭 🏯 🏰 💒 🗼 🗽 ⛪ 🕌 🛐 🕍 ⛩️ 🕋 ⛲ ⛺ 🌋 🌁 🌃 🌄 🌅 🌆 🌇 🌉 ♨️ 🎠 🎡 🎢 💈 🎪 🚂 🚃 🚄 🚅 🚆 🚇 🚈 🚉 🚊 🚝 🚞 🚋 🚌 🚍 🚎 🚐 🚑 🚒 🚓 🚔 🚕 🚖 🚗 🚘 🚙 🚚 🚛 🚜 🏎️ 🏍️ 🛵 🦽 🦼 🛺 🚲 🛴 🛹 🛼 🚏 ⛽ 🛢️ 🚨 🚥 🚦 🛑 🚧 ⚓ ⛵ 🛶 🚤 🛳️ ⛴️ 🚢 ✈️ 🛩️ 🛫 🛬 🪂 💺 🚁 🚟 🚠 🚡 🛰️ 🚀 🛸')))},
+                        { name: 'Activities', icon: '⚽', emojis: unique(cpRange(0x1F380,0x1F3FF).concat(words('⚽ ⚾ 🥎 🏀 🏐 🏈 🏉 🎾 🥏 🎳 🏏 🏑 🏒 🥍 🏓 🏸 🥊 🥋 🥅 ⛳ ⛸️ 🎣 🤿 🎽 🎿 🛷 🥌 🎯 🪀 🪁 🔫 🎱 🔮 🪄 🎮 🕹️ 🎰 🎲 🧩 🧸 🪅 🪩 🪆 ♠️ ♥️ ♦️ ♣️ ♟️ 🃏 🀄 🎴 🎭 🖼️ 🎨 🧵 🪡 🧶 🪢')))},
+                        { name: 'Objects', icon: '💡', emojis: unique(cpRange(0x1F4A0,0x1F5FF).concat(words('🪬 🧿 🪧 🪪 🩼 🩺 🩻 🪮 🪭 🧰 🧲 🧪 🧫 🧬 🧯 🧴 🧵 🧶 🧷 🧹 🧺 🧻 🧼 🧽 🧾 🧸 🪆 🪔 🪄 🪅 🪩 🪫 🪙 🪃 🪚 🪛 🪝 🪜 🪠 🪤 🪞 🪟 🪑 🪒 🪓 🪦 🪧 🛒 🛍️ 🛎️ 🛏️ 🛋️ 🚪 🪵 🪨 🛗 🪥 🪣 🪄')))},
+                        { name: 'Symbols', icon: '❤️', emojis: unique(cpRange(0x2600,0x27BF).concat(cpRange(0x1F7E0,0x1F7FF), words('❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 ❤️‍🔥 ❤️‍🩹 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ☮️ ✝️ ☪️ 🕉️ ☸️ ✡️ 🔯 🕎 ☯️ ☦️ 🛐 ⛎ ♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓ 🆔 ⚛️ 🉑 ☢️ ☣️ 📴 📳 🈶 🈚 🈸 🈺 🈷️ ✴️ 🆚 💮 🉐 ㊙️ ㊗️ 🈴 🈵 🈹 🈲 🅰️ 🅱️ 🆎 🆑 🅾️ 🆘 ❌ ⭕ 🛑 ⛔ 📛 🚫 💯 💢 ♨️ 🚷 🚯 🚳 🚱 🔞 📵 🚭 ❗ ❕ ❓ ❔ ‼️ ⁉️ 🔅 🔆 〽️ ⚠️ 🚸 🔱 ⚜️ 🔰 ♻️ ✅ 🈯 💹 ❇️ ✳️ ❎ 🌐 💠 Ⓜ️ 🌀 💤 🏧 🚾 ♿ 🅿️ 🛗 🈳 🈂️ 🛂 🛃 🛄 🛅 🚹 🚺 🚼 ⚧️ 🚻 🚮 🎦 📶 🈁 🔣 ℹ️ 🔤 🔡 🔠 🆖 🆗 🆙 🆒 🆕 🆓 0️⃣ 1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ 6️⃣ 7️⃣ 8️⃣ 9️⃣ 🔟 🔢 #️⃣ *️⃣ ▶️ ⏸️ ⏯️ ⏹️ ⏺️ ⏭️ ⏮️ ⏩ ⏪ 🔀 🔁 🔂 ◀️ 🔼 🔽 ⏫ ⏬ ➡️ ⬅️ ⬆️ ⬇️ ↗️ ↘️ ↙️ ↖️ ↕️ ↔️ ↪️ ↩️ ⤴️ ⤵️ 🔃 🔄 🔙 🔚 🔛 🔜 🔝 🛐 ⚕️ ♾️ ✔️ ➕ ➖ ➗ ✖️ 🟰 💲 💱 ™️ ©️ ®️ 〰️ ➰ ➿ 🔘 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ 🟤 🔺 🔻 🔸 🔹 🔶 🔷 🔳 🔲 ▪️ ▫️ ◾ ◽ ◼️ ◻️ 🟥 🟧 🟨 🟩 🟦 🟪 ⬛ ⬜ 🟫')))},
+                        { name: 'Flags', icon: '🏳️', emojis: unique(allFlags())}
+                    ];
+                    return categories;
+                }
+                var mrWhatsappEmojiData = null;
+                function getEmojiData(){ if (!mrWhatsappEmojiData) mrWhatsappEmojiData = whatsappEmojiCategories(); return mrWhatsappEmojiData; }
+                function insertEmoji(input, emoji){
+                    if (!input || input.disabled) return;
+                    var start = typeof input.selectionStart === 'number' ? input.selectionStart : input.value.length;
+                    var end = typeof input.selectionEnd === 'number' ? input.selectionEnd : input.value.length;
+                    var before = input.value.slice(0, start), after = input.value.slice(end);
+                    input.value = before + emoji + after;
+                    var pos = start + emoji.length;
+                    input.focus();
+                    if (input.setSelectionRange) input.setSelectionRange(pos, pos);
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                function installWhatsappEmojiPicker(){
+                    injectWhatsappEmojiStyles();
+                    var bar = document.querySelector('.messenger-input');
+                    var input = document.getElementById('chatInput');
+                    if (!bar || !input || document.getElementById('mrWhatsappEmojiBtn')) return;
+                    bar.classList.add('has-whatsapp-emoji');
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.id = 'mrWhatsappEmojiBtn';
+                    btn.className = 'icon-btn mr-whatsapp-emoji-btn';
+                    btn.title = 'WhatsApp emojis';
+                    btn.setAttribute('aria-label', 'Open WhatsApp emoji picker');
+                    btn.innerHTML = '<i class="far fa-face-smile"></i>';
+                    var panel = document.createElement('div');
+                    panel.id = 'mrWhatsappEmojiPanel';
+                    panel.className = 'mr-whatsapp-emoji-panel';
+                    panel.setAttribute('role', 'dialog');
+                    panel.setAttribute('aria-label', 'WhatsApp emoji picker');
+                    var head = document.createElement('div');
+                    head.className = 'mr-whatsapp-emoji-head';
+                    var body = document.createElement('div');
+                    body.className = 'mr-whatsapp-emoji-body';
+                    panel.appendChild(head);
+                    panel.appendChild(body);
+                    var data = getEmojiData();
+                    function draw(index){
+                        index = index || 0;
+                        head.querySelectorAll('.mr-whatsapp-emoji-tab').forEach(function(t, i){ t.classList.toggle('active', i === index); });
+                        var cat = data[index];
+                        body.innerHTML = '<div class="mr-whatsapp-emoji-title">' + cat.name + ' · WhatsApp emoji set</div><div class="mr-whatsapp-emoji-grid"></div>';
+                        var grid = body.querySelector('.mr-whatsapp-emoji-grid');
+                        cat.emojis.forEach(function(emoji){
+                            var cell = document.createElement('button');
+                            cell.type = 'button';
+                            cell.className = 'mr-whatsapp-emoji-cell';
+                            cell.textContent = emoji;
+                            cell.title = emoji;
+                            cell.onclick = function(ev){ ev.preventDefault(); insertEmoji(input, emoji); };
+                            grid.appendChild(cell);
+                        });
+                    }
+                    data.forEach(function(cat, index){
+                        var tab = document.createElement('button');
+                        tab.type = 'button';
+                        tab.className = 'mr-whatsapp-emoji-tab';
+                        tab.textContent = cat.icon;
+                        tab.title = cat.name;
+                        tab.onclick = function(ev){ ev.preventDefault(); draw(index); };
+                        head.appendChild(tab);
+                    });
+                    draw(0);
+                    btn.onclick = function(ev){
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        if (input.disabled) { if (typeof showToast === 'function') showToast('This chat is view-only.', 'warning'); return; }
+                        panel.classList.toggle('open');
+                    };
+                    panel.onclick = function(ev){ ev.stopPropagation(); };
+                    bar.insertBefore(btn, input);
+                    bar.appendChild(panel);
+                    if (!document.__mrWhatsappEmojiOutsideClickBound) {
+                        document.__mrWhatsappEmojiOutsideClickBound = true;
+                        document.addEventListener('click', function(){
+                            var p = document.getElementById('mrWhatsappEmojiPanel');
+                            if (p) p.classList.remove('open');
+                        });
+                        document.addEventListener('keydown', function(ev){
+                            if (ev.key === 'Escape') {
+                                var p = document.getElementById('mrWhatsappEmojiPanel');
+                                if (p) p.classList.remove('open');
+                            }
+                        });
+                    }
+                }
+                if (typeof showChatUI === 'function' && !showChatUI.__mrWhatsappEmojiPatched) {
+                    var _mrPrevWhatsappEmojiShowChatUI = showChatUI;
+                    showChatUI = function(){
+                        var result = _mrPrevWhatsappEmojiShowChatUI.apply(this, arguments);
+                        setTimeout(installWhatsappEmojiPicker, 90);
+                        return result;
+                    };
+                    showChatUI.__mrWhatsappEmojiPatched = true;
+                }
+                document.addEventListener('DOMContentLoaded', function(){ setTimeout(installWhatsappEmojiPicker, 700); });
+            })();
+
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
