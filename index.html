@@ -14223,500 +14223,403 @@
 
 
 
-            // ================================================================
-            // MuleRun chat window controls: move, resize, minimize, maximize, sidebar and online agents
-            // ================================================================
+            // MuleRun requested addition: manually resizable chat window, online agents panel, and hide/show agent names.
             (function(){
-                var _mrChatOnlineTimer = null;
+                var MR_CHAT_UI_STYLE_ID = 'mr-chat-manual-size-online-style';
+                var _mrChatNamesHidden = false;
+                var _mrChatOnlineVisible = false;
+                var _mrChatResizeObserver = null;
 
-                function _mrInjectChatWindowStyles(){
-                    if (document.getElementById('mrChatWindowControlStyles')) return;
+                function _mrSafeUserKey(){
+                    return (STATE.currentUser && STATE.currentUser.username) ? String(STATE.currentUser.username).replace(/[^a-z0-9_-]/gi, '_') : 'guest';
+                }
+                function _mrNamesKey(){ return 'ph_chat_names_hidden_' + _mrSafeUserKey(); }
+                function _mrOnlineKey(){ return 'ph_chat_online_visible_' + _mrSafeUserKey(); }
+                function _mrSizeKey(){ return 'ph_chat_window_size_' + _mrSafeUserKey(); }
+                function _mrPosKey(){ return 'ph_chat_window_pos_' + _mrSafeUserKey(); }
+                function _mrBoolStore(key, value){ try { localStorage.setItem(key, value ? '1' : '0'); } catch (_) {} }
+                function _mrBoolRead(key, fallback){
+                    try {
+                        var v = localStorage.getItem(key);
+                        if (v === '1') return true;
+                        if (v === '0') return false;
+                    } catch (_) {}
+                    return !!fallback;
+                }
+                function _mrInjectChatControlsStyles(){
+                    if (document.getElementById(MR_CHAT_UI_STYLE_ID)) return;
                     var st = document.createElement('style');
-                    st.id = 'mrChatWindowControlStyles';
+                    st.id = MR_CHAT_UI_STYLE_ID;
                     st.textContent =
-                        '.modal-overlay.mr-chat-floating{background:transparent!important;backdrop-filter:none!important;pointer-events:none!important;padding:0!important;align-items:flex-start!important;justify-content:flex-start!important;}' +
-                        '.modal-overlay.mr-chat-floating #modalBox{pointer-events:auto!important;}' +
-                        '#modalBox.chat-modal.mr-chat-resizable{position:fixed!important;resize:both!important;overflow:hidden!important;min-width:380px!important;min-height:330px!important;max-width:calc(100vw - 12px)!important;max-height:calc(100vh - 12px)!important;}' +
-                        '#modalBox.chat-modal.mr-chat-maximized{left:6px!important;top:6px!important;width:calc(100vw - 12px)!important;height:calc(100vh - 12px)!important;max-width:calc(100vw - 12px)!important;max-height:calc(100vh - 12px)!important;resize:none!important;}' +
-                        '#modalBox.chat-modal.mr-chat-minimized{left:auto!important;top:auto!important;right:18px!important;bottom:18px!important;width:min(420px,calc(100vw - 36px))!important;height:58px!important;min-height:58px!important;max-height:58px!important;padding:8px 10px!important;resize:none!important;overflow:hidden!important;}' +
-                        '#modalBox.chat-modal.mr-chat-minimized #modalContent>:not(.mr-chat-window-bar){display:none!important;}' +
-                        '.mr-chat-window-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-8px -8px 12px;padding:9px 10px;border:1px solid var(--card-border);border-radius:16px;background:linear-gradient(135deg,rgba(184,134,11,.16),rgba(255,255,255,.08));cursor:move;user-select:none;touch-action:none;}' +
-                        '.mr-chat-window-title{display:flex;align-items:center;gap:8px;font-weight:900;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
-                        '.mr-chat-window-title i{color:var(--primary);}' +
-                        '.mr-chat-window-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;}' +
-                        '.mr-chat-window-actions button{height:32px;min-width:32px;border-radius:999px;border:1px solid var(--card-border);background:var(--input-bg);color:var(--text);cursor:pointer;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 10px;}' +
-                        '.mr-chat-window-actions button:hover{background:var(--primary);border-color:var(--primary);color:#fff;}' +
-                        '.mr-chat-window-actions .mr-chat-text-btn{font-size:.76rem;min-width:auto;}' +
-                        '.mr-online-count{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;background:rgba(39,174,96,.14);color:#1f8b4c;font-size:.72rem;font-weight:900;}' +
-                        '.mr-online-count:before{content:"";width:7px;height:7px;border-radius:50%;background:#27ae60;box-shadow:0 0 0 4px rgba(39,174,96,.14);}' +
-                        '.mr-chat-min-badge{display:none;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:var(--danger);color:#fff;font-size:.72rem;font-weight:900;box-shadow:0 8px 20px rgba(192,57,43,.34);}' +
-                        '#modalBox.chat-modal.mr-chat-minimized .mr-chat-min-badge.has-new{display:inline-flex;}' +
-                        '#modalBox.chat-modal.mr-chat-minimized.mr-chat-has-new .mr-chat-window-title i{animation:mrChatNewPulse 1.1s infinite;}' +
-                        '@keyframes mrChatNewPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}' +
-                        '.mr-chat-resize-handle{position:absolute;z-index:9999;pointer-events:auto;opacity:.72;background:transparent;}' +
-                        '.mr-chat-resize-handle.se{right:0;bottom:0;width:34px;height:34px;cursor:nwse-resize;}' +
-                        '.mr-chat-resize-handle.se:before{content:"";position:absolute;right:7px;bottom:7px;width:15px;height:15px;border-right:3px solid var(--primary);border-bottom:3px solid var(--primary);border-radius:2px;}' +
-                        '.mr-chat-resize-handle.e{right:0;top:64px;bottom:18px;width:14px;cursor:ew-resize;}' +
-                        '.mr-chat-resize-handle.w{left:0;top:64px;bottom:18px;width:14px;cursor:ew-resize;}' +
-                        '.mr-chat-resize-handle.s{left:18px;right:42px;bottom:0;height:14px;cursor:ns-resize;}' +
-                        '.mr-chat-resize-handle.n{left:18px;right:18px;top:0;height:14px;cursor:ns-resize;}' +
-                        '.mr-chat-resize-handle.nw{left:-4px;top:-4px;width:18px;height:18px;cursor:nwse-resize;}' +
-                        '.mr-chat-resize-handle.ne{right:-4px;top:-4px;width:18px;height:18px;cursor:nesw-resize;}' +
-                        '.mr-chat-resize-handle.sw{left:-4px;bottom:-4px;width:18px;height:18px;cursor:nesw-resize;}' +
-                        '#modalBox.chat-modal.mr-chat-minimized .mr-chat-resize-handle,#modalBox.chat-modal.mr-chat-maximized .mr-chat-resize-handle{display:none!important;}' +
-                        '.chat-shell.mr-sidebar-hidden{grid-template-columns:minmax(260px,1fr)!important;}' +
-                        '.chat-shell.mr-sidebar-hidden .chat-sidebar{display:none!important;}' +
-                        '.mr-online-panel{margin:10px;border:1px solid var(--card-border);border-radius:16px;background:var(--input-bg);overflow:hidden;flex:0 0 auto;}' +
-                        '.mr-online-panel.hidden{display:none!important;}' +
-                        '.mr-online-panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid var(--card-border);font-weight:900;font-size:.82rem;}' +
-                        '#mrChatOnlineList{max-height:240px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;}' +
-                        '#mrChatOnlineList::-webkit-scrollbar{width:10px;}' +
-                        '#mrChatOnlineList::-webkit-scrollbar-thumb{background:var(--primary);border-radius:999px;border:3px solid transparent;background-clip:content-box;}' +
-                        '.mr-online-agent{display:flex;align-items:center;gap:9px;padding:9px 12px;border-bottom:1px solid rgba(0,0,0,.05);cursor:pointer;}' +
-                        '.mr-online-agent:last-child{border-bottom:0;}' +
-                        '.mr-online-agent:hover{background:rgba(184,134,11,.12);}' +
-                        '.mr-online-agent.offline{opacity:.74;}' +
-                        '.mr-online-agent-dot,.mr-agent-presence-dot{width:9px;height:9px;border-radius:50%;background:#27ae60;box-shadow:0 0 0 4px rgba(39,174,96,.13);flex:0 0 auto;}' +
-                        '.mr-online-agent.offline .mr-online-agent-dot{background:#a0a0a0;box-shadow:none;}' +
-                        '.mr-online-agent-main{min-width:0;flex:1;}' +
-                        '.mr-online-agent-name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
-                        '.mr-online-agent-sub{font-size:.72rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
-                        '.mr-online-agent-status{font-weight:800;color:#1f8b4c;}' +
-                        '.mr-online-agent.offline .mr-online-agent-status{color:var(--text2);}' +
-                        '.mr-agent-presence{display:inline-flex;align-items:center;gap:5px;margin-left:4px;font-weight:800;color:#1f8b4c;}' +
-                        '.mr-agent-presence.offline{color:var(--text2);opacity:.72;}' +
-                        '.mr-agent-presence.offline .mr-agent-presence-dot{background:#a0a0a0;box-shadow:none;}' +
-                        '@media(max-width:780px){#modalBox.chat-modal.mr-chat-resizable{left:6px!important;top:6px!important;width:calc(100vw - 12px)!important;height:calc(100vh - 12px)!important}.mr-chat-window-actions .mr-chat-text-btn span{display:none}.mr-chat-window-actions button{padding:0 8px}.mr-chat-window-bar{gap:6px}}';
+                        '#modalBox.chat-modal.mr-chat-resizable{resize:none!important;min-width:min(720px,96vw)!important;min-height:min(520px,92vh)!important;max-width:98vw!important;max-height:96vh!important;overflow:hidden!important;position:fixed!important;margin:0!important;transform:none!important;}' +
+                        '#modalBox.chat-modal.mr-chat-resizable:after{display:none!important;}' +
+                        '#modalBox.chat-modal.mr-chat-moving,#modalBox.chat-modal.mr-chat-resizing{user-select:none!important;}' +
+                        '.mr-chat-drag-handle{position:absolute;left:50%;top:6px;z-index:8;transform:translateX(-50%);display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;background:var(--toast-bg);color:var(--toast-text);box-shadow:0 8px 22px rgba(0,0,0,.18);font-size:.72rem;font-weight:800;cursor:move;touch-action:none;opacity:.92;}' +
+                        '.mr-chat-drag-handle:hover{opacity:1;}' +
+                        '.mr-chat-resize-handle{position:absolute;right:0;bottom:0;z-index:9;width:34px;height:34px;cursor:nwse-resize;touch-action:none;border-radius:10px 0 18px 0;background:linear-gradient(135deg,transparent 45%,rgba(184,134,11,.18) 46%,rgba(184,134,11,.36));}' +
+                        '.mr-chat-resize-handle:before{content:"";position:absolute;right:7px;bottom:7px;width:15px;height:15px;border-right:3px solid rgba(184,134,11,.95);border-bottom:3px solid rgba(184,134,11,.95);border-radius:2px;}' +
+                        '.mr-chat-size-hint{position:absolute;right:36px;bottom:8px;z-index:4;font-size:.68rem;color:var(--text2);background:var(--input-bg);border:1px solid var(--card-border);border-radius:999px;padding:3px 8px;pointer-events:none;opacity:.82;}' +
+                        '.mr-chat-minimized-pill{position:fixed;right:22px;bottom:22px;z-index:100000;display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:999px;background:var(--toast-bg);color:var(--toast-text);box-shadow:0 18px 50px rgba(0,0,0,.32);border:1px solid rgba(255,255,255,.12);font-weight:800;cursor:pointer;}' +
+                        '.mr-chat-minimized-pill button{border:0;border-radius:999px;background:var(--primary);color:#fff;padding:7px 12px;font-weight:800;cursor:pointer;}' +
+                        '#modalBox:not(.chat-modal) .mr-chat-drag-handle,#modalBox:not(.chat-modal) .mr-chat-resize-handle,#modalBox:not(.chat-modal) .mr-chat-size-hint{display:none!important;}' +
+                        '.mr-chat-extra-tools{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;}' +
+                        '.mr-chat-online-panel{display:none;border-bottom:1px solid var(--card-border);padding:10px 12px;background:rgba(39,174,96,.07);max-height:170px;overflow:auto;}' +
+                        '.mr-chat-online-panel.open{display:block;}' +
+                        '.mr-chat-online-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;font-weight:800;font-size:.78rem;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;}' +
+                        '.mr-chat-online-list{display:flex;flex-direction:column;gap:6px;}' +
+                        '.mr-chat-online-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--card-border);border-radius:12px;background:var(--input-bg);font-size:.82rem;}' +
+                        '.mr-chat-online-dot,.mr-chat-contact-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 0 3px rgba(39,174,96,.15);flex:0 0 auto;}' +
+                        '.mr-chat-contact-dot.offline{background:var(--text2);box-shadow:none;opacity:.55;}' +
+                        '.mr-chat-online-empty{font-size:.82rem;color:var(--text2);padding:7px 2px;}' +
+                        '.chat-shell.mr-chat-names-hidden{grid-template-columns:minmax(300px,1fr)!important;}' +
+                        '.chat-shell.mr-chat-names-hidden .chat-sidebar{display:none!important;}' +
+                        '.chat-shell.mr-chat-names-hidden .messenger-title #chatContactName,.chat-shell.mr-chat-names-hidden .messenger-title .chat-avatar,.chat-shell.mr-chat-names-hidden .bubble-row>.chat-avatar,.chat-shell.mr-chat-names-hidden .chat-context-label,.chat-shell.mr-chat-names-hidden .msg-sender{display:none!important;}' +
+                        '.chat-shell.mr-chat-names-hidden .chat-msg-head{justify-content:flex-end;margin-bottom:0;}' +
+                        '.chat-shell.mr-chat-names-hidden .bubble-row{max-width:84%;}' +
+                        '.chat-shell.mr-chat-names-hidden .bubble{border-radius:18px!important;}' +
+                        '@media(max-width:780px){#modalBox.chat-modal.mr-chat-resizable{resize:vertical!important;min-width:92vw!important}.mr-chat-size-hint{display:none}.mr-chat-online-panel{max-height:140px}}';
                     document.head.appendChild(st);
                 }
-
                 function _mrClamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
-                function _mrSetImportant(el, name, value){ if (el) el.style.setProperty(name, value, 'important'); }
-                function _mrPositionChatBox(){
+                function _mrSaveChatGeometry(){
                     var box = document.getElementById('modalBox');
-                    var container = document.getElementById('modalContainer');
-                    if (!box || !container || !box.classList.contains('chat-modal')) return;
-                    container.classList.add('mr-chat-floating');
-                    box.classList.add('mr-chat-resizable');
-                    if (!box.dataset.mrChatPositioned) {
-                        var r = box.getBoundingClientRect();
-                        var w = Math.min(r.width || (window.innerWidth * 0.92), window.innerWidth - 16);
-                        var h = Math.min(r.height || (window.innerHeight * 0.88), window.innerHeight - 16);
-                        var l = _mrClamp(r.left || ((window.innerWidth - w) / 2), 6, Math.max(6, window.innerWidth - w - 6));
-                        var t = _mrClamp(r.top || ((window.innerHeight - h) / 2), 6, Math.max(6, window.innerHeight - h - 6));
-                        _mrSetImportant(box, 'position', 'fixed');
-                        _mrSetImportant(box, 'left', l + 'px');
-                        _mrSetImportant(box, 'top', t + 'px');
-                        _mrSetImportant(box, 'right', 'auto');
-                        _mrSetImportant(box, 'bottom', 'auto');
-                        _mrSetImportant(box, 'width', w + 'px');
-                        _mrSetImportant(box, 'height', h + 'px');
-                        box.dataset.mrChatPositioned = '1';
-                    }
+                    if (!box || !box.classList.contains('chat-modal')) return;
+                    var r = box.getBoundingClientRect ? box.getBoundingClientRect() : null;
+                    if (!r) return;
+                    try { localStorage.setItem(_mrSizeKey(), JSON.stringify({ w:Math.round(r.width), h:Math.round(r.height) })); } catch (_) {}
+                    try { localStorage.setItem(_mrPosKey(), JSON.stringify({ x:Math.round(r.left), y:Math.round(r.top) })); } catch (_) {}
                 }
-
-                function _mrMakeDraggable(){
-                    var box = document.getElementById('modalBox');
-                    var bar = document.getElementById('mrChatWindowBar');
-                    if (!box || !bar || bar.dataset.dragReady) return;
-                    bar.dataset.dragReady = '1';
-                    bar.addEventListener('pointerdown', function(ev){
-                        if (ev.target && ev.target.closest('button')) return;
-                        if (box.classList.contains('mr-chat-maximized')) return;
-                        ev.preventDefault();
-                        box.classList.remove('mr-chat-minimized');
-                        var r = box.getBoundingClientRect();
-                        var startX = ev.clientX, startY = ev.clientY, startL = r.left, startT = r.top;
-                        try { bar.setPointerCapture(ev.pointerId); } catch (_) {}
-                        function move(e){
-                            var w = box.offsetWidth || r.width, h = box.offsetHeight || r.height;
-                            var l = _mrClamp(startL + e.clientX - startX, 0, Math.max(0, window.innerWidth - w));
-                            var t = _mrClamp(startT + e.clientY - startY, 0, Math.max(0, window.innerHeight - Math.min(h, window.innerHeight)));
-                            _mrSetImportant(box, 'left', l + 'px');
-                            _mrSetImportant(box, 'top', t + 'px');
-                            _mrSetImportant(box, 'right', 'auto');
-                            _mrSetImportant(box, 'bottom', 'auto');
-                        }
-                        function up(){
-                            document.removeEventListener('pointermove', move);
-                            document.removeEventListener('pointerup', up);
-                        }
-                        document.addEventListener('pointermove', move);
-                        document.addEventListener('pointerup', up);
-                    });
+                function _mrSetChatBoxGeometry(box, x, y, w, h){
+                    var vw = Math.max(320, window.innerWidth || 1200), vh = Math.max(420, window.innerHeight || 800);
+                    var minW = Math.min(720, Math.max(320, vw - 24)), minH = Math.min(520, Math.max(360, vh - 24));
+                    w = _mrClamp(Math.round(w), minW, Math.max(minW, vw - 16));
+                    h = _mrClamp(Math.round(h), minH, Math.max(minH, vh - 16));
+                    x = _mrClamp(Math.round(x), 8, Math.max(8, vw - w - 8));
+                    y = _mrClamp(Math.round(y), 8, Math.max(8, vh - h - 8));
+                    box.style.setProperty('width', w + 'px', 'important');
+                    box.style.setProperty('height', h + 'px', 'important');
+                    box.style.setProperty('left', x + 'px', 'important');
+                    box.style.setProperty('top', y + 'px', 'important');
+                    box.style.setProperty('right', 'auto', 'important');
+                    box.style.setProperty('bottom', 'auto', 'important');
+                    box.style.setProperty('max-width', '98vw', 'important');
+                    box.style.setProperty('max-height', '96vh', 'important');
                 }
-
-                function _mrMakeResizable(){
+                function _mrBindChatMoveResize(){
                     var box = document.getElementById('modalBox');
-                    if (!box || box.dataset.mrResizeReady) return;
-                    box.dataset.mrResizeReady = '1';
-                    function bindResizeGrip(grip, dir){
-                        function startResize(ev){
-                            if (ev.type === 'mousedown' && window.PointerEvent) return;
-                            if (box.classList.contains('mr-chat-maximized') || box.classList.contains('mr-chat-minimized')) return;
-                            ev.preventDefault();
-                            ev.stopPropagation();
-                            var point = (ev.touches && ev.touches[0]) || ev;
-                            var r = box.getBoundingClientRect();
-                            var startX = point.clientX, startY = point.clientY, startL = r.left, startT = r.top, startW = r.width, startH = r.height;
-                            var minW = 380, minH = 330;
-                            try { if (ev.pointerId != null) grip.setPointerCapture(ev.pointerId); } catch (_) {}
-                            document.body.style.userSelect = 'none';
-                            function move(e){
-                                var p = (e.touches && e.touches[0]) || e;
-                                var dx = p.clientX - startX, dy = p.clientY - startY;
-                                var left = startL, top = startT, width = startW, height = startH;
-                                if (dir.indexOf('e') !== -1) width = _mrClamp(startW + dx, minW, window.innerWidth - startL - 6);
-                                if (dir.indexOf('s') !== -1) height = _mrClamp(startH + dy, minH, window.innerHeight - startT - 6);
-                                if (dir.indexOf('w') !== -1) {
-                                    left = _mrClamp(startL + dx, 6, startL + startW - minW);
-                                    width = startW + (startL - left);
-                                }
-                                if (dir.indexOf('n') !== -1) {
-                                    top = _mrClamp(startT + dy, 6, startT + startH - minH);
-                                    height = startH + (startT - top);
-                                }
-                                _mrSetImportant(box, 'left', left + 'px');
-                                _mrSetImportant(box, 'top', top + 'px');
-                                _mrSetImportant(box, 'right', 'auto');
-                                _mrSetImportant(box, 'bottom', 'auto');
-                                _mrSetImportant(box, 'width', width + 'px');
-                                _mrSetImportant(box, 'height', height + 'px');
-                            }
+                    if (!box) return;
+                    function point(ev){ var e = ev.touches && ev.touches[0] ? ev.touches[0] : ev; return { x:e.clientX, y:e.clientY }; }
+                    function bindDrag(handle){
+                        if (!handle || handle.__mrDragBound) return;
+                        handle.__mrDragBound = true;
+                        handle.addEventListener('pointerdown', function(ev){
+                            ev.preventDefault(); ev.stopPropagation();
+                            var p = point(ev), r = box.getBoundingClientRect();
+                            var sx = p.x, sy = p.y, ox = r.left, oy = r.top;
+                            box.classList.add('mr-chat-moving');
+                            try { handle.setPointerCapture(ev.pointerId); } catch (_) {}
+                            function move(e){ var q = point(e); _mrSetChatBoxGeometry(box, ox + q.x - sx, oy + q.y - sy, r.width, r.height); }
                             function up(){
-                                document.body.style.userSelect = '';
                                 document.removeEventListener('pointermove', move);
                                 document.removeEventListener('pointerup', up);
-                                document.removeEventListener('pointercancel', up);
-                                document.removeEventListener('mousemove', move);
-                                document.removeEventListener('mouseup', up);
-                                document.removeEventListener('touchmove', move);
-                                document.removeEventListener('touchend', up);
-                                document.removeEventListener('touchcancel', up);
+                                box.classList.remove('mr-chat-moving');
+                                _mrSaveChatGeometry();
                             }
                             document.addEventListener('pointermove', move);
                             document.addEventListener('pointerup', up);
-                            document.addEventListener('pointercancel', up);
-                            document.addEventListener('mousemove', move);
-                            document.addEventListener('mouseup', up);
-                            document.addEventListener('touchmove', move, { passive:false });
-                            document.addEventListener('touchend', up);
-                            document.addEventListener('touchcancel', up);
-                        }
-                        grip.addEventListener('pointerdown', startResize);
-                        grip.addEventListener('mousedown', startResize);
-                        grip.addEventListener('touchstart', startResize, { passive:false });
+                        });
                     }
-                    ['n','e','s','w','nw','ne','sw','se'].forEach(function(dir){
-                        var grip = document.createElement('div');
-                        grip.className = 'mr-chat-resize-handle ' + dir;
-                        grip.dataset.resizeDir = dir;
-                        grip.title = 'Drag to resize chat window';
-                        box.appendChild(grip);
-                        bindResizeGrip(grip, dir);
-                    });
-                    function startDirectCornerResize(ev){
-                        if (ev.type === 'mousedown' && window.PointerEvent) return;
-                        if (box.classList.contains('mr-chat-maximized') || box.classList.contains('mr-chat-minimized')) return;
-                        if (ev.target && ev.target.closest && ev.target.closest('button,input,select,textarea,a,.chat-contact,.bubble,.mr-online-agent')) return;
-                        var point = (ev.touches && ev.touches[0]) || ev;
-                        var r = box.getBoundingClientRect();
-                        if (!point || point.clientX < r.right - 64 || point.clientY < r.bottom - 64) return;
-                        ev.preventDefault();
-                        ev.stopPropagation();
-                        var startX = point.clientX, startY = point.clientY, startW = r.width, startH = r.height, startL = r.left, startT = r.top;
-                        document.body.style.userSelect = 'none';
-                        function move(e){
-                            var p = (e.touches && e.touches[0]) || e;
-                            var w = _mrClamp(startW + p.clientX - startX, 380, window.innerWidth - startL - 6);
-                            var h = _mrClamp(startH + p.clientY - startY, 330, window.innerHeight - startT - 6);
-                            _mrSetImportant(box, 'width', w + 'px');
-                            _mrSetImportant(box, 'height', h + 'px');
-                            _mrSetImportant(box, 'left', startL + 'px');
-                            _mrSetImportant(box, 'top', startT + 'px');
-                            _mrSetImportant(box, 'right', 'auto');
-                            _mrSetImportant(box, 'bottom', 'auto');
-                        }
-                        function up(){
-                            document.body.style.userSelect = '';
-                            document.removeEventListener('pointermove', move);
-                            document.removeEventListener('pointerup', up);
-                            document.removeEventListener('pointercancel', up);
-                            document.removeEventListener('mousemove', move);
-                            document.removeEventListener('mouseup', up);
-                            document.removeEventListener('touchmove', move);
-                            document.removeEventListener('touchend', up);
-                            document.removeEventListener('touchcancel', up);
-                        }
-                        document.addEventListener('pointermove', move);
-                        document.addEventListener('pointerup', up);
-                        document.addEventListener('pointercancel', up);
-                        document.addEventListener('mousemove', move);
-                        document.addEventListener('mouseup', up);
-                        document.addEventListener('touchmove', move, { passive:false });
-                        document.addEventListener('touchend', up);
-                        document.addEventListener('touchcancel', up);
+                    function bindResize(handle){
+                        if (!handle || handle.__mrResizeBound) return;
+                        handle.__mrResizeBound = true;
+                        handle.addEventListener('pointerdown', function(ev){
+                            ev.preventDefault(); ev.stopPropagation();
+                            var p = point(ev), r = box.getBoundingClientRect();
+                            var sx = p.x, sy = p.y, sw = r.width, sh = r.height, ox = r.left, oy = r.top;
+                            box.classList.add('mr-chat-resizing');
+                            try { handle.setPointerCapture(ev.pointerId); } catch (_) {}
+                            function move(e){ var q = point(e); _mrSetChatBoxGeometry(box, ox, oy, sw + q.x - sx, sh + q.y - sy); }
+                            function up(){
+                                document.removeEventListener('pointermove', move);
+                                document.removeEventListener('pointerup', up);
+                                box.classList.remove('mr-chat-resizing');
+                                _mrSaveChatGeometry();
+                            }
+                            document.addEventListener('pointermove', move);
+                            document.addEventListener('pointerup', up);
+                        });
                     }
-                    box.addEventListener('pointerdown', startDirectCornerResize, true);
-                    box.addEventListener('mousedown', startDirectCornerResize, true);
-                    box.addEventListener('touchstart', startDirectCornerResize, { capture:true, passive:false });
-                    box.addEventListener('mousemove', function(ev){
-                        if (box.classList.contains('mr-chat-maximized') || box.classList.contains('mr-chat-minimized')) return;
-                        var r = box.getBoundingClientRect();
-                        box.style.cursor = (ev.clientX >= r.right - 64 && ev.clientY >= r.bottom - 64) ? 'nwse-resize' : '';
-                    });
+                    bindDrag(document.getElementById('mrChatDragHandle'));
+                    bindResize(document.getElementById('mrChatResizeHandle'));
                 }
-
-                function _mrToggleSidebar(force){
-                    var shell = document.querySelector('.chat-shell');
-                    if (!shell) return;
-                    var hide = (typeof force === 'boolean') ? force : !shell.classList.contains('mr-sidebar-hidden');
-                    shell.classList.toggle('mr-sidebar-hidden', hide);
-                    try { localStorage.setItem('ph_chat_sidebar_hidden', hide ? '1' : '0'); } catch (_) {}
-                    var btn = document.getElementById('mrChatSidebarToggle');
-                    if (btn) btn.innerHTML = hide ? '<i class="fas fa-table-columns"></i><span>Show agents</span>' : '<i class="fas fa-table-columns"></i><span>Hide agents</span>';
-                }
-
-                async function _mrPresenceMap(){
-                    var map = {};
+                function _mrApplySavedChatSize(){
+                    var box = document.getElementById('modalBox');
+                    if (!box || !box.classList.contains('chat-modal')) return;
+                    box.classList.add('mr-chat-resizable');
                     try {
-                        if (typeof readData === 'function') map = await readData('presence', null, true) || {};
+                        var saved = JSON.parse(localStorage.getItem(_mrSizeKey()) || '{}');
+                        var pos = JSON.parse(localStorage.getItem(_mrPosKey()) || '{}');
+                        var vw = Math.max(320, window.innerWidth || 1200), vh = Math.max(420, window.innerHeight || 800);
+                        var w = Math.min(Math.max(parseInt(saved.w, 10) || Math.round(vw * 0.96), Math.min(720, vw - 24)), Math.round(vw * 0.98));
+                        var h = Math.min(Math.max(parseInt(saved.h, 10) || Math.round(vh * 0.92), Math.min(520, vh - 24)), Math.round(vh * 0.96));
+                        var x = parseInt(pos.x, 10); if (!isFinite(x)) x = Math.round((vw - w) / 2);
+                        var y = parseInt(pos.y, 10); if (!isFinite(y)) y = Math.round((vh - h) / 2);
+                        _mrSetChatBoxGeometry(box, x, y, w, h);
+                    } catch (_) {}
+                    if (!document.getElementById('mrChatDragHandle')) {
+                        var drag = document.createElement('div');
+                        drag.id = 'mrChatDragHandle';
+                        drag.className = 'mr-chat-drag-handle';
+                        drag.innerHTML = '<i class="fas fa-arrows-up-down-left-right"></i> Drag to move';
+                        box.appendChild(drag);
+                    }
+                    if (!document.getElementById('mrChatResizeHandle')) {
+                        var resize = document.createElement('div');
+                        resize.id = 'mrChatResizeHandle';
+                        resize.className = 'mr-chat-resize-handle';
+                        resize.title = 'Drag to resize chat window';
+                        box.appendChild(resize);
+                    }
+                    var hint = document.getElementById('mrChatSizeHint');
+                    if (!hint) {
+                        hint = document.createElement('div');
+                        hint.id = 'mrChatSizeHint';
+                        hint.className = 'mr-chat-size-hint';
+                        hint.textContent = 'Drag corner to resize';
+                        box.appendChild(hint);
+                    }
+                    _mrBindChatMoveResize();
+                    if (_mrChatResizeObserver) { try { _mrChatResizeObserver.disconnect(); } catch (_) {} }
+                    if (window.ResizeObserver) {
+                        var lastSave = 0;
+                        _mrChatResizeObserver = new ResizeObserver(function(){
+                            var now = Date.now();
+                            if (now - lastSave < 500) return;
+                            lastSave = now;
+                            if (!box.classList.contains('mr-chat-moving') && !box.classList.contains('mr-chat-resizing')) _mrSaveChatGeometry();
+                        });
+                        try { _mrChatResizeObserver.observe(box); } catch (_) {}
+                    }
+                }
+                function _mrResetChatSize(){
+                    try { localStorage.removeItem(_mrSizeKey()); localStorage.removeItem(_mrPosKey()); } catch (_) {}
+                    var box = document.getElementById('modalBox');
+                    if (box) {
+                        box.style.removeProperty('width');
+                        box.style.removeProperty('height');
+                        box.style.removeProperty('left');
+                        box.style.removeProperty('top');
+                        setTimeout(_mrApplySavedChatSize, 20);
+                    }
+                    if (typeof showToast === 'function') showToast('Chat window size reset.', 'success');
+                }
+                function _mrIsPresenceOnline(p){
+                    if (!p || p.offline) return false;
+                    var ls = parseInt(p.lastSeen || 0, 10);
+                    return !!ls && (Date.now() - ls) < 65000;
+                }
+                async function _mrReadPresence(){
+                    var out = {};
+                    try {
+                        var fb = await readData('presence', null, true);
+                        if (fb && typeof fb === 'object') out = fb;
                     } catch (_) {}
                     try {
                         for (var i = 0; i < localStorage.length; i++) {
                             var k = localStorage.key(i);
                             if (k && k.indexOf('ph_presence_') === 0) {
-                                try { var v = JSON.parse(localStorage.getItem(k)); if (v && v.username) map[v.username] = Object.assign({}, map[v.username] || {}, v); } catch (_) {}
+                                try { var v = JSON.parse(localStorage.getItem(k)); if (v && v.username && !out[v.username]) out[v.username] = v; } catch (_) {}
                             }
                         }
                     } catch (_) {}
-                    return map;
+                    return out;
                 }
-                function _mrIsOnlinePresence(p){
-                    if (!p || p.offline) return false;
-                    var ls = parseInt(p.lastSeen || 0, 10);
-                    return !!ls && (Date.now() - ls) < 70000;
+                function _mrDisplayNameForUser(users, key){
+                    var u = (users || {})[key] || {};
+                    if (typeof _profileNames === 'function') return _profileNames(u, key).display;
+                    return u.name || key;
                 }
-                function _mrUserDisplayName(username){
-                    var u = (STATE.users || {})[username] || {};
-                    return u.name || username;
+                function _mrAvatarForUser(users, key, cls){
+                    var name = _mrDisplayNameForUser(users, key);
+                    if (typeof _profileAvatarHtml === 'function') return _profileAvatarHtml(key, name, cls || 'chat-avatar');
+                    return '<div class="' + (cls || 'chat-avatar') + '">' + escapeHTML(String(name || key || '?').slice(0, 1).toUpperCase()) + '</div>';
                 }
-
-                async function _mrDecoratePresence(){
+                async function _mrRenderOnlineAgentsPanel(){
+                    var panel = document.getElementById('mrChatOnlinePanel');
+                    if (!panel) return;
+                    var list = document.getElementById('mrChatOnlineList');
+                    if (!list) return;
+                    panel.classList.toggle('open', !!_mrChatOnlineVisible);
+                    if (!_mrChatOnlineVisible) return;
+                    var users = STATE.users || {};
+                    if (!Object.keys(users).length) {
+                        try { users = await readData('users', 'ph_users', true) || {}; STATE.users = users; } catch (_) {}
+                    }
+                    var presence = await _mrReadPresence();
+                    var me = STATE.currentUser && STATE.currentUser.username;
+                    var names = Object.keys(users || {}).filter(function(k){ return k !== me && _mrIsPresenceOnline(presence[k]); });
+                    names.sort(function(a, b){ return _mrDisplayNameForUser(users, a).localeCompare(_mrDisplayNameForUser(users, b)); });
+                    list.innerHTML = names.length ? names.map(function(k){
+                        var u = users[k] || {}, display = _mrDisplayNameForUser(users, k);
+                        return '<div class="mr-chat-online-item" title="Online agent"><span class="mr-chat-online-dot"></span>' + _mrAvatarForUser(users, k, 'chat-avatar') + '<div style="min-width:0;"><div class="chat-contact-name">' + escapeHTML(display) + '</div><div class="chat-contact-sub">@' + escapeHTML(k) + ' · ' + escapeHTML(u.role || 'agent') + '</div></div></div>';
+                    }).join('') : '<div class="mr-chat-online-empty">No other agents are online right now.</div>';
+                }
+                async function _mrAnnotateOnlineContacts(){
+                    var contacts = document.querySelectorAll('#chatContactsList .chat-contact[data-key^="user_"]');
+                    if (!contacts.length) return;
+                    var presence = await _mrReadPresence();
+                    contacts.forEach(function(el){
+                        var user = String(el.dataset.key || '').replace(/^user_/, '');
+                        var nameEl = el.querySelector('.chat-contact-name');
+                        if (!nameEl) return;
+                        var dot = nameEl.querySelector('.mr-chat-contact-dot');
+                        if (!dot) {
+                            dot = document.createElement('span');
+                            dot.className = 'mr-chat-contact-dot';
+                            dot.style.marginRight = '6px';
+                            nameEl.insertBefore(dot, nameEl.firstChild);
+                        }
+                        var online = _mrIsPresenceOnline(presence[user]);
+                        dot.classList.toggle('offline', !online);
+                        dot.title = online ? 'Online' : 'Offline';
+                    });
+                }
+                function _mrApplyNamesHiddenState(){
                     var shell = document.querySelector('.chat-shell');
                     if (!shell) return;
-                    var users = STATE.users || {};
-                    var presence = await _mrPresenceMap();
-                    try {
-                        var loadedUsers = await readData('users', 'ph_users', true) || {};
-                        if (Object.keys(loadedUsers).length) users = loadedUsers;
-                    } catch (_) {}
-                    Object.keys(presence || {}).forEach(function(k){
-                        if (!users[k]) users[k] = { name: presence[k].name || k, role: presence[k].role || 'agent' };
-                    });
-                    STATE.users = users;
-                    var agentNames = Object.keys(users).filter(function(k){
-                        var u = users[k] || {};
-                        if (k === 'Plan') return false;
-                        if (u.disabled || u.active === false || u.role === 'readonly') return false;
-                        return true;
-                    }).sort(function(a,b){
-                        var ao = _mrIsOnlinePresence(presence[a]) ? 0 : 1;
-                        var bo = _mrIsOnlinePresence(presence[b]) ? 0 : 1;
-                        if (ao !== bo) return ao - bo;
-                        return _mrUserDisplayName(a).localeCompare(_mrUserDisplayName(b));
-                    });
-                    var onlineNames = agentNames.filter(function(k){ return _mrIsOnlinePresence(presence[k]); });
-                    var count = document.getElementById('mrChatOnlineCount');
-                    if (count) count.textContent = onlineNames.length + ' online';
-                    document.querySelectorAll('.chat-contact[data-key^="user_"]').forEach(function(row){
-                        var username = (row.dataset.key || '').slice(5);
-                        var sub = row.querySelector('.chat-contact-sub');
-                        if (!sub) return;
-                        var oldPresence = sub.querySelector('.mr-agent-presence');
-                        if (oldPresence) {
-                            var prev = oldPresence.previousSibling;
-                            oldPresence.remove();
-                            if (prev && prev.nodeType === 3 && /·\s*$/.test(prev.nodeValue || '')) prev.nodeValue = (prev.nodeValue || '').replace(/\s*·\s*$/, '');
-                        }
-                        var online = _mrIsOnlinePresence(presence[username]);
-                        sub.insertAdjacentHTML('beforeend', ' · <span class="mr-agent-presence ' + (online ? '' : 'offline') + '"><span class="mr-agent-presence-dot"></span>' + (online ? 'Online' : 'Offline') + '</span>');
-                    });
-                    _mrRenderOnlinePanel(users, presence, agentNames, onlineNames);
+                    shell.classList.toggle('mr-chat-names-hidden', !!_mrChatNamesHidden);
+                    var btn = document.getElementById('mrToggleChatNamesBtn');
+                    if (btn) btn.innerHTML = _mrChatNamesHidden ? '<i class="fas fa-eye"></i> Show Names' : '<i class="fas fa-eye-slash"></i> Hide Names';
                 }
-
-                function _mrRenderOnlinePanel(users, presence, agentNames, onlineNames){
-                    var list = document.getElementById('mrChatOnlineList');
-                    var panelCount = document.getElementById('mrChatOnlinePanelCount');
-                    if (!list) return;
-                    agentNames = agentNames || [];
-                    onlineNames = onlineNames || [];
-                    if (panelCount) panelCount.textContent = onlineNames.length + '/' + agentNames.length;
-                    if (!agentNames.length) {
-                        list.innerHTML = '<div class="text-muted text-sm" style="padding:12px;">No agents found.</div>';
-                        return;
+                function _mrToggleChatNames(){
+                    _mrChatNamesHidden = !_mrChatNamesHidden;
+                    _mrBoolStore(_mrNamesKey(), _mrChatNamesHidden);
+                    _mrApplyNamesHiddenState();
+                }
+                function _mrToggleOnlineAgents(){
+                    if (_mrChatNamesHidden) {
+                        _mrChatNamesHidden = false;
+                        _mrBoolStore(_mrNamesKey(), false);
+                        _mrApplyNamesHiddenState();
                     }
-                    var me = STATE.currentUser && STATE.currentUser.username;
-                    list.innerHTML = agentNames.map(function(k){
-                        var u = users[k] || {}, name = u.name || k;
-                        var online = _mrIsOnlinePresence(presence[k]);
-                        return '<div class="mr-online-agent ' + (online ? '' : 'offline') + '" data-online-user="' + escapeHTML(k) + '">' +
-                            '<span class="mr-online-agent-dot"></span><div class="mr-online-agent-main">' +
-                            '<div class="mr-online-agent-name">' + escapeHTML(name) + (k === me ? ' <span class="text-muted text-xs">(You)</span>' : '') + '</div>' +
-                            '<div class="mr-online-agent-sub">@' + escapeHTML(k) + ' · ' + escapeHTML(u.role || 'agent') + ' · <span class="mr-online-agent-status">' + (online ? 'Online' : 'Offline') + '</span></div>' +
-                            '</div></div>';
-                    }).join('');
-                    list.querySelectorAll('[data-online-user]').forEach(function(el){
-                        el.onclick = function(){
-                            var username = this.getAttribute('data-online-user');
-                            if (!username || (STATE.currentUser && username === STATE.currentUser.username)) return;
-                            var display = _mrUserDisplayName(username);
-                            if (typeof window._selectChatContact === 'function') window._selectChatContact(username, null, display, null);
-                        };
-                    });
+                    _mrChatOnlineVisible = !_mrChatOnlineVisible;
+                    _mrBoolStore(_mrOnlineKey(), _mrChatOnlineVisible);
+                    _mrRenderOnlineAgentsPanel();
                 }
-
-                function _mrToggleOnlinePanel(force){
-                    var panel = document.getElementById('mrChatOnlinePanel');
-                    var shell = document.querySelector('.chat-shell');
-                    if (!panel) return;
-                    if (shell && shell.classList.contains('mr-sidebar-hidden')) _mrToggleSidebar(false);
-                    var open = (typeof force === 'boolean') ? force : panel.classList.contains('hidden');
-                    panel.classList.toggle('hidden', !open);
-                    var btn = document.getElementById('mrChatOnlineToggle');
-                    if (btn) btn.classList.toggle('active', open);
-                    if (open) _mrDecoratePresence();
-                }
-
-                function _mrInstallChatControls(){
-                    _mrInjectChatWindowStyles();
-                    _mrPositionChatBox();
-                    var content = document.getElementById('modalContent');
-                    var box = document.getElementById('modalBox');
-                    if (!content || !box || !box.classList.contains('chat-modal')) return;
-                    if (!document.getElementById('mrChatWindowBar')) {
-                        content.insertAdjacentHTML('afterbegin',
-                            '<div class="mr-chat-window-bar" id="mrChatWindowBar">' +
-                                '<div class="mr-chat-window-title"><i class="fas fa-comments"></i><span>Team Messenger</span><span class="mr-online-count" id="mrChatOnlineCount">0 online</span><span class="mr-chat-min-badge" id="mrChatMinNotifyBadge">0</span></div>' +
-                                '<div class="mr-chat-window-actions">' +
-                                    '<button type="button" class="mr-chat-text-btn" id="mrChatSidebarToggle" title="Hide or show the agent list"><i class="fas fa-table-columns"></i><span>Hide agents</span></button>' +
-                                    '<button type="button" class="mr-chat-text-btn" id="mrChatOnlineToggle" title="Show online agents"><i class="fas fa-user-check"></i><span>Online agents</span></button>' +
-                                    '<button type="button" id="mrChatMinBtn" title="Minimize chat"><i class="fas fa-minus"></i></button>' +
-                                    '<button type="button" id="mrChatMaxBtn" title="Maximize or restore chat"><i class="fas fa-up-right-and-down-left-from-center"></i></button>' +
-                                    '<button type="button" id="mrChatCloseBtn" title="Close chat"><i class="fas fa-times"></i></button>' +
-                                '</div>' +
-                            '</div>');
-                    }
+                function _mrEnsureOnlinePanel(){
                     var sidebar = document.querySelector('.chat-sidebar');
-                    if (sidebar && !document.getElementById('mrChatOnlinePanel')) {
-                        var head = sidebar.querySelector('.chat-sidebar-head') || sidebar;
-                        head.insertAdjacentHTML('afterend', '<div class="mr-online-panel hidden" id="mrChatOnlinePanel"><div class="mr-online-panel-head"><span><i class="fas fa-user-check"></i> Online agents</span><span class="mini-badge" id="mrChatOnlinePanelCount">0</span></div><div id="mrChatOnlineList"></div></div>');
+                    if (!sidebar || document.getElementById('mrChatOnlinePanel')) return;
+                    var panel = document.createElement('div');
+                    panel.id = 'mrChatOnlinePanel';
+                    panel.className = 'mr-chat-online-panel';
+                    panel.innerHTML = '<div class="mr-chat-online-head"><span><i class="fas fa-signal"></i> Online Agents</span><button type="button" class="btn btn-sm btn-outline" id="mrCloseOnlinePanel">Hide</button></div><div class="mr-chat-online-list" id="mrChatOnlineList"></div>';
+                    var head = sidebar.querySelector('.chat-sidebar-head');
+                    if (head && head.nextSibling) sidebar.insertBefore(panel, head.nextSibling); else sidebar.appendChild(panel);
+                    var close = document.getElementById('mrCloseOnlinePanel');
+                    if (close) close.onclick = function(){ _mrChatOnlineVisible = false; _mrBoolStore(_mrOnlineKey(), false); _mrRenderOnlineAgentsPanel(); };
+                }
+                function _mrShowMinimizedPill(){
+                    var pill = document.getElementById('mrChatMinimizedPill');
+                    if (!pill) {
+                        pill = document.createElement('div');
+                        pill.id = 'mrChatMinimizedPill';
+                        pill.className = 'mr-chat-minimized-pill';
+                        pill.innerHTML = '<i class="fas fa-comments"></i><span>Chat minimized</span><button type="button">Open</button>';
+                        document.body.appendChild(pill);
+                        pill.onclick = function(){ _mrRestoreChatWindow(); };
                     }
-                    _mrMakeDraggable();
-                    _mrMakeResizable();
-                    var sideBtn = document.getElementById('mrChatSidebarToggle');
-                    if (sideBtn && !sideBtn.dataset.bound) { sideBtn.dataset.bound = '1'; sideBtn.onclick = function(){ _mrToggleSidebar(); }; }
-                    var onlineBtn = document.getElementById('mrChatOnlineToggle');
-                    if (onlineBtn && !onlineBtn.dataset.bound) { onlineBtn.dataset.bound = '1'; onlineBtn.onclick = function(){ _mrToggleOnlinePanel(); }; }
-                    var minBtn = document.getElementById('mrChatMinBtn');
-                    if (minBtn && !minBtn.dataset.bound) { minBtn.dataset.bound = '1'; minBtn.onclick = function(){ box.classList.toggle('mr-chat-minimized'); if (box.classList.contains('mr-chat-minimized')) box.classList.remove('mr-chat-maximized'); }; }
-                    var maxBtn = document.getElementById('mrChatMaxBtn');
-                    if (maxBtn && !maxBtn.dataset.bound) {
-                        maxBtn.dataset.bound = '1';
-                        maxBtn.onclick = function(){
-                            box.classList.remove('mr-chat-minimized');
-                            if (box.classList.contains('mr-chat-maximized')) {
-                                box.classList.remove('mr-chat-maximized');
-                                if (box.dataset.mrRestore) {
-                                    try {
-                                        var r = JSON.parse(box.dataset.mrRestore);
-                                        ['left','top','width','height'].forEach(function(k){ if (r[k]) _mrSetImportant(box, k, r[k]); });
-                                        _mrSetImportant(box, 'right', 'auto'); _mrSetImportant(box, 'bottom', 'auto');
-                                    } catch (_) {}
-                                }
-                            } else {
-                                var rect = box.getBoundingClientRect();
-                                box.dataset.mrRestore = JSON.stringify({ left:rect.left + 'px', top:rect.top + 'px', width:rect.width + 'px', height:rect.height + 'px' });
-                                box.classList.add('mr-chat-maximized');
-                            }
-                        };
-                    }
-                    var closeBtn = document.getElementById('mrChatCloseBtn');
-                    if (closeBtn && !closeBtn.dataset.bound) { closeBtn.dataset.bound = '1'; closeBtn.onclick = function(){ window.closeModal(); }; }
-                    try { _mrToggleSidebar(localStorage.getItem('ph_chat_sidebar_hidden') === '1'); } catch (_) {}
-                    _mrDecoratePresence();
-                    if (_mrChatOnlineTimer) clearInterval(_mrChatOnlineTimer);
-                    _mrChatOnlineTimer = setInterval(function(){
-                        if (!document.querySelector('.chat-shell')) { clearInterval(_mrChatOnlineTimer); _mrChatOnlineTimer = null; return; }
-                        _mrDecoratePresence();
-                    }, 5000);
+                    pill.style.display = 'flex';
                 }
-
-                if (typeof showModal === 'function' && !showModal.__mrChatWindowControlsPatched) {
-                    var _mrPrevShowModalForChatWindow = showModal;
-                    showModal = function(html){
-                        var result = _mrPrevShowModalForChatWindow.apply(this, arguments);
-                        var isChat = String(html || '').indexOf('chat-shell') !== -1;
-                        if (!isChat) {
-                            var container = document.getElementById('modalContainer');
-                            var box = document.getElementById('modalBox');
-                            if (container) container.classList.remove('mr-chat-floating');
-                            if (box) {
-                                box.classList.remove('mr-chat-resizable','mr-chat-maximized','mr-chat-minimized');
-                                ['position','left','top','right','bottom','width','height'].forEach(function(k){ box.style.removeProperty(k); });
-                                delete box.dataset.mrChatPositioned;
-                            }
-                        }
-                        return result;
-                    };
-                    showModal.__mrChatWindowControlsPatched = true;
+                function _mrMinimizeChatWindow(){
+                    _mrSaveChatGeometry();
+                    var c = document.getElementById('modalContainer');
+                    if (c) c.classList.add('hidden');
+                    _mrShowMinimizedPill();
                 }
-
-                if (typeof showChatUI === 'function' && !showChatUI.__mrWindowControlsPatched) {
-                    var _mrPrevShowChatUIWindowControls = showChatUI;
-                    showChatUI = function(){
-                        var result = _mrPrevShowChatUIWindowControls.apply(this, arguments);
-                        setTimeout(_mrInstallChatControls, 80);
-                        return result;
-                    };
-                    showChatUI.__mrWindowControlsPatched = true;
+                function _mrRestoreChatWindow(){
+                    var pill = document.getElementById('mrChatMinimizedPill');
+                    if (pill) pill.style.display = 'none';
+                    var c = document.getElementById('modalContainer');
+                    if (c) c.classList.remove('hidden');
+                    setTimeout(_mrInstallChatControls, 30);
                 }
-
-                if (typeof loadChatContacts === 'function' && !loadChatContacts.__mrPresenceDecorPatched) {
-                    var _mrPrevLoadChatContactsPresence = loadChatContacts;
-                    loadChatContacts = async function(){
-                        var result = await _mrPrevLoadChatContactsPresence.apply(this, arguments);
-                        setTimeout(_mrDecoratePresence, 30);
-                        return result;
-                    };
-                    loadChatContacts.__mrPresenceDecorPatched = true;
-                }
-
-                function _mrUpdateMinimizedChatBadge(n){
-                    var badge = document.getElementById('mrChatMinNotifyBadge');
-                    if (!badge) return;
-                    n = parseInt(n || 0, 10) || 0;
-                    badge.textContent = n > 99 ? '99+' : String(n);
-                    badge.classList.toggle('has-new', n > 0);
+                function _mrCleanupChatWindowChrome(){
                     var box = document.getElementById('modalBox');
-                    if (box) box.classList.toggle('mr-chat-has-new', n > 0);
+                    if (!box) return;
+                    ['mrChatDragHandle','mrChatResizeHandle','mrChatSizeHint'].forEach(function(id){ var el = document.getElementById(id); if (el) el.remove(); });
+                    box.classList.remove('mr-chat-resizable','mr-chat-moving','mr-chat-resizing');
+                    box.style.removeProperty('left');
+                    box.style.removeProperty('top');
+                    box.style.removeProperty('right');
+                    box.style.removeProperty('bottom');
+                    box.style.removeProperty('width');
+                    box.style.removeProperty('height');
+                    if (_mrChatResizeObserver) { try { _mrChatResizeObserver.disconnect(); } catch (_) {} _mrChatResizeObserver = null; }
                 }
-                if (typeof _mrSetBadge === 'function' && !_mrSetBadge.__mrMinimizedChatBadgePatched) {
-                    var _mrPrevSetBadgeForMinimizedChat = _mrSetBadge;
-                    _mrSetBadge = function(n){
-                        var result = _mrPrevSetBadgeForMinimizedChat.apply(this, arguments);
-                        _mrUpdateMinimizedChatBadge(n);
+                if (typeof showModal === 'function' && !showModal.__mrChatWindowChromePatched) {
+                    var _mrPrevShowModalForChatChrome = showModal;
+                    showModal = function(html){
+                        var result = _mrPrevShowModalForChatChrome.apply(this, arguments);
+                        var box = document.getElementById('modalBox');
+                        if (box && !box.classList.contains('chat-modal')) _mrCleanupChatWindowChrome();
                         return result;
                     };
-                    _mrSetBadge.__mrMinimizedChatBadgePatched = true;
+                    showModal.__mrChatWindowChromePatched = true;
+                    window.showModal = showModal;
                 }
-                setInterval(function(){
-                    var source = document.getElementById('chatNotifyBadge') || document.getElementById('chatCardNotifyBadge');
-                    if (source) _mrUpdateMinimizedChatBadge(source.textContent || 0);
-                }, 2500);
-
-                window._mrToggleChatSidebar = _mrToggleSidebar;
-                window._mrToggleChatOnlineAgents = _mrToggleOnlinePanel;
+                function _mrInstallChatControls(){
+                    _mrInjectChatControlsStyles();
+                    _mrChatNamesHidden = _mrBoolRead(_mrNamesKey(), false);
+                    _mrChatOnlineVisible = _mrBoolRead(_mrOnlineKey(), false);
+                    _mrApplySavedChatSize();
+                    _mrEnsureOnlinePanel();
+                    var tools = document.querySelector('.chat-history-tools');
+                    if (tools && !document.getElementById('mrToggleChatNamesBtn')) {
+                        var wrap = document.createElement('span');
+                        wrap.className = 'mr-chat-extra-tools';
+                        wrap.innerHTML = '<button type="button" class="btn btn-sm btn-outline" id="mrToggleOnlineAgentsBtn"><i class="fas fa-signal"></i> Online Agents</button><button type="button" class="btn btn-sm btn-outline" id="mrToggleChatNamesBtn"></button><button type="button" class="btn btn-sm btn-outline" id="mrResetChatSizeBtn" title="Reset chat window size"><i class="fas fa-maximize"></i> Reset Size</button><button type="button" class="btn btn-sm btn-outline" id="mrMinimizeChatBtn" title="Minimize chat"><i class="fas fa-window-minimize"></i> Minimize</button>';
+                        tools.insertBefore(wrap, tools.firstChild);
+                        document.getElementById('mrToggleOnlineAgentsBtn').onclick = _mrToggleOnlineAgents;
+                        document.getElementById('mrToggleChatNamesBtn').onclick = _mrToggleChatNames;
+                        document.getElementById('mrResetChatSizeBtn').onclick = _mrResetChatSize;
+                        document.getElementById('mrMinimizeChatBtn').onclick = _mrMinimizeChatWindow;
+                    }
+                    _mrApplyNamesHiddenState();
+                    _mrRenderOnlineAgentsPanel();
+                    _mrAnnotateOnlineContacts();
+                }
+                if (typeof showChatUI === 'function' && !showChatUI.__mrManualSizeOnlinePatched) {
+                    var _mrPrevShowChatUiForManualControls = showChatUI;
+                    showChatUI = function(){
+                        var result = _mrPrevShowChatUiForManualControls.apply(this, arguments);
+                        setTimeout(_mrInstallChatControls, 120);
+                        setTimeout(_mrInstallChatControls, 420);
+                        return result;
+                    };
+                    showChatUI.__mrManualSizeOnlinePatched = true;
+                }
+                if (typeof loadChatContacts === 'function' && !loadChatContacts.__mrOnlineDotsPatched) {
+                    var _mrPrevLoadChatContactsForOnlineDots = loadChatContacts;
+                    loadChatContacts = async function(){
+                        var result = await _mrPrevLoadChatContactsForOnlineDots.apply(this, arguments);
+                        setTimeout(function(){ _mrEnsureOnlinePanel(); _mrRenderOnlineAgentsPanel(); _mrAnnotateOnlineContacts(); }, 30);
+                        return result;
+                    };
+                    loadChatContacts.__mrOnlineDotsPatched = true;
+                }
+                if (typeof renderChatMessages === 'function' && !renderChatMessages.__mrNamesTogglePatched) {
+                    var _mrPrevRenderChatMessagesForNamesToggle = renderChatMessages;
+                    renderChatMessages = function(){
+                        var result = _mrPrevRenderChatMessagesForNamesToggle.apply(this, arguments);
+                        setTimeout(_mrApplyNamesHiddenState, 20);
+                        return result;
+                    };
+                    renderChatMessages.__mrNamesTogglePatched = true;
+                }
+                window._mrResetChatSize = _mrResetChatSize;
+                window._mrMinimizeChatWindow = _mrMinimizeChatWindow;
+                window._mrRestoreChatWindow = _mrRestoreChatWindow;
+                document.addEventListener('DOMContentLoaded', function(){ setTimeout(_mrInstallChatControls, 900); });
             })();
 
             document.addEventListener('DOMContentLoaded', init);
