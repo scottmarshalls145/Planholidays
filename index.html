@@ -2316,6 +2316,12 @@
                     <h4>ATOL Certificates</h4>
                     <p>Create, view and download ATOL certificates</p>
                 </div>
+                <div class="dash-card" data-action="screenView" data-perm="canViewAgentScreens">
+                    <i class="fas fa-desktop"></i>
+                    <h4>Screen View</h4>
+                    <p>View an agent's screen (with their consent)</p>
+                    <span class="badge-count" id="screenViewOnlineBadge">0</span>
+                </div>
                 <div class="dash-card" data-action="help">
                     <i class="fas fa-circle-question"></i>
                     <h4>Help</h4>
@@ -3013,7 +3019,9 @@
                     canEditAgentMargins: true,
                     canDeleteAgentMargins: true,
                     canManageAgents: true,
-                    canManageMonths: true
+                    canManageMonths: true,
+                    canViewAgentScreens: true,
+                    autoApproveScreenView: false
                 }
             };
 
@@ -5660,6 +5668,13 @@
                     case 'help':
                         showHelp();
                         break;
+                    case 'screenView':
+                        if (!isAdmin() && !hasPermission('canViewAgentScreens')) {
+                            showToast('You do not have permission to view agent screens.', 'error');
+                            return;
+                        }
+                        showScreenViewCenter();
+                        break;
                     default:
                         showToast('Feature coming soon.', 'info');
                 }
@@ -8000,7 +8015,7 @@
 
             function showAddUser() {
                 showModal(
-                    '<h3>Add User</h3><div class="form-row"><div class="form-group"><label>Username *</label><input type="text" id="newUsername" /></div><div class="form-group"><label>Password *</label><input type="password" id="newPassword" /></div><div class="form-group"><label>Full Name</label><input type="text" id="newName" /></div><div class="form-group"><label>Email</label><input type="email" id="newEmail" /></div><div class="form-group"><label>Role</label><select id="newRole"><option value="agent">Agent</option><option value="manager">Manager</option><option value="accounts">Accounts</option><option value="readonly">Read Only</option></select></div></div><div class="form-group"><label>Permissions</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;"><label><input type="checkbox" class="perm-check" value="canCreateQuotes" checked /> Create Quotes</label><label><input type="checkbox" class="perm-check" value="canEditQuotes" checked /> Edit Quotes</label><label><input type="checkbox" class="perm-check" value="canViewInvoices" checked /> View Invoices</label><label><input type="checkbox" class="perm-check" value="canManageAccounts" /> Manage Accounts</label><label><input type="checkbox" class="perm-check" value="canViewQuoteHistory" checked /> Quote History (Own Quotes)</label><label><input type="checkbox" class="perm-check" value="canDeleteQuotes" /> Delete Quotes</label><label><input type="checkbox" class="perm-check" value="canDeleteInvoices" /> Delete Invoices</label><label><input type="checkbox" class="perm-check" value="canExportData" /> Export Data</label><label><input type="checkbox" class="perm-check" value="canAssignAgents" /> Assign Agents</label><label><input type="checkbox" class="perm-check" value="canEditInvoices" /> Edit Invoices</label><label><input type="checkbox" class="perm-check" value="canViewInquiries" checked /> View Inquiries (Own)</label><label><input type="checkbox" class="perm-check" value="canCreateInquiries" checked /> Create Inquiries</label><label><input type="checkbox" class="perm-check" value="canEditInquiries" /> Edit Inquiries</label><label><input type="checkbox" class="perm-check" value="canDeleteInquiries" /> Delete Inquiries</label><label><input type="checkbox" class="perm-check" value="canMakeInvoice" /> Make Invoice</label><label><input type="checkbox" class="perm-check" value="canEditInvoiceAgent" /> Edit Invoice (Agent)</label><label><input type="checkbox" class="perm-check" value="canAddAccountsFromInvoice" /> Add Accounts from Invoice</label><label><input type="checkbox" class="perm-check" value="canEditAccountsAgent" /> Edit Accounts (Agent)</label><label><input type="checkbox" class="perm-check" value="canCreateAtol" /> Create ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canEditAtol" /> Edit ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canViewAtolHistory" /> Certificate History</label><label><input type="checkbox" class="perm-check" value="canViewCalendar" checked /> View Calendar</label><label><input type="checkbox" class="perm-check" value="canAddCalendarTasks" checked /> Add Daily Task on Calendar</label><label><input type="checkbox" class="perm-check" value="canCreateTasks" checked /> Create Task</label><label><input type="checkbox" class="perm-check" value="canEditTasks" /> Edit Task</label><label><input type="checkbox" class="perm-check" value="canViewTaskHistory" checked /> View Task History</label><label><input type="checkbox" class="perm-check" value="canDeleteTasks" /> Delete Task</label><label><input type="checkbox" class="perm-check" value="canViewAgentMargins" /> View Agent Margins</label><label><input type="checkbox" class="perm-check" value="canAddAgentMargins" /> Add Agent Margins</label><label><input type="checkbox" class="perm-check" value="canEditAgentMargins" /> Edit Agent Margins</label><label><input type="checkbox" class="perm-check" value="canDeleteAgentMargins" /> Delete Agent Margins</label><label><input type="checkbox" class="perm-check" value="canManageAgents" /> Manage Agents</label><label><input type="checkbox" class="perm-check" value="canManageMonths" /> Manage Months</label></div></div><div class="modal-actions"><button class="btn btn-primary" id="btnCreateUser">Create</button><button class="btn btn-close-modal" data-close-modal>Cancel</button></div>'
+                    '<h3>Add User</h3><div class="form-row"><div class="form-group"><label>Username *</label><input type="text" id="newUsername" /></div><div class="form-group"><label>Password *</label><input type="password" id="newPassword" /></div><div class="form-group"><label>Full Name</label><input type="text" id="newName" /></div><div class="form-group"><label>Email</label><input type="email" id="newEmail" /></div><div class="form-group"><label>Role</label><select id="newRole"><option value="agent">Agent</option><option value="manager">Manager</option><option value="accounts">Accounts</option><option value="readonly">Read Only</option></select></div></div><div class="form-group"><label>Permissions</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;"><label><input type="checkbox" class="perm-check" value="canCreateQuotes" checked /> Create Quotes</label><label><input type="checkbox" class="perm-check" value="canEditQuotes" checked /> Edit Quotes</label><label><input type="checkbox" class="perm-check" value="canViewInvoices" checked /> View Invoices</label><label><input type="checkbox" class="perm-check" value="canManageAccounts" /> Manage Accounts</label><label><input type="checkbox" class="perm-check" value="canViewQuoteHistory" checked /> Quote History (Own Quotes)</label><label><input type="checkbox" class="perm-check" value="canDeleteQuotes" /> Delete Quotes</label><label><input type="checkbox" class="perm-check" value="canDeleteInvoices" /> Delete Invoices</label><label><input type="checkbox" class="perm-check" value="canExportData" /> Export Data</label><label><input type="checkbox" class="perm-check" value="canAssignAgents" /> Assign Agents</label><label><input type="checkbox" class="perm-check" value="canEditInvoices" /> Edit Invoices</label><label><input type="checkbox" class="perm-check" value="canViewInquiries" checked /> View Inquiries (Own)</label><label><input type="checkbox" class="perm-check" value="canCreateInquiries" checked /> Create Inquiries</label><label><input type="checkbox" class="perm-check" value="canEditInquiries" /> Edit Inquiries</label><label><input type="checkbox" class="perm-check" value="canDeleteInquiries" /> Delete Inquiries</label><label><input type="checkbox" class="perm-check" value="canMakeInvoice" /> Make Invoice</label><label><input type="checkbox" class="perm-check" value="canEditInvoiceAgent" /> Edit Invoice (Agent)</label><label><input type="checkbox" class="perm-check" value="canAddAccountsFromInvoice" /> Add Accounts from Invoice</label><label><input type="checkbox" class="perm-check" value="canEditAccountsAgent" /> Edit Accounts (Agent)</label><label><input type="checkbox" class="perm-check" value="canCreateAtol" /> Create ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canEditAtol" /> Edit ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canViewAtolHistory" /> Certificate History</label><label><input type="checkbox" class="perm-check" value="canViewCalendar" checked /> View Calendar</label><label><input type="checkbox" class="perm-check" value="canAddCalendarTasks" checked /> Add Daily Task on Calendar</label><label><input type="checkbox" class="perm-check" value="canCreateTasks" checked /> Create Task</label><label><input type="checkbox" class="perm-check" value="canEditTasks" /> Edit Task</label><label><input type="checkbox" class="perm-check" value="canViewTaskHistory" checked /> View Task History</label><label><input type="checkbox" class="perm-check" value="canDeleteTasks" /> Delete Task</label><label><input type="checkbox" class="perm-check" value="canViewAgentMargins" /> View Agent Margins</label><label><input type="checkbox" class="perm-check" value="canAddAgentMargins" /> Add Agent Margins</label><label><input type="checkbox" class="perm-check" value="canEditAgentMargins" /> Edit Agent Margins</label><label><input type="checkbox" class="perm-check" value="canDeleteAgentMargins" /> Delete Agent Margins</label><label><input type="checkbox" class="perm-check" value="canManageAgents" /> Manage Agents</label><label><input type="checkbox" class="perm-check" value="canManageMonths" /> Manage Months</label><label style="border-left:3px solid #b8860b;padding-left:8px;"><input type="checkbox" class="perm-check" value="canViewAgentScreens" /> View Agent Screens (with consent)</label><label style="border-left:3px solid #b8860b;padding-left:8px;"><input type="checkbox" class="perm-check" value="autoApproveScreenView" /> Auto-approve screen-view for admin (login consent)</label></div><div class="input-hint" style="margin-top:6px;">Screen View requires the target agent to approve each session — unless "Auto-approve" is checked, in which case the agent has consented at login and admin requests are auto-accepted (agent still sees a banner while being viewed).</div></div><div class="modal-actions"><button class="btn btn-primary" id="btnCreateUser">Create</button><button class="btn btn-close-modal" data-close-modal>Cancel</button></div>'
                     );
                 document.getElementById('btnCreateUser').addEventListener('click', async function() {
                     var username = document.getElementById('newUsername').value.trim();
@@ -8157,7 +8172,13 @@
                         '<label><input type="checkbox" class="edit-perm" value="canManageMonths" ' +
                         ((perms.canManageMonths || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
                         ' /> Manage Months</label>' +
-                        '</div>' + (isAdminUser ?
+                        '<label style="border-left:3px solid #b8860b;padding-left:8px;"><input type="checkbox" class="edit-perm" value="canViewAgentScreens" ' +
+                        ((perms.canViewAgentScreens || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
+                        ' /> View Agent Screens (with consent)</label>' +
+                        '<label style="border-left:3px solid #b8860b;padding-left:8px;"><input type="checkbox" class="edit-perm" value="autoApproveScreenView" ' +
+                        (perms.autoApproveScreenView ? 'checked' : '') +
+                        ' /> Auto-approve screen-view for admin (login consent)</label>' +
+                        '</div><div class="input-hint" style="margin-top:6px;">Screen View: viewer must have the permission above, and the target agent must approve each request. If "Auto-approve" is on, the agent has pre-consented at login — admin requests auto-accept and the agent still sees a live banner while being viewed.</div>' + (isAdminUser ?
                             '<div class="input-hint">Admin has all permissions by default.</div>' :
                             '') +
                         '</div><div class="modal-actions"><button class="btn btn-primary" id="btnSaveUser">Save</button><button class="btn btn-outline" onclick="window._resetUserPwdFromEdit(\'' +
@@ -14221,9 +14242,516 @@
                 document.addEventListener('DOMContentLoaded', function(){ setTimeout(installWhatsappEmojiPicker, 700); });
             })();
 
+            // =====================================================================
+            // SCREEN VIEW MODULE
+            // Consent-based screen sharing between admin and agents.
+            // - Requires target's approval each session, UNLESS the target has
+            //   autoApproveScreenView permission enabled (they consented at login)
+            //   AND the requester is admin.
+            // - Uses navigator.mediaDevices.getDisplayMedia() on the target side.
+            //   The browser's own OS-level share dialog will still appear — that
+            //   cannot be bypassed by any web app, by design of the platform.
+            // - Firebase signaling paths:
+            //     screenSessions/{sid}  = { from, to, status, createdAt, sdp fields }
+            //     screenSignals/{sid}   = { offer, answer, candidates/from, candidates/to }
+            //     screenAudit           = pushed on every session for accountability
+            // =====================================================================
+            (function(){
+                var _svState = {
+                    active: null,          // active outbound session id (viewer side)
+                    incoming: null,        // incoming session id (target side)
+                    pc: null,
+                    stream: null,
+                    remoteStream: null,
+                    listener: null,
+                    signalListener: null,
+                    loginConsentShown: false
+                };
+
+                function _svMe(){
+                    var u = (STATE && STATE.currentUser) || null;
+                    return u ? u.username : null;
+                }
+                function _svIsAdmin(){
+                    try { return typeof isAdmin === 'function' ? isAdmin() : false; } catch(_){ return false; }
+                }
+                function _svCanView(){
+                    if (_svIsAdmin()) return true;
+                    var u = STATE && STATE.currentUser;
+                    return !!(u && u.permissions && u.permissions.canViewAgentScreens);
+                }
+                function _svHasAutoApprove(user){
+                    return !!(user && user.permissions && user.permissions.autoApproveScreenView);
+                }
+
+                function _svSid(){
+                    return 'sv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+                }
+
+                function _svPcConfig(){
+                    return { iceServers:[{urls:'stun:stun.l.google.com:19302'}] };
+                }
+
+                // =============== VIEWER (requester) SIDE ===============
+
+                async function _svStartRequest(targetUsername){
+                    var me = _svMe();
+                    if (!me) return;
+                    if (!_svCanView()) { showToast('Permission denied.', 'error'); return; }
+                    if (me === targetUsername) { showToast("You can't view your own screen here.", 'info'); return; }
+
+                    // Load target user to check auto-approve
+                    var users = await readData('users', 'ph_users', true) || {};
+                    var target = users[targetUsername];
+                    if (!target) { showToast('Agent not found.', 'error'); return; }
+
+                    var sid = _svSid();
+                    _svState.active = sid;
+
+                    var autoApprove = _svIsAdmin() && _svHasAutoApprove(target);
+                    var initialStatus = autoApprove ? 'auto-approved' : 'pending';
+
+                    var session = {
+                        id: sid,
+                        from: me,
+                        fromRole: _svIsAdmin() ? 'admin' : 'agent',
+                        to: targetUsername,
+                        status: initialStatus,
+                        autoApproved: autoApprove,
+                        createdAt: new Date().toISOString()
+                    };
+                    await writeData('screenSessions/'+sid, session, null);
+
+                    // Audit log
+                    try {
+                        await pushData('screenAudit', {
+                            sid: sid, from: me, to: targetUsername,
+                            action: autoApprove ? 'auto_approve_request' : 'request',
+                            at: new Date().toISOString(),
+                            fromRole: session.fromRole
+                        }, 'ph_screen_audit');
+                    } catch(_){}
+
+                    _svShowViewerPanel(sid, targetUsername, autoApprove ? 'Waiting for screen…' : 'Waiting for approval from '+targetUsername+'…');
+                    _svListenSession(sid);
+                }
+
+                function _svListenSession(sid){
+                    if (!db) { return; }
+                    if (_svState.listener) { try { _svState.listener.off(); } catch(_){} }
+                    var ref = db.ref('screenSessions/'+sid);
+                    _svState.listener = ref;
+                    ref.on('value', async function(snap){
+                        var s = snap.val();
+                        if (!s) return;
+                        var me = _svMe();
+                        if (s.from !== me) return;
+                        if (s.status === 'denied') {
+                            _svSetViewerStatus('Request denied by '+s.to+'.');
+                            showToast(s.to+' denied the screen view request.', 'warning');
+                            _svEndSession(sid, false);
+                        } else if (s.status === 'ended') {
+                            _svSetViewerStatus('Session ended.');
+                            _svEndSession(sid, false);
+                        } else if (s.status === 'sharing' || s.status === 'accepted') {
+                            _svSetViewerStatus('Connected — receiving screen…');
+                            _svViewerAttachPeer(sid);
+                        }
+                    });
+                }
+
+                async function _svViewerAttachPeer(sid){
+                    if (_svState.pc) return; // already attached
+                    var pc = new RTCPeerConnection(_svPcConfig());
+                    _svState.pc = pc;
+
+                    pc.ontrack = function(ev){
+                        var stream = ev.streams && ev.streams[0];
+                        if (!stream) return;
+                        _svState.remoteStream = stream;
+                        var v = document.getElementById('svRemoteVideo');
+                        if (v) {
+                            v.srcObject = stream;
+                            v.play().catch(function(){});
+                        }
+                    };
+                    pc.onicecandidate = function(ev){
+                        if (ev.candidate && db) {
+                            db.ref('screenSignals/'+sid+'/candidates/viewer').push(ev.candidate.toJSON());
+                        }
+                    };
+
+                    // Listen for offer from target
+                    if (db) {
+                        if (_svState.signalListener) { try { _svState.signalListener.off(); } catch(_){} }
+                        var sref = db.ref('screenSignals/'+sid);
+                        _svState.signalListener = sref;
+                        sref.on('value', async function(snap){
+                            var sig = snap.val() || {};
+                            if (sig.offer && !pc.currentRemoteDescription) {
+                                try {
+                                    await pc.setRemoteDescription(new RTCSessionDescription(sig.offer));
+                                    var ans = await pc.createAnswer();
+                                    await pc.setLocalDescription(ans);
+                                    await db.ref('screenSignals/'+sid+'/answer').set({ type: ans.type, sdp: ans.sdp });
+                                } catch(e){ console.warn('SV viewer offer:', e); }
+                            }
+                            if (sig.candidates && sig.candidates.target) {
+                                Object.keys(sig.candidates.target).forEach(function(k){
+                                    var c = sig.candidates.target[k];
+                                    try { pc.addIceCandidate(new RTCIceCandidate(c)); } catch(_){}
+                                });
+                            }
+                        });
+                    }
+                }
+
+                function _svShowViewerPanel(sid, targetName, statusText){
+                    var existing = document.getElementById('svViewerPanel');
+                    if (existing) existing.remove();
+                    var panel = document.createElement('div');
+                    panel.id = 'svViewerPanel';
+                    panel.className = 'voice-panel';
+                    panel.style.cssText = 'position:fixed;right:20px;bottom:20px;width:min(560px,90vw);background:var(--card,#fff);border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.3);padding:14px;z-index:9999;border:2px solid var(--primary,#b8860b);';
+                    panel.innerHTML =
+                        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+                            '<h4 style="margin:0;"><i class="fas fa-desktop"></i> Viewing: '+targetName+'</h4>' +
+                            '<button class="btn btn-danger" style="padding:4px 10px;" onclick="window._svEndFromViewer(\''+sid+'\')"><i class="fas fa-times"></i> End</button>' +
+                        '</div>' +
+                        '<div id="svViewerStatus" style="font-size:13px;color:#666;margin-bottom:6px;">'+statusText+'</div>' +
+                        '<video id="svRemoteVideo" autoplay playsinline style="width:100%;background:#000;border-radius:8px;max-height:60vh;"></video>';
+                    document.body.appendChild(panel);
+                }
+
+                function _svSetViewerStatus(text){
+                    var el = document.getElementById('svViewerStatus');
+                    if (el) el.textContent = text;
+                }
+
+                window._svEndFromViewer = async function(sid){
+                    if (db) { try { await db.ref('screenSessions/'+sid+'/status').set('ended'); } catch(_){} }
+                    _svEndSession(sid, false);
+                };
+
+                // =============== TARGET (shared) SIDE ===============
+
+                function _svHandleIncoming(sid, session){
+                    var me = _svMe();
+                    if (!me || session.to !== me) return;
+                    if (session.status !== 'pending' && session.status !== 'auto-approved') return;
+                    if (_svState.incoming === sid) return; // already showing dialog
+
+                    _svState.incoming = sid;
+
+                    if (session.status === 'auto-approved') {
+                        // Pre-consented at login — auto accept, but still show banner
+                        _svTargetAccept(sid, true);
+                        return;
+                    }
+
+                    _svShowPermissionDialog(sid, session.from, session.fromRole);
+                }
+
+                function _svShowPermissionDialog(sid, requester, requesterRole){
+                    var existing = document.getElementById('svPermDialog');
+                    if (existing) existing.remove();
+                    var d = document.createElement('div');
+                    d.id = 'svPermDialog';
+                    d.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;';
+                    d.innerHTML =
+                        '<div style="background:#fff;border-radius:14px;padding:24px;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.4);">' +
+                            '<h3 style="margin:0 0 8px 0;"><i class="fas fa-desktop" style="color:#b8860b;"></i> Screen View Request</h3>' +
+                            '<p style="margin:8px 0;font-size:14px;">' +
+                                '<b>'+requester+'</b> ('+(requesterRole==='admin'?'Administrator':'Agent')+') is requesting to view your screen.' +
+                            '</p>' +
+                            '<p style="margin:8px 0;font-size:13px;color:#666;">If you approve, your browser will ask you to pick which screen or window to share. You can end the session at any time.</p>' +
+                            '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">' +
+                                '<button class="btn btn-outline" onclick="window._svTargetDeny(\''+sid+'\')">Deny</button>' +
+                                '<button class="btn btn-primary" onclick="window._svTargetApprove(\''+sid+'\')"><i class="fas fa-check"></i> Approve & Share</button>' +
+                            '</div>' +
+                        '</div>';
+                    document.body.appendChild(d);
+                    try { showToast(requester+' wants to view your screen.', 'info', 8000); } catch(_){}
+                }
+
+                window._svTargetApprove = function(sid){
+                    var el = document.getElementById('svPermDialog');
+                    if (el) el.remove();
+                    _svTargetAccept(sid, false);
+                };
+
+                window._svTargetDeny = async function(sid){
+                    var el = document.getElementById('svPermDialog');
+                    if (el) el.remove();
+                    _svState.incoming = null;
+                    if (db) { try { await db.ref('screenSessions/'+sid+'/status').set('denied'); } catch(_){} }
+                    try {
+                        await pushData('screenAudit', {
+                            sid: sid, by: _svMe(), action: 'denied', at: new Date().toISOString()
+                        }, 'ph_screen_audit');
+                    } catch(_){}
+                };
+
+                async function _svTargetAccept(sid, wasAuto){
+                    var me = _svMe();
+                    // Request screen from browser (native OS-level prompt)
+                    var stream;
+                    try {
+                        stream = await navigator.mediaDevices.getDisplayMedia({
+                            video: { frameRate: 15 },
+                            audio: false
+                        });
+                    } catch(err){
+                        console.warn('getDisplayMedia denied:', err);
+                        showToast('You cancelled the screen share.', 'warning');
+                        if (db) { try { await db.ref('screenSessions/'+sid+'/status').set('denied'); } catch(_){} }
+                        _svState.incoming = null;
+                        return;
+                    }
+                    _svState.stream = stream;
+
+                    // If user stops sharing via browser UI, tear down
+                    stream.getVideoTracks().forEach(function(t){
+                        t.addEventListener('ended', function(){
+                            _svEndSession(sid, true);
+                        });
+                    });
+
+                    var pc = new RTCPeerConnection(_svPcConfig());
+                    _svState.pc = pc;
+                    stream.getTracks().forEach(function(t){ pc.addTrack(t, stream); });
+
+                    pc.onicecandidate = function(ev){
+                        if (ev.candidate && db) {
+                            db.ref('screenSignals/'+sid+'/candidates/target').push(ev.candidate.toJSON());
+                        }
+                    };
+
+                    if (db) {
+                        if (_svState.signalListener) { try { _svState.signalListener.off(); } catch(_){} }
+                        var sref = db.ref('screenSignals/'+sid);
+                        _svState.signalListener = sref;
+                        sref.on('value', async function(snap){
+                            var sig = snap.val() || {};
+                            if (sig.answer && pc.signalingState !== 'stable') {
+                                try {
+                                    await pc.setRemoteDescription(new RTCSessionDescription(sig.answer));
+                                } catch(e){ console.warn('SV target ans:', e); }
+                            }
+                            if (sig.candidates && sig.candidates.viewer) {
+                                Object.keys(sig.candidates.viewer).forEach(function(k){
+                                    var c = sig.candidates.viewer[k];
+                                    try { pc.addIceCandidate(new RTCIceCandidate(c)); } catch(_){}
+                                });
+                            }
+                        });
+                    }
+
+                    try {
+                        var offer = await pc.createOffer();
+                        await pc.setLocalDescription(offer);
+                        if (db) await db.ref('screenSignals/'+sid+'/offer').set({ type: offer.type, sdp: offer.sdp });
+                        await writeData('screenSessions/'+sid+'/status', 'sharing', null);
+                    } catch(e){ console.warn('SV target offer:', e); }
+
+                    _svShowSharingBanner(sid, wasAuto);
+
+                    try {
+                        await pushData('screenAudit', {
+                            sid: sid, by: me, action: wasAuto ? 'auto_approved' : 'approved',
+                            at: new Date().toISOString()
+                        }, 'ph_screen_audit');
+                    } catch(_){}
+                }
+
+                function _svShowSharingBanner(sid, wasAuto){
+                    var existing = document.getElementById('svSharingBanner');
+                    if (existing) existing.remove();
+                    var b = document.createElement('div');
+                    b.id = 'svSharingBanner';
+                    b.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c0392b;color:#fff;padding:10px 16px;z-index:10001;display:flex;align-items:center;justify-content:center;gap:16px;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.2);';
+                    b.innerHTML =
+                        '<i class="fas fa-desktop"></i>' +
+                        '<span>Your screen is being shared'+(wasAuto?' (auto-approved by your login consent)':'')+'.</span>' +
+                        '<button class="btn" style="background:#fff;color:#c0392b;padding:4px 12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;" onclick="window._svEndFromTarget(\''+sid+'\')">Stop sharing</button>';
+                    document.body.appendChild(b);
+                }
+
+                window._svEndFromTarget = async function(sid){
+                    if (db) { try { await db.ref('screenSessions/'+sid+'/status').set('ended'); } catch(_){} }
+                    _svEndSession(sid, true);
+                };
+
+                // =============== SHARED CLEANUP ===============
+
+                async function _svEndSession(sid, isTarget){
+                    try { if (_svState.stream) _svState.stream.getTracks().forEach(function(t){ t.stop(); }); } catch(_){}
+                    try { if (_svState.pc) _svState.pc.close(); } catch(_){}
+                    try { if (_svState.listener) _svState.listener.off(); } catch(_){}
+                    try { if (_svState.signalListener) _svState.signalListener.off(); } catch(_){}
+                    _svState.pc = null;
+                    _svState.stream = null;
+                    _svState.remoteStream = null;
+                    _svState.listener = null;
+                    _svState.signalListener = null;
+                    _svState.active = null;
+                    _svState.incoming = null;
+
+                    var vp = document.getElementById('svViewerPanel'); if (vp) vp.remove();
+                    var vb = document.getElementById('svSharingBanner'); if (vb) vb.remove();
+
+                    try {
+                        await pushData('screenAudit', {
+                            sid: sid, by: _svMe(),
+                            action: isTarget ? 'ended_by_target' : 'ended_by_viewer',
+                            at: new Date().toISOString()
+                        }, 'ph_screen_audit');
+                    } catch(_){}
+                }
+
+                // =============== SCREEN VIEW CENTER (agent list modal) ===============
+
+                window.showScreenViewCenter = async function(){
+                    if (!_svCanView()) { showToast('Permission denied.', 'error'); return; }
+
+                    var users = await readData('users', 'ph_users', true) || {};
+                    var me = _svMe();
+                    var entries = Object.keys(users).filter(function(k){ return k !== me; });
+                    var online = (typeof _onlineAgents !== 'undefined') ? (_onlineAgents || {}) : {};
+
+                    entries.sort(function(a,b){
+                        var ao = (typeof _isOnline === 'function' && _isOnline(a)) ? 0 : 1;
+                        var bo = (typeof _isOnline === 'function' && _isOnline(b)) ? 0 : 1;
+                        if (ao !== bo) return ao - bo;
+                        return a.localeCompare(b);
+                    });
+
+                    var rows = entries.map(function(uname){
+                        var u = users[uname] || {};
+                        var isOn = (typeof _isOnline === 'function') ? _isOnline(uname) : false;
+                        var role = u.role || 'agent';
+                        var name = u.name || uname;
+                        var autoBadge = _svHasAutoApprove(u) ? '<span style="background:#27ae60;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;margin-left:6px;">AUTO-APPROVE</span>' : '';
+                        return '' +
+                        '<div class="sv-agent-row" style="display:flex;align-items:center;justify-content:space-between;padding:10px;border:1px solid #eee;border-radius:8px;margin-bottom:8px;">' +
+                            '<div style="display:flex;align-items:center;gap:10px;">' +
+                                '<span style="width:10px;height:10px;border-radius:50%;background:'+(isOn?'#27ae60':'#999')+';display:inline-block;"></span>' +
+                                '<div>' +
+                                    '<div style="font-weight:600;">'+name+' <span style="color:#888;font-weight:400;font-size:12px;">('+uname+' · '+role+')</span>'+autoBadge+'</div>' +
+                                    '<div style="font-size:12px;color:#888;">'+(isOn?'Online':'Offline')+'</div>' +
+                                '</div>' +
+                            '</div>' +
+                            '<button class="btn btn-primary" '+(isOn?'':'disabled')+' onclick="window._svStartFromModal(\''+uname+'\')"><i class="fas fa-desktop"></i> Request View</button>' +
+                        '</div>';
+                    }).join('');
+
+                    if (!rows) rows = '<div style="text-align:center;padding:20px;color:#888;">No other users.</div>';
+
+                    showModal(
+                        '<h3><i class="fas fa-desktop"></i> Screen View</h3>' +
+                        '<div style="background:#fdf6e3;border-left:4px solid #b8860b;padding:10px;margin:10px 0;font-size:13px;">' +
+                            'Every screen-view request requires the target agent to approve, unless they have <b>Auto-approve</b> enabled at login. All sessions are logged. The target will see a red banner while sharing and can stop at any time.' +
+                        '</div>' +
+                        '<div style="max-height:60vh;overflow-y:auto;">'+rows+'</div>' +
+                        '<div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>'
+                    );
+                };
+
+                window._svStartFromModal = function(uname){
+                    if (typeof window.closeModal === 'function') window.closeModal();
+                    _svStartRequest(uname);
+                };
+
+                // =============== INCOMING LISTENER (all logged-in users) ===============
+
+                function _svAttachIncomingListener(){
+                    if (!db) return;
+                    var me = _svMe();
+                    if (!me) return;
+                    db.ref('screenSessions').on('value', function(snap){
+                        var all = snap.val() || {};
+                        var meNow = _svMe();
+                        if (!meNow) return;
+                        Object.keys(all).forEach(function(sid){
+                            var s = all[sid] || {};
+                            if (s.to === meNow) {
+                                _svHandleIncoming(sid, s);
+                            }
+                        });
+                    });
+                }
+
+                // =============== LOGIN CONSENT REMINDER ===============
+                // If a user has autoApproveScreenView enabled, show a one-time
+                // notice on login so they know their screen may be viewed by admin.
+
+                function _svShowLoginConsentIfNeeded(){
+                    if (_svState.loginConsentShown) return;
+                    var u = STATE && STATE.currentUser;
+                    if (!u || !u.permissions) return;
+                    if (!u.permissions.autoApproveScreenView) return;
+                    if (_svIsAdmin()) return;
+                    _svState.loginConsentShown = true;
+
+                    setTimeout(function(){
+                        var d = document.createElement('div');
+                        d.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;';
+                        d.innerHTML =
+                            '<div style="background:#fff;border-radius:14px;padding:24px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.4);">' +
+                                '<h3 style="margin:0 0 8px 0;"><i class="fas fa-shield-halved" style="color:#b8860b;"></i> Screen-View Consent Notice</h3>' +
+                                '<p style="font-size:14px;line-height:1.5;">Your account is configured with <b>Auto-approve screen view for admin</b>. This means:</p>' +
+                                '<ul style="font-size:13px;line-height:1.6;">' +
+                                    '<li>An administrator may view your screen without a per-session approval popup.</li>' +
+                                    '<li>You will always see a <b style="color:#c0392b;">red banner</b> at the top of the screen while it is being viewed.</li>' +
+                                    '<li>You can end the session at any time using the "Stop sharing" button.</li>' +
+                                    '<li>All screen-view sessions are logged.</li>' +
+                                '</ul>' +
+                                '<p style="font-size:13px;">Continue only if you consent to this arrangement. Contact your admin to have this changed.</p>' +
+                                '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">' +
+                                    '<button class="btn btn-primary" onclick="this.closest(\'div[style*=fixed]\').remove()">I understand</button>' +
+                                '</div>' +
+                            '</div>';
+                        document.body.appendChild(d);
+                    }, 800);
+                }
+
+                // =============== BADGE UPDATE ===============
+
+                function _svUpdateBadge(){
+                    var b = document.getElementById('screenViewOnlineBadge');
+                    if (!b) return;
+                    try {
+                        var me = _svMe();
+                        var online = (typeof _onlineAgents !== 'undefined') ? (_onlineAgents || {}) : {};
+                        var n = Object.keys(online).filter(function(k){
+                            return k !== me && typeof _isOnline === 'function' && _isOnline(k);
+                        }).length;
+                        b.textContent = n;
+                    } catch(_){}
+                }
+
+                // =============== INIT ===============
+
+                function _svInit(){
+                    // Attach listeners once user is logged in
+                    var check = setInterval(function(){
+                        if (STATE && STATE.currentUser) {
+                            clearInterval(check);
+                            try { _svAttachIncomingListener(); } catch(e){ console.warn('SV listener:', e); }
+                            try { _svShowLoginConsentIfNeeded(); } catch(_){}
+                            setInterval(_svUpdateBadge, 5000);
+                            _svUpdateBadge();
+                        }
+                    }, 500);
+                }
+
+                document.addEventListener('DOMContentLoaded', function(){ setTimeout(_svInit, 1200); });
+            })();
+
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
