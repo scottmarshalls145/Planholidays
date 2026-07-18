@@ -2316,12 +2316,6 @@
                     <h4>ATOL Certificates</h4>
                     <p>Create, view and download ATOL certificates</p>
                 </div>
-                <div class="dash-card" data-action="screenView" data-perm="canViewAgentScreens">
-                    <i class="fas fa-desktop"></i>
-                    <h4>Screen View</h4>
-                    <p>View an agent's screen (with their consent)</p>
-                    <span class="badge-count" id="screenViewOnlineBadge">0</span>
-                </div>
                 <div class="dash-card" data-action="help">
                     <i class="fas fa-circle-question"></i>
                     <h4>Help</h4>
@@ -3019,9 +3013,7 @@
                     canEditAgentMargins: true,
                     canDeleteAgentMargins: true,
                     canManageAgents: true,
-                    canManageMonths: true,
-                    canViewAgentScreens: true,
-                    autoApproveScreenView: false
+                    canManageMonths: true
                 }
             };
 
@@ -5668,13 +5660,6 @@
                     case 'help':
                         showHelp();
                         break;
-                    case 'screenView':
-                        if (!isAdmin() && !hasPermission('canViewAgentScreens')) {
-                            showToast('You do not have permission to view agent screens.', 'error');
-                            return;
-                        }
-                        showScreenViewCenter();
-                        break;
                     default:
                         showToast('Feature coming soon.', 'info');
                 }
@@ -8015,7 +8000,7 @@
 
             function showAddUser() {
                 showModal(
-                    '<h3>Add User</h3><div class="form-row"><div class="form-group"><label>Username *</label><input type="text" id="newUsername" /></div><div class="form-group"><label>Password *</label><input type="password" id="newPassword" /></div><div class="form-group"><label>Full Name</label><input type="text" id="newName" /></div><div class="form-group"><label>Email</label><input type="email" id="newEmail" /></div><div class="form-group"><label>Role</label><select id="newRole"><option value="agent">Agent</option><option value="manager">Manager</option><option value="accounts">Accounts</option><option value="readonly">Read Only</option></select></div></div><div class="form-group"><label>Permissions</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;"><label><input type="checkbox" class="perm-check" value="canCreateQuotes" checked /> Create Quotes</label><label><input type="checkbox" class="perm-check" value="canEditQuotes" checked /> Edit Quotes</label><label><input type="checkbox" class="perm-check" value="canViewInvoices" checked /> View Invoices</label><label><input type="checkbox" class="perm-check" value="canManageAccounts" /> Manage Accounts</label><label><input type="checkbox" class="perm-check" value="canViewQuoteHistory" checked /> Quote History (Own Quotes)</label><label><input type="checkbox" class="perm-check" value="canDeleteQuotes" /> Delete Quotes</label><label><input type="checkbox" class="perm-check" value="canDeleteInvoices" /> Delete Invoices</label><label><input type="checkbox" class="perm-check" value="canExportData" /> Export Data</label><label><input type="checkbox" class="perm-check" value="canAssignAgents" /> Assign Agents</label><label><input type="checkbox" class="perm-check" value="canEditInvoices" /> Edit Invoices</label><label><input type="checkbox" class="perm-check" value="canViewInquiries" checked /> View Inquiries (Own)</label><label><input type="checkbox" class="perm-check" value="canCreateInquiries" checked /> Create Inquiries</label><label><input type="checkbox" class="perm-check" value="canEditInquiries" /> Edit Inquiries</label><label><input type="checkbox" class="perm-check" value="canDeleteInquiries" /> Delete Inquiries</label><label><input type="checkbox" class="perm-check" value="canMakeInvoice" /> Make Invoice</label><label><input type="checkbox" class="perm-check" value="canEditInvoiceAgent" /> Edit Invoice (Agent)</label><label><input type="checkbox" class="perm-check" value="canAddAccountsFromInvoice" /> Add Accounts from Invoice</label><label><input type="checkbox" class="perm-check" value="canEditAccountsAgent" /> Edit Accounts (Agent)</label><label><input type="checkbox" class="perm-check" value="canCreateAtol" /> Create ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canEditAtol" /> Edit ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canViewAtolHistory" /> Certificate History</label><label><input type="checkbox" class="perm-check" value="canViewCalendar" checked /> View Calendar</label><label><input type="checkbox" class="perm-check" value="canAddCalendarTasks" checked /> Add Daily Task on Calendar</label><label><input type="checkbox" class="perm-check" value="canCreateTasks" checked /> Create Task</label><label><input type="checkbox" class="perm-check" value="canEditTasks" /> Edit Task</label><label><input type="checkbox" class="perm-check" value="canViewTaskHistory" checked /> View Task History</label><label><input type="checkbox" class="perm-check" value="canDeleteTasks" /> Delete Task</label><label><input type="checkbox" class="perm-check" value="canViewAgentMargins" /> View Agent Margins</label><label><input type="checkbox" class="perm-check" value="canAddAgentMargins" /> Add Agent Margins</label><label><input type="checkbox" class="perm-check" value="canEditAgentMargins" /> Edit Agent Margins</label><label><input type="checkbox" class="perm-check" value="canDeleteAgentMargins" /> Delete Agent Margins</label><label><input type="checkbox" class="perm-check" value="canManageAgents" /> Manage Agents</label><label><input type="checkbox" class="perm-check" value="canManageMonths" /> Manage Months</label><label style="border-left:3px solid #b8860b;padding-left:8px;"><input type="checkbox" class="perm-check" value="canViewAgentScreens" /> View Agent Screens (with consent)</label><label style="border-left:3px solid #b8860b;padding-left:8px;"><input type="checkbox" class="perm-check" value="autoApproveScreenView" /> Auto-approve screen-view for admin (login consent)</label></div><div class="input-hint" style="margin-top:6px;">Screen View requires the target agent to approve each session — unless "Auto-approve" is checked, in which case the agent has consented at login and admin requests are auto-accepted (agent still sees a banner while being viewed).</div></div><div class="modal-actions"><button class="btn btn-primary" id="btnCreateUser">Create</button><button class="btn btn-close-modal" data-close-modal>Cancel</button></div>'
+                    '<h3>Add User</h3><div class="form-row"><div class="form-group"><label>Username *</label><input type="text" id="newUsername" /></div><div class="form-group"><label>Password *</label><input type="password" id="newPassword" /></div><div class="form-group"><label>Full Name</label><input type="text" id="newName" /></div><div class="form-group"><label>Email</label><input type="email" id="newEmail" /></div><div class="form-group"><label>Role</label><select id="newRole"><option value="agent">Agent</option><option value="manager">Manager</option><option value="accounts">Accounts</option><option value="readonly">Read Only</option></select></div></div><div class="form-group"><label>Permissions</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;"><label><input type="checkbox" class="perm-check" value="canCreateQuotes" checked /> Create Quotes</label><label><input type="checkbox" class="perm-check" value="canEditQuotes" checked /> Edit Quotes</label><label><input type="checkbox" class="perm-check" value="canViewInvoices" checked /> View Invoices</label><label><input type="checkbox" class="perm-check" value="canManageAccounts" /> Manage Accounts</label><label><input type="checkbox" class="perm-check" value="canViewQuoteHistory" checked /> Quote History (Own Quotes)</label><label><input type="checkbox" class="perm-check" value="canDeleteQuotes" /> Delete Quotes</label><label><input type="checkbox" class="perm-check" value="canDeleteInvoices" /> Delete Invoices</label><label><input type="checkbox" class="perm-check" value="canExportData" /> Export Data</label><label><input type="checkbox" class="perm-check" value="canAssignAgents" /> Assign Agents</label><label><input type="checkbox" class="perm-check" value="canEditInvoices" /> Edit Invoices</label><label><input type="checkbox" class="perm-check" value="canViewInquiries" checked /> View Inquiries (Own)</label><label><input type="checkbox" class="perm-check" value="canCreateInquiries" checked /> Create Inquiries</label><label><input type="checkbox" class="perm-check" value="canEditInquiries" /> Edit Inquiries</label><label><input type="checkbox" class="perm-check" value="canDeleteInquiries" /> Delete Inquiries</label><label><input type="checkbox" class="perm-check" value="canMakeInvoice" /> Make Invoice</label><label><input type="checkbox" class="perm-check" value="canEditInvoiceAgent" /> Edit Invoice (Agent)</label><label><input type="checkbox" class="perm-check" value="canAddAccountsFromInvoice" /> Add Accounts from Invoice</label><label><input type="checkbox" class="perm-check" value="canEditAccountsAgent" /> Edit Accounts (Agent)</label><label><input type="checkbox" class="perm-check" value="canCreateAtol" /> Create ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canEditAtol" /> Edit ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canViewAtolHistory" /> Certificate History</label><label><input type="checkbox" class="perm-check" value="canViewCalendar" checked /> View Calendar</label><label><input type="checkbox" class="perm-check" value="canAddCalendarTasks" checked /> Add Daily Task on Calendar</label><label><input type="checkbox" class="perm-check" value="canCreateTasks" checked /> Create Task</label><label><input type="checkbox" class="perm-check" value="canEditTasks" /> Edit Task</label><label><input type="checkbox" class="perm-check" value="canViewTaskHistory" checked /> View Task History</label><label><input type="checkbox" class="perm-check" value="canDeleteTasks" /> Delete Task</label><label><input type="checkbox" class="perm-check" value="canViewAgentMargins" /> View Agent Margins</label><label><input type="checkbox" class="perm-check" value="canAddAgentMargins" /> Add Agent Margins</label><label><input type="checkbox" class="perm-check" value="canEditAgentMargins" /> Edit Agent Margins</label><label><input type="checkbox" class="perm-check" value="canDeleteAgentMargins" /> Delete Agent Margins</label><label><input type="checkbox" class="perm-check" value="canManageAgents" /> Manage Agents</label><label><input type="checkbox" class="perm-check" value="canManageMonths" /> Manage Months</label></div></div><div class="modal-actions"><button class="btn btn-primary" id="btnCreateUser">Create</button><button class="btn btn-close-modal" data-close-modal>Cancel</button></div>'
                     );
                 document.getElementById('btnCreateUser').addEventListener('click', async function() {
                     var username = document.getElementById('newUsername').value.trim();
@@ -8172,13 +8157,7 @@
                         '<label><input type="checkbox" class="edit-perm" value="canManageMonths" ' +
                         ((perms.canManageMonths || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
                         ' /> Manage Months</label>' +
-                        '<label style="border-left:3px solid #b8860b;padding-left:8px;"><input type="checkbox" class="edit-perm" value="canViewAgentScreens" ' +
-                        ((perms.canViewAgentScreens || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> View Agent Screens (with consent)</label>' +
-                        '<label style="border-left:3px solid #b8860b;padding-left:8px;"><input type="checkbox" class="edit-perm" value="autoApproveScreenView" ' +
-                        (perms.autoApproveScreenView ? 'checked' : '') +
-                        ' /> Auto-approve screen-view for admin (login consent)</label>' +
-                        '</div><div class="input-hint" style="margin-top:6px;">Screen View: viewer must have the permission above, and the target agent must approve each request. If "Auto-approve" is on, the agent has pre-consented at login — admin requests auto-accept and the agent still sees a live banner while being viewed.</div>' + (isAdminUser ?
+                        '</div>' + (isAdminUser ?
                             '<div class="input-hint">Admin has all permissions by default.</div>' :
                             '') +
                         '</div><div class="modal-actions"><button class="btn btn-primary" id="btnSaveUser">Save</button><button class="btn btn-outline" onclick="window._resetUserPwdFromEdit(\'' +
@@ -14242,516 +14221,927 @@
                 document.addEventListener('DOMContentLoaded', function(){ setTimeout(installWhatsappEmojiPicker, 700); });
             })();
 
-            // =====================================================================
-            // SCREEN VIEW MODULE
-            // Consent-based screen sharing between admin and agents.
-            // - Requires target's approval each session, UNLESS the target has
-            //   autoApproveScreenView permission enabled (they consented at login)
-            //   AND the requester is admin.
-            // - Uses navigator.mediaDevices.getDisplayMedia() on the target side.
-            //   The browser's own OS-level share dialog will still appear — that
-            //   cannot be bypassed by any web app, by design of the platform.
-            // - Firebase signaling paths:
-            //     screenSessions/{sid}  = { from, to, status, createdAt, sdp fields }
-            //     screenSignals/{sid}   = { offer, answer, candidates/from, candidates/to }
-            //     screenAudit           = pushed on every session for accountability
-            // =====================================================================
+            // MuleRun requested addition: chat sidebar agent toggle, online agent names, and movable/resizable chat window only.
             (function(){
-                var _svState = {
-                    active: null,          // active outbound session id (viewer side)
-                    incoming: null,        // incoming session id (target side)
-                    pc: null,
-                    stream: null,
-                    remoteStream: null,
-                    listener: null,
-                    signalListener: null,
-                    loginConsentShown: false
-                };
-
-                function _svMe(){
-                    var u = (STATE && STATE.currentUser) || null;
-                    return u ? u.username : null;
+                var STYLE_ID = 'mr-chat-window-agent-tools-style';
+                var refreshTimer = null;
+                var dragState = null;
+                var sizeStep = 0;
+                function addToolStyles(){
+                    if (document.getElementById(STYLE_ID)) return;
+                    var st = document.createElement('style');
+                    st.id = STYLE_ID;
+                    st.textContent = '' +
+                        '.modal-box:not(.chat-modal) .mr-chat-window-toolbar{display:none!important}' +
+                        '#modalBox.chat-modal.mr-chat-window{position:fixed!important;left:2vw;top:4vh;right:auto!important;bottom:auto!important;margin:0!important;transform:none!important;resize:both!important;min-width:360px!important;min-height:330px!important;overflow:hidden!important;max-width:98vw!important;max-height:96vh!important}' +
+                        '#modalBox.chat-modal.mr-chat-window.mr-chat-maximized{left:1vw!important;top:1vh!important;width:98vw!important;height:96vh!important;max-width:98vw!important;max-height:96vh!important}' +
+                        '#modalBox.chat-modal.mr-chat-window.mr-chat-minimized{left:auto!important;top:auto!important;right:18px!important;bottom:18px!important;width:min(420px,calc(100vw - 36px))!important;height:62px!important;min-height:62px!important;resize:none!important;padding:12px 16px!important}' +
+                        '#modalBox.chat-modal.mr-chat-window.mr-chat-minimized #modalContent>p,#modalBox.chat-modal.mr-chat-window.mr-chat-minimized #modalContent>.chat-shell,#modalBox.chat-modal.mr-chat-window.mr-chat-minimized #modalContent>.modal-actions{display:none!important}' +
+                        '#modalBox.chat-modal.mr-chat-window.mr-chat-minimized #modalContent>h3{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;margin:5px 0 0!important}' +
+                        '.mr-chat-window-toolbar{position:absolute;top:10px;right:14px;z-index:80;display:flex;gap:5px;align-items:center;background:rgba(0,0,0,.10);border:1px solid var(--card-border);border-radius:999px;padding:4px;backdrop-filter:blur(12px)}' +
+                        '.mr-chat-window-btn{width:30px;height:30px;border:0;border-radius:999px;background:var(--input-bg);color:var(--text);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:.78rem;font-weight:800;line-height:1}' +
+                        '.mr-chat-window-btn:hover{background:var(--primary);color:#fff}.mr-chat-drag-handle{cursor:move}.modal-box.chat-modal #modalContent>h3{padding-right:205px}.modal-box.chat-modal .messenger-head{cursor:move}' +
+                        '.mr-chat-sidebar-tools{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:10px}.mr-chat-sidebar-btn{border:1px solid var(--card-border);background:var(--input-bg);color:var(--text);border-radius:999px;padding:7px 10px;font-size:.76rem;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:6px}.mr-chat-sidebar-btn:hover{border-color:var(--primary);color:var(--primary)}' +
+                        '.mr-chat-online-agents{margin-top:10px;padding:10px;border:1px solid var(--card-border);border-radius:14px;background:rgba(39,174,96,.08)}.mr-chat-online-title{font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:7px}.mr-chat-online-list{display:flex;flex-direction:column;gap:6px;max-height:130px;overflow:auto}.mr-chat-online-person{display:flex;align-items:center;gap:7px;font-size:.82rem;font-weight:700;min-width:0}.mr-chat-online-person span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mr-chat-online-dot{width:9px;height:9px;border-radius:50%;background:#27ae60;box-shadow:0 0 0 3px rgba(39,174,96,.14);flex:0 0 auto}.mr-chat-online-empty{font-size:.78rem;color:var(--text2)}' +
+                        '.chat-shell.mr-agents-hidden .chat-contact[data-key^="user_"],.chat-shell.mr-agents-hidden .mr-chat-online-agents{display:none!important}.chat-contact.mr-agent-online{box-shadow:inset 3px 0 0 #27ae60}.chat-contact.mr-agent-online .chat-contact-name:after{content:"  Online";color:#27ae60;font-size:.68rem;font-weight:900;margin-left:5px}' +
+                        '.theme-custom .mr-chat-window-toolbar,.theme-custom .mr-chat-online-agents{background:rgba(0,0,0,.20)!important;color:var(--custom-readable)!important;border-color:var(--custom-border)!important}.theme-custom .mr-chat-online-title,.theme-custom .mr-chat-online-empty{color:var(--custom-readable-soft)!important}' +
+                        '@media(max-width:780px){#modalBox.chat-modal.mr-chat-window{left:1vw!important;top:1vh!important;width:98vw!important;height:96vh!important;resize:none!important}.modal-box.chat-modal #modalContent>h3{padding-right:150px}.mr-chat-window-toolbar{right:8px;top:8px}.mr-chat-window-btn{width:28px;height:28px}}';
+                    document.head.appendChild(st);
                 }
-                function _svIsAdmin(){
-                    try { return typeof isAdmin === 'function' ? isAdmin() : false; } catch(_){ return false; }
+                function safeName(u, fallback){ return (u && (u.name || u.displayName || u.username)) || fallback || ''; }
+                function initials(name){ return String(name || '?').split(/\s+/).map(function(x){ return x.charAt(0); }).join('').slice(0,2).toUpperCase() || '?'; }
+                function isUserOnline(username, presence){
+                    var p = presence && presence[username];
+                    if (!p || p.offline) return false;
+                    var last = Number(p.lastSeen || 0);
+                    return last && (Date.now() - last) < 70000;
                 }
-                function _svCanView(){
-                    if (_svIsAdmin()) return true;
-                    var u = STATE && STATE.currentUser;
-                    return !!(u && u.permissions && u.permissions.canViewAgentScreens);
-                }
-                function _svHasAutoApprove(user){
-                    return !!(user && user.permissions && user.permissions.autoApproveScreenView);
-                }
-
-                function _svSid(){
-                    return 'sv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-                }
-
-                function _svPcConfig(){
-                    return { iceServers:[{urls:'stun:stun.l.google.com:19302'}] };
-                }
-
-                // =============== VIEWER (requester) SIDE ===============
-
-                async function _svStartRequest(targetUsername){
-                    var me = _svMe();
-                    if (!me) return;
-                    if (!_svCanView()) { showToast('Permission denied.', 'error'); return; }
-                    if (me === targetUsername) { showToast("You can't view your own screen here.", 'info'); return; }
-
-                    // Load target user to check auto-approve
-                    var users = await readData('users', 'ph_users', true) || {};
-                    var target = users[targetUsername];
-                    if (!target) { showToast('Agent not found.', 'error'); return; }
-
-                    var sid = _svSid();
-                    _svState.active = sid;
-
-                    var autoApprove = _svIsAdmin() && _svHasAutoApprove(target);
-                    var initialStatus = autoApprove ? 'auto-approved' : 'pending';
-
-                    var session = {
-                        id: sid,
-                        from: me,
-                        fromRole: _svIsAdmin() ? 'admin' : 'agent',
-                        to: targetUsername,
-                        status: initialStatus,
-                        autoApproved: autoApprove,
-                        createdAt: new Date().toISOString()
-                    };
-                    await writeData('screenSessions/'+sid, session, null);
-
-                    // Audit log
+                async function getPresence(){
+                    var presence = null;
+                    try { if (typeof readData === 'function') presence = await readData('presence', null, true); } catch (_) {}
+                    presence = presence || {};
                     try {
-                        await pushData('screenAudit', {
-                            sid: sid, from: me, to: targetUsername,
-                            action: autoApprove ? 'auto_approve_request' : 'request',
-                            at: new Date().toISOString(),
-                            fromRole: session.fromRole
-                        }, 'ph_screen_audit');
-                    } catch(_){}
-
-                    _svShowViewerPanel(sid, targetUsername, autoApprove ? 'Waiting for screen…' : 'Waiting for approval from '+targetUsername+'…');
-                    _svListenSession(sid);
+                        for (var i = 0; i < localStorage.length; i++) {
+                            var key = localStorage.key(i);
+                            if (key && key.indexOf('ph_presence_') === 0) {
+                                var val = JSON.parse(localStorage.getItem(key) || 'null');
+                                if (val && val.username && !presence[val.username]) presence[val.username] = val;
+                            }
+                        }
+                    } catch (_) {}
+                    return presence;
                 }
+                async function getUsers(){
+                    var users = null;
+                    try { if (typeof readData === 'function') users = await readData('users', 'ph_users', true); } catch (_) {}
+                    users = users || (typeof STATE !== 'undefined' && STATE.users) || {};
+                    try { if (typeof STATE !== 'undefined') STATE.users = users; } catch (_) {}
+                    return users;
+                }
+                function applyAgentVisibility(){
+                    var shell = document.querySelector('.chat-shell');
+                    var btn = document.getElementById('mrToggleAgentsBtn');
+                    var hidden = false;
+                    try { hidden = localStorage.getItem('ph_chat_agents_hidden') === '1'; } catch (_) {}
+                    if (shell) shell.classList.toggle('mr-agents-hidden', hidden);
+                    if (btn) btn.innerHTML = hidden ? '<i class="fas fa-eye"></i> Show Agents' : '<i class="fas fa-eye-slash"></i> Hide Agents';
+                }
+                function ensureSidebarTools(){
+                    var head = document.querySelector('.chat-sidebar-head');
+                    if (!head || document.getElementById('mrChatSidebarTools')) return;
+                    var wrap = document.createElement('div');
+                    wrap.id = 'mrChatSidebarTools';
+                    wrap.className = 'mr-chat-sidebar-tools';
+                    wrap.innerHTML = '<button type="button" id="mrToggleAgentsBtn" class="mr-chat-sidebar-btn"><i class="fas fa-eye-slash"></i> Hide Agents</button>';
+                    head.appendChild(wrap);
+                    var online = document.createElement('div');
+                    online.id = 'mrChatOnlineAgents';
+                    online.className = 'mr-chat-online-agents';
+                    online.innerHTML = '<div class="mr-chat-online-title">Online agents</div><div class="mr-chat-online-list"><div class="mr-chat-online-empty">Checking online agents...</div></div>';
+                    head.appendChild(online);
+                    document.getElementById('mrToggleAgentsBtn').onclick = function(){
+                        var hidden = false;
+                        try { hidden = localStorage.getItem('ph_chat_agents_hidden') === '1'; localStorage.setItem('ph_chat_agents_hidden', hidden ? '0' : '1'); } catch (_) {}
+                        applyAgentVisibility();
+                    };
+                    applyAgentVisibility();
+                }
+                async function refreshOnlineAgents(){
+                    if (!document.querySelector('.chat-shell')) return;
+                    ensureSidebarTools();
+                    var users = await getUsers();
+                    var presence = await getPresence();
+                    var me = (typeof STATE !== 'undefined' && STATE.currentUser && STATE.currentUser.username) || '';
+                    var keys = Object.keys(users || {}).filter(function(k){
+                        var u = users[k] || {};
+                        if (k === me) return false;
+                        if (u.disabled || u.active === false || u.role === 'readonly') return false;
+                        return true;
+                    });
+                    var onlineKeys = keys.filter(function(k){ return isUserOnline(k, presence); }).sort(function(a,b){ return safeName(users[a], a).localeCompare(safeName(users[b], b)); });
+                    var list = document.querySelector('#mrChatOnlineAgents .mr-chat-online-list');
+                    if (list) {
+                        list.innerHTML = onlineKeys.length ? onlineKeys.map(function(k){
+                            var name = safeName(users[k], k);
+                            return '<div class="mr-chat-online-person" title="@' + escapeHTML(k) + '"><span class="mr-chat-online-dot"></span><span>' + escapeHTML(name) + '</span></div>';
+                        }).join('') : '<div class="mr-chat-online-empty">No other agents online.</div>';
+                    }
+                    var btn = document.getElementById('mrToggleAgentsBtn');
+                    if (btn && !btn.querySelector('.mr-online-count')) {
+                        btn.insertAdjacentHTML('beforeend', ' <span class="mr-online-count"></span>');
+                    }
+                    var count = document.querySelector('#mrToggleAgentsBtn .mr-online-count');
+                    if (count) count.textContent = '(' + onlineKeys.length + ' online)';
+                    document.querySelectorAll('.chat-contact[data-key^="user_"]').forEach(function(row){
+                        var uname = (row.getAttribute('data-key') || '').replace(/^user_/, '');
+                        row.classList.toggle('mr-agent-online', onlineKeys.indexOf(uname) !== -1);
+                    });
+                    applyAgentVisibility();
+                }
+                function cleanupNonChatModal(){
+                    var box = document.getElementById('modalBox');
+                    if (!box || box.classList.contains('chat-modal')) return;
+                    box.classList.remove('mr-chat-window', 'mr-chat-maximized', 'mr-chat-minimized');
+                    ['left','top','right','bottom','width','height','position','resize','margin','transform'].forEach(function(p){ box.style[p] = ''; });
+                    var toolbar = document.getElementById('mrChatWindowToolbar');
+                    if (toolbar) toolbar.remove();
+                }
+                function setChatWindowSize(kind){
+                    var box = document.getElementById('modalBox');
+                    if (!box) return;
+                    box.classList.remove('mr-chat-minimized', 'mr-chat-maximized');
+                    var sizes = { small: [760, 560], medium: [980, 680], large: [1240, Math.round(window.innerHeight * .90)] };
+                    var s = sizes[kind] || sizes.medium;
+                    var w = Math.min(s[0], Math.round(window.innerWidth * .96));
+                    var h = Math.min(s[1], Math.round(window.innerHeight * .92));
+                    box.style.width = w + 'px';
+                    box.style.height = h + 'px';
+                    box.style.left = Math.max(8, Math.round((window.innerWidth - w) / 2)) + 'px';
+                    box.style.top = Math.max(8, Math.round((window.innerHeight - h) / 2)) + 'px';
+                    box.style.right = 'auto';
+                    box.style.bottom = 'auto';
+                }
+                function toggleMaximize(){
+                    var box = document.getElementById('modalBox');
+                    if (!box) return;
+                    box.classList.remove('mr-chat-minimized');
+                    box.classList.toggle('mr-chat-maximized');
+                    if (box.classList.contains('mr-chat-maximized')) {
+                        box.style.left = ''; box.style.top = ''; box.style.width = ''; box.style.height = '';
+                    }
+                }
+                function toggleMinimize(){
+                    var box = document.getElementById('modalBox');
+                    if (!box) return;
+                    box.classList.remove('mr-chat-maximized');
+                    box.classList.toggle('mr-chat-minimized');
+                    var btn = document.getElementById('mrChatMinBtn');
+                    if (btn) btn.innerHTML = box.classList.contains('mr-chat-minimized') ? '<i class="fas fa-window-restore"></i>' : '<i class="fas fa-window-minimize"></i>';
+                }
+                function startDrag(ev){
+                    var box = document.getElementById('modalBox');
+                    if (!box || box.classList.contains('mr-chat-maximized')) return;
+                    var target = ev.target;
+                    if (target && target.closest && (target.closest('button') || target.closest('input') || target.closest('.chat-contact') || target.closest('.bubble') || target.closest('.messenger-input'))) return;
+                    ev.preventDefault();
+                    var rect = box.getBoundingClientRect();
+                    box.classList.remove('mr-chat-minimized');
+                    dragState = { x: ev.clientX, y: ev.clientY, left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+                    document.addEventListener('mousemove', onDragMove);
+                    document.addEventListener('mouseup', endDrag);
+                }
+                function onDragMove(ev){
+                    if (!dragState) return;
+                    var box = document.getElementById('modalBox');
+                    if (!box) return;
+                    var left = Math.max(0, Math.min(window.innerWidth - 80, dragState.left + ev.clientX - dragState.x));
+                    var top = Math.max(0, Math.min(window.innerHeight - 50, dragState.top + ev.clientY - dragState.y));
+                    box.style.left = left + 'px';
+                    box.style.top = top + 'px';
+                    box.style.width = dragState.width + 'px';
+                    box.style.height = dragState.height + 'px';
+                    box.style.right = 'auto';
+                    box.style.bottom = 'auto';
+                }
+                function endDrag(){
+                    dragState = null;
+                    document.removeEventListener('mousemove', onDragMove);
+                    document.removeEventListener('mouseup', endDrag);
+                }
+                function installChatWindowTools(){
+                    addToolStyles();
+                    var box = document.getElementById('modalBox');
+                    if (!box || !box.classList.contains('chat-modal')) return;
+                    box.classList.add('mr-chat-window');
+                    if (!box.style.left && !box.classList.contains('mr-chat-maximized')) setChatWindowSize('large');
+                    if (!document.getElementById('mrChatWindowToolbar')) {
+                        var toolbar = document.createElement('div');
+                        toolbar.id = 'mrChatWindowToolbar';
+                        toolbar.className = 'mr-chat-window-toolbar';
+                        toolbar.innerHTML = '<button type="button" class="mr-chat-window-btn mr-chat-drag-handle" title="Move chat"><i class="fas fa-arrows-up-down-left-right"></i></button><button type="button" class="mr-chat-window-btn" id="mrChatSmallBtn" title="Small size">S</button><button type="button" class="mr-chat-window-btn" id="mrChatMediumBtn" title="Medium size">M</button><button type="button" class="mr-chat-window-btn" id="mrChatLargeBtn" title="Large size">L</button><button type="button" class="mr-chat-window-btn" id="mrChatMaxBtn" title="Maximize"><i class="fas fa-expand"></i></button><button type="button" class="mr-chat-window-btn" id="mrChatMinBtn" title="Minimize"><i class="fas fa-window-minimize"></i></button>';
+                        box.appendChild(toolbar);
+                        document.getElementById('mrChatSmallBtn').onclick = function(){ setChatWindowSize('small'); };
+                        document.getElementById('mrChatMediumBtn').onclick = function(){ setChatWindowSize('medium'); };
+                        document.getElementById('mrChatLargeBtn').onclick = function(){ setChatWindowSize('large'); };
+                        document.getElementById('mrChatMaxBtn').onclick = toggleMaximize;
+                        document.getElementById('mrChatMinBtn').onclick = toggleMinimize;
+                        toolbar.querySelector('.mr-chat-drag-handle').addEventListener('mousedown', startDrag);
+                    }
+                    var h3 = box.querySelector('#modalContent>h3');
+                    var head = box.querySelector('.messenger-head');
+                    if (h3 && !h3.__mrChatDragBound) { h3.__mrChatDragBound = true; h3.addEventListener('mousedown', startDrag); }
+                    if (head && !head.__mrChatDragBound) { head.__mrChatDragBound = true; head.addEventListener('mousedown', startDrag); }
+                    ensureSidebarTools();
+                    refreshOnlineAgents();
+                    if (!refreshTimer) {
+                        refreshTimer = setInterval(function(){
+                            var open = document.querySelector('#modalBox.chat-modal .chat-shell') && !document.getElementById('modalContainer').classList.contains('hidden');
+                            if (open) refreshOnlineAgents();
+                        }, 8000);
+                    }
+                }
+                if (typeof showModal === 'function' && !showModal.__mrChatWindowToolsPatched) {
+                    var prevShowModalForTools = showModal;
+                    showModal = function(){
+                        var result = prevShowModalForTools.apply(this, arguments);
+                        setTimeout(function(){ cleanupNonChatModal(); installChatWindowTools(); }, 40);
+                        return result;
+                    };
+                    showModal.__mrChatWindowToolsPatched = true;
+                }
+                if (typeof showChatUI === 'function' && !showChatUI.__mrChatWindowToolsPatched) {
+                    var prevShowChatForTools = showChatUI;
+                    showChatUI = function(){
+                        var result = prevShowChatForTools.apply(this, arguments);
+                        setTimeout(installChatWindowTools, 120);
+                        return result;
+                    };
+                    showChatUI.__mrChatWindowToolsPatched = true;
+                }
+                if (typeof loadChatContacts === 'function' && !loadChatContacts.__mrChatSidebarToolsPatched) {
+                    var prevLoadContactsForTools = loadChatContacts;
+                    loadChatContacts = async function(){
+                        var result = await prevLoadContactsForTools.apply(this, arguments);
+                        setTimeout(refreshOnlineAgents, 120);
+                        return result;
+                    };
+                    loadChatContacts.__mrChatSidebarToolsPatched = true;
+                }
+                document.addEventListener('DOMContentLoaded', function(){ addToolStyles(); setTimeout(installChatWindowTools, 900); });
+            })();
 
-                function _svListenSession(sid){
-                    if (!db) { return; }
-                    if (_svState.listener) { try { _svState.listener.off(); } catch(_){} }
-                    var ref = db.ref('screenSessions/'+sid);
-                    _svState.listener = ref;
-                    ref.on('value', async function(snap){
-                        var s = snap.val();
-                        if (!s) return;
-                        var me = _svMe();
-                        if (s.from !== me) return;
-                        if (s.status === 'denied') {
-                            _svSetViewerStatus('Request denied by '+s.to+'.');
-                            showToast(s.to+' denied the screen view request.', 'warning');
-                            _svEndSession(sid, false);
-                        } else if (s.status === 'ended') {
-                            _svSetViewerStatus('Session ended.');
-                            _svEndSession(sid, false);
-                        } else if (s.status === 'sharing' || s.status === 'accepted') {
-                            _svSetViewerStatus('Connected — receiving screen…');
-                            _svViewerAttachPeer(sid);
+            // MuleRun targeted fix: make chat size change by mouse drag work reliably.
+            (function(){
+                var STYLE_ID = 'mr-chat-drag-resize-fix-style';
+                var resizing = null;
+                function addResizeFixStyle(){
+                    if (document.getElementById(STYLE_ID)) return;
+                    var st = document.createElement('style');
+                    st.id = STYLE_ID;
+                    st.textContent = '' +
+                        '#modalBox.chat-modal.mr-chat-window{width:var(--mr-chat-width,96vw)!important;height:var(--mr-chat-height,92vh)!important}' +
+                        '#modalBox.chat-modal.mr-chat-window.mr-chat-resizing{user-select:none!important;transition:none!important}' +
+                        '.mr-chat-resize-grip{position:absolute;right:6px;bottom:6px;width:22px;height:22px;z-index:95;cursor:nwse-resize;border-radius:6px;background:linear-gradient(135deg,transparent 48%,rgba(184,134,11,.36) 49%,rgba(184,134,11,.36) 62%,transparent 63%),linear-gradient(135deg,transparent 62%,rgba(184,134,11,.72) 63%,rgba(184,134,11,.72) 76%,transparent 77%);opacity:.9}' +
+                        '.mr-chat-resize-grip:hover{opacity:1;background-color:rgba(184,134,11,.10)}' +
+                        '#modalBox.chat-modal.mr-chat-minimized .mr-chat-resize-grip,#modalBox.chat-modal.mr-chat-maximized .mr-chat-resize-grip{display:none!important}';
+                    document.head.appendChild(st);
+                }
+                function setImportantSize(box, w, h){
+                    var minW = Math.min(360, window.innerWidth - 16);
+                    var minH = 330;
+                    w = Math.max(minW, Math.min(w, window.innerWidth - 16));
+                    h = Math.max(minH, Math.min(h, window.innerHeight - 16));
+                    box.style.setProperty('--mr-chat-width', w + 'px');
+                    box.style.setProperty('--mr-chat-height', h + 'px');
+                    box.style.setProperty('width', w + 'px', 'important');
+                    box.style.setProperty('height', h + 'px', 'important');
+                    box.style.setProperty('max-width', 'calc(100vw - 16px)', 'important');
+                    box.style.setProperty('max-height', 'calc(100vh - 16px)', 'important');
+                }
+                function startResize(ev){
+                    var box = document.getElementById('modalBox');
+                    if (!box || box.classList.contains('mr-chat-minimized') || box.classList.contains('mr-chat-maximized')) return;
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    var rect = box.getBoundingClientRect();
+                    resizing = { x: ev.clientX, y: ev.clientY, w: rect.width, h: rect.height, left: rect.left, top: rect.top };
+                    box.classList.add('mr-chat-resizing');
+                    document.addEventListener('mousemove', onResizeMove);
+                    document.addEventListener('mouseup', stopResize);
+                }
+                function onResizeMove(ev){
+                    if (!resizing) return;
+                    var box = document.getElementById('modalBox');
+                    if (!box) return;
+                    var maxW = window.innerWidth - resizing.left - 8;
+                    var maxH = window.innerHeight - resizing.top - 8;
+                    var w = Math.min(maxW, resizing.w + ev.clientX - resizing.x);
+                    var h = Math.min(maxH, resizing.h + ev.clientY - resizing.y);
+                    setImportantSize(box, w, h);
+                }
+                function stopResize(){
+                    var box = document.getElementById('modalBox');
+                    if (box) box.classList.remove('mr-chat-resizing');
+                    resizing = null;
+                    document.removeEventListener('mousemove', onResizeMove);
+                    document.removeEventListener('mouseup', stopResize);
+                }
+                function installResizeFix(){
+                    addResizeFixStyle();
+                    var box = document.getElementById('modalBox');
+                    if (!box || !box.classList.contains('chat-modal')) return;
+                    box.classList.add('mr-chat-window');
+                    if (!document.getElementById('mrChatResizeGrip')) {
+                        var grip = document.createElement('div');
+                        grip.id = 'mrChatResizeGrip';
+                        grip.className = 'mr-chat-resize-grip';
+                        grip.title = 'Drag to resize chat';
+                        grip.addEventListener('mousedown', startResize);
+                        box.appendChild(grip);
+                    }
+                    var rect = box.getBoundingClientRect();
+                    if (rect.width && rect.height && !box.style.getPropertyValue('--mr-chat-width')) setImportantSize(box, rect.width, rect.height);
+                    ['mrChatSmallBtn','mrChatMediumBtn','mrChatLargeBtn'].forEach(function(id){
+                        var btn = document.getElementById(id);
+                        if (btn && !btn.__mrResizeFixBound) {
+                            btn.__mrResizeFixBound = true;
+                            btn.addEventListener('click', function(){
+                                setTimeout(function(){
+                                    var b = document.getElementById('modalBox');
+                                    if (b && b.classList.contains('chat-modal')) {
+                                        var r = b.getBoundingClientRect();
+                                        setImportantSize(b, r.width, r.height);
+                                    }
+                                }, 20);
+                            });
                         }
                     });
                 }
-
-                async function _svViewerAttachPeer(sid){
-                    if (_svState.pc) return; // already attached
-                    var pc = new RTCPeerConnection(_svPcConfig());
-                    _svState.pc = pc;
-
-                    pc.ontrack = function(ev){
-                        var stream = ev.streams && ev.streams[0];
-                        if (!stream) return;
-                        _svState.remoteStream = stream;
-                        var v = document.getElementById('svRemoteVideo');
-                        if (v) {
-                            v.srcObject = stream;
-                            v.play().catch(function(){});
-                        }
+                if (typeof showChatUI === 'function' && !showChatUI.__mrResizeFixPatched) {
+                    var prevShowChatResizeFix = showChatUI;
+                    showChatUI = function(){
+                        var result = prevShowChatResizeFix.apply(this, arguments);
+                        setTimeout(installResizeFix, 160);
+                        return result;
                     };
-                    pc.onicecandidate = function(ev){
-                        if (ev.candidate && db) {
-                            db.ref('screenSignals/'+sid+'/candidates/viewer').push(ev.candidate.toJSON());
-                        }
+                    showChatUI.__mrResizeFixPatched = true;
+                }
+                if (typeof showModal === 'function' && !showModal.__mrResizeFixPatched) {
+                    var prevShowModalResizeFix = showModal;
+                    showModal = function(){
+                        var result = prevShowModalResizeFix.apply(this, arguments);
+                        setTimeout(installResizeFix, 80);
+                        return result;
                     };
-
-                    // Listen for offer from target
-                    if (db) {
-                        if (_svState.signalListener) { try { _svState.signalListener.off(); } catch(_){} }
-                        var sref = db.ref('screenSignals/'+sid);
-                        _svState.signalListener = sref;
-                        sref.on('value', async function(snap){
-                            var sig = snap.val() || {};
-                            if (sig.offer && !pc.currentRemoteDescription) {
-                                try {
-                                    await pc.setRemoteDescription(new RTCSessionDescription(sig.offer));
-                                    var ans = await pc.createAnswer();
-                                    await pc.setLocalDescription(ans);
-                                    await db.ref('screenSignals/'+sid+'/answer').set({ type: ans.type, sdp: ans.sdp });
-                                } catch(e){ console.warn('SV viewer offer:', e); }
-                            }
-                            if (sig.candidates && sig.candidates.target) {
-                                Object.keys(sig.candidates.target).forEach(function(k){
-                                    var c = sig.candidates.target[k];
-                                    try { pc.addIceCandidate(new RTCIceCandidate(c)); } catch(_){}
-                                });
-                            }
-                        });
-                    }
+                    showModal.__mrResizeFixPatched = true;
                 }
+                document.addEventListener('DOMContentLoaded', function(){ setTimeout(installResizeFix, 1000); });
+            })();
 
-                function _svShowViewerPanel(sid, targetName, statusText){
-                    var existing = document.getElementById('svViewerPanel');
-                    if (existing) existing.remove();
-                    var panel = document.createElement('div');
-                    panel.id = 'svViewerPanel';
-                    panel.className = 'voice-panel';
-                    panel.style.cssText = 'position:fixed;right:20px;bottom:20px;width:min(560px,90vw);background:var(--card,#fff);border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.3);padding:14px;z-index:9999;border:2px solid var(--primary,#b8860b);';
-                    panel.innerHTML =
-                        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
-                            '<h4 style="margin:0;"><i class="fas fa-desktop"></i> Viewing: '+targetName+'</h4>' +
-                            '<button class="btn btn-danger" style="padding:4px 10px;" onclick="window._svEndFromViewer(\''+sid+'\')"><i class="fas fa-times"></i> End</button>' +
-                        '</div>' +
-                        '<div id="svViewerStatus" style="font-size:13px;color:#666;margin-bottom:6px;">'+statusText+'</div>' +
-                        '<video id="svRemoteVideo" autoplay playsinline style="width:100%;background:#000;border-radius:8px;max-height:60vh;"></video>';
-                    document.body.appendChild(panel);
+            // MuleRun targeted fix: faster chat resize + minimized chat does not block dashboard work.
+            (function(){
+                var STYLE_ID = 'mr-chat-fast-resize-minimize-style';
+                var raf = 0, pending = null, active = null;
+                function addFastMinimizeStyles(){
+                    if (document.getElementById(STYLE_ID)) return;
+                    var st = document.createElement('style');
+                    st.id = STYLE_ID;
+                    st.textContent = '' +
+                        '#modalContainer.mr-chat-overlay-minimized{pointer-events:none!important;background:transparent!important;backdrop-filter:none!important;animation:none!important}' +
+                        '#modalContainer.mr-chat-overlay-minimized #modalBox{pointer-events:auto!important}' +
+                        '#modalContainer.mr-chat-overlay-minimized #modalBox.chat-modal.mr-chat-minimized{box-shadow:0 18px 60px rgba(0,0,0,.28)!important}' +
+                        '#modalBox.chat-modal.mr-chat-window{will-change:width,height,left,top}' +
+                        '#modalBox.chat-modal.mr-chat-window.mr-fast-resizing{transition:none!important;animation:none!important;user-select:none!important}' +
+                        '#modalBox.chat-modal.mr-chat-window.mr-fast-resizing *{pointer-events:none!important}' +
+                        '#modalBox.chat-modal.mr-chat-window.mr-fast-resizing #mrChatResizeGrip{pointer-events:auto!important}' +
+                        '#mrChatResizeGrip{touch-action:none!important}';
+                    document.head.appendChild(st);
                 }
-
-                function _svSetViewerStatus(text){
-                    var el = document.getElementById('svViewerStatus');
-                    if (el) el.textContent = text;
+                function syncMinimizedOverlay(){
+                    var container = document.getElementById('modalContainer');
+                    var box = document.getElementById('modalBox');
+                    if (!container || !box) return;
+                    var minimized = box.classList.contains('chat-modal') && box.classList.contains('mr-chat-minimized') && !container.classList.contains('hidden');
+                    container.classList.toggle('mr-chat-overlay-minimized', minimized);
                 }
-
-                window._svEndFromViewer = async function(sid){
-                    if (db) { try { await db.ref('screenSessions/'+sid+'/status').set('ended'); } catch(_){} }
-                    _svEndSession(sid, false);
-                };
-
-                // =============== TARGET (shared) SIDE ===============
-
-                function _svHandleIncoming(sid, session){
-                    var me = _svMe();
-                    if (!me || session.to !== me) return;
-                    if (session.status !== 'pending' && session.status !== 'auto-approved') return;
-                    if (_svState.incoming === sid) return; // already showing dialog
-
-                    _svState.incoming = sid;
-
-                    if (session.status === 'auto-approved') {
-                        // Pre-consented at login — auto accept, but still show banner
-                        _svTargetAccept(sid, true);
-                        return;
-                    }
-
-                    _svShowPermissionDialog(sid, session.from, session.fromRole);
+                function applyFastSize(){
+                    raf = 0;
+                    if (!active || !pending) return;
+                    var box = document.getElementById('modalBox');
+                    if (!box) return;
+                    box.style.setProperty('--mr-chat-width', pending.w + 'px');
+                    box.style.setProperty('--mr-chat-height', pending.h + 'px');
+                    box.style.width = pending.w + 'px';
+                    box.style.height = pending.h + 'px';
                 }
-
-                function _svShowPermissionDialog(sid, requester, requesterRole){
-                    var existing = document.getElementById('svPermDialog');
-                    if (existing) existing.remove();
-                    var d = document.createElement('div');
-                    d.id = 'svPermDialog';
-                    d.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;';
-                    d.innerHTML =
-                        '<div style="background:#fff;border-radius:14px;padding:24px;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.4);">' +
-                            '<h3 style="margin:0 0 8px 0;"><i class="fas fa-desktop" style="color:#b8860b;"></i> Screen View Request</h3>' +
-                            '<p style="margin:8px 0;font-size:14px;">' +
-                                '<b>'+requester+'</b> ('+(requesterRole==='admin'?'Administrator':'Agent')+') is requesting to view your screen.' +
-                            '</p>' +
-                            '<p style="margin:8px 0;font-size:13px;color:#666;">If you approve, your browser will ask you to pick which screen or window to share. You can end the session at any time.</p>' +
-                            '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">' +
-                                '<button class="btn btn-outline" onclick="window._svTargetDeny(\''+sid+'\')">Deny</button>' +
-                                '<button class="btn btn-primary" onclick="window._svTargetApprove(\''+sid+'\')"><i class="fas fa-check"></i> Approve & Share</button>' +
-                            '</div>' +
-                        '</div>';
-                    document.body.appendChild(d);
-                    try { showToast(requester+' wants to view your screen.', 'info', 8000); } catch(_){}
-                }
-
-                window._svTargetApprove = function(sid){
-                    var el = document.getElementById('svPermDialog');
-                    if (el) el.remove();
-                    _svTargetAccept(sid, false);
-                };
-
-                window._svTargetDeny = async function(sid){
-                    var el = document.getElementById('svPermDialog');
-                    if (el) el.remove();
-                    _svState.incoming = null;
-                    if (db) { try { await db.ref('screenSessions/'+sid+'/status').set('denied'); } catch(_){} }
-                    try {
-                        await pushData('screenAudit', {
-                            sid: sid, by: _svMe(), action: 'denied', at: new Date().toISOString()
-                        }, 'ph_screen_audit');
-                    } catch(_){}
-                };
-
-                async function _svTargetAccept(sid, wasAuto){
-                    var me = _svMe();
-                    // Request screen from browser (native OS-level prompt)
-                    var stream;
-                    try {
-                        stream = await navigator.mediaDevices.getDisplayMedia({
-                            video: { frameRate: 15 },
-                            audio: false
-                        });
-                    } catch(err){
-                        console.warn('getDisplayMedia denied:', err);
-                        showToast('You cancelled the screen share.', 'warning');
-                        if (db) { try { await db.ref('screenSessions/'+sid+'/status').set('denied'); } catch(_){} }
-                        _svState.incoming = null;
-                        return;
-                    }
-                    _svState.stream = stream;
-
-                    // If user stops sharing via browser UI, tear down
-                    stream.getVideoTracks().forEach(function(t){
-                        t.addEventListener('ended', function(){
-                            _svEndSession(sid, true);
-                        });
-                    });
-
-                    var pc = new RTCPeerConnection(_svPcConfig());
-                    _svState.pc = pc;
-                    stream.getTracks().forEach(function(t){ pc.addTrack(t, stream); });
-
-                    pc.onicecandidate = function(ev){
-                        if (ev.candidate && db) {
-                            db.ref('screenSignals/'+sid+'/candidates/target').push(ev.candidate.toJSON());
-                        }
+                function onMove(ev){
+                    if (!active) return;
+                    var maxW = window.innerWidth - active.left - 8;
+                    var maxH = window.innerHeight - active.top - 8;
+                    pending = {
+                        w: Math.max(active.minW, Math.min(maxW, active.w + ev.clientX - active.x)),
+                        h: Math.max(active.minH, Math.min(maxH, active.h + ev.clientY - active.y))
                     };
-
-                    if (db) {
-                        if (_svState.signalListener) { try { _svState.signalListener.off(); } catch(_){} }
-                        var sref = db.ref('screenSignals/'+sid);
-                        _svState.signalListener = sref;
-                        sref.on('value', async function(snap){
-                            var sig = snap.val() || {};
-                            if (sig.answer && pc.signalingState !== 'stable') {
-                                try {
-                                    await pc.setRemoteDescription(new RTCSessionDescription(sig.answer));
-                                } catch(e){ console.warn('SV target ans:', e); }
-                            }
-                            if (sig.candidates && sig.candidates.viewer) {
-                                Object.keys(sig.candidates.viewer).forEach(function(k){
-                                    var c = sig.candidates.viewer[k];
-                                    try { pc.addIceCandidate(new RTCIceCandidate(c)); } catch(_){}
-                                });
-                            }
-                        });
+                    if (!raf) raf = requestAnimationFrame(applyFastSize);
+                }
+                function stopFastResize(){
+                    var box = document.getElementById('modalBox');
+                    if (box) box.classList.remove('mr-fast-resizing');
+                    active = null;
+                    pending = null;
+                    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+                    document.removeEventListener('mousemove', onMove, true);
+                    document.removeEventListener('mouseup', stopFastResize, true);
+                }
+                function startFastResize(ev){
+                    var box = document.getElementById('modalBox');
+                    if (!box || box.classList.contains('mr-chat-minimized') || box.classList.contains('mr-chat-maximized')) return;
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+                    var r = box.getBoundingClientRect();
+                    active = { x: ev.clientX, y: ev.clientY, w: r.width, h: r.height, left: r.left, top: r.top, minW: Math.min(360, window.innerWidth - 16), minH: 330 };
+                    box.classList.add('mr-fast-resizing');
+                    document.addEventListener('mousemove', onMove, true);
+                    document.addEventListener('mouseup', stopFastResize, true);
+                }
+                function installFastGrip(){
+                    addFastMinimizeStyles();
+                    var box = document.getElementById('modalBox');
+                    if (!box || !box.classList.contains('chat-modal')) { syncMinimizedOverlay(); return; }
+                    var oldGrip = document.getElementById('mrChatResizeGrip');
+                    if (oldGrip && !oldGrip.__mrFastResizeGrip) {
+                        var fresh = oldGrip.cloneNode(true);
+                        fresh.__mrFastResizeGrip = true;
+                        fresh.addEventListener('mousedown', startFastResize, true);
+                        oldGrip.parentNode.replaceChild(fresh, oldGrip);
+                    } else if (oldGrip && !oldGrip.__mrFastResizeBound) {
+                        oldGrip.__mrFastResizeBound = true;
+                        oldGrip.addEventListener('mousedown', startFastResize, true);
                     }
-
-                    try {
-                        var offer = await pc.createOffer();
-                        await pc.setLocalDescription(offer);
-                        if (db) await db.ref('screenSignals/'+sid+'/offer').set({ type: offer.type, sdp: offer.sdp });
-                        await writeData('screenSessions/'+sid+'/status', 'sharing', null);
-                    } catch(e){ console.warn('SV target offer:', e); }
-
-                    _svShowSharingBanner(sid, wasAuto);
-
-                    try {
-                        await pushData('screenAudit', {
-                            sid: sid, by: me, action: wasAuto ? 'auto_approved' : 'approved',
-                            at: new Date().toISOString()
-                        }, 'ph_screen_audit');
-                    } catch(_){}
+                    var minBtn = document.getElementById('mrChatMinBtn');
+                    if (minBtn && !minBtn.__mrMinOverlayBound) {
+                        minBtn.__mrMinOverlayBound = true;
+                        minBtn.addEventListener('click', function(){ setTimeout(syncMinimizedOverlay, 0); setTimeout(syncMinimizedOverlay, 60); }, true);
+                    }
+                    if (!box.__mrMinimizeObserverBound && window.MutationObserver) {
+                        box.__mrMinimizeObserverBound = true;
+                        new MutationObserver(syncMinimizedOverlay).observe(box, { attributes:true, attributeFilter:['class'] });
+                    }
+                    syncMinimizedOverlay();
                 }
-
-                function _svShowSharingBanner(sid, wasAuto){
-                    var existing = document.getElementById('svSharingBanner');
-                    if (existing) existing.remove();
-                    var b = document.createElement('div');
-                    b.id = 'svSharingBanner';
-                    b.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c0392b;color:#fff;padding:10px 16px;z-index:10001;display:flex;align-items:center;justify-content:center;gap:16px;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.2);';
-                    b.innerHTML =
-                        '<i class="fas fa-desktop"></i>' +
-                        '<span>Your screen is being shared'+(wasAuto?' (auto-approved by your login consent)':'')+'.</span>' +
-                        '<button class="btn" style="background:#fff;color:#c0392b;padding:4px 12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;" onclick="window._svEndFromTarget(\''+sid+'\')">Stop sharing</button>';
-                    document.body.appendChild(b);
+                if (typeof window.closeModal === 'function' && !window.closeModal.__mrMinOverlayPatched) {
+                    var prevClose = window.closeModal;
+                    window.closeModal = function(){
+                        var result = prevClose.apply(this, arguments);
+                        var container = document.getElementById('modalContainer');
+                        if (container) container.classList.remove('mr-chat-overlay-minimized');
+                        return result;
+                    };
+                    window.closeModal.__mrMinOverlayPatched = true;
                 }
-
-                window._svEndFromTarget = async function(sid){
-                    if (db) { try { await db.ref('screenSessions/'+sid+'/status').set('ended'); } catch(_){} }
-                    _svEndSession(sid, true);
-                };
-
-                // =============== SHARED CLEANUP ===============
-
-                async function _svEndSession(sid, isTarget){
-                    try { if (_svState.stream) _svState.stream.getTracks().forEach(function(t){ t.stop(); }); } catch(_){}
-                    try { if (_svState.pc) _svState.pc.close(); } catch(_){}
-                    try { if (_svState.listener) _svState.listener.off(); } catch(_){}
-                    try { if (_svState.signalListener) _svState.signalListener.off(); } catch(_){}
-                    _svState.pc = null;
-                    _svState.stream = null;
-                    _svState.remoteStream = null;
-                    _svState.listener = null;
-                    _svState.signalListener = null;
-                    _svState.active = null;
-                    _svState.incoming = null;
-
-                    var vp = document.getElementById('svViewerPanel'); if (vp) vp.remove();
-                    var vb = document.getElementById('svSharingBanner'); if (vb) vb.remove();
-
-                    try {
-                        await pushData('screenAudit', {
-                            sid: sid, by: _svMe(),
-                            action: isTarget ? 'ended_by_target' : 'ended_by_viewer',
-                            at: new Date().toISOString()
-                        }, 'ph_screen_audit');
-                    } catch(_){}
+                if (typeof showChatUI === 'function' && !showChatUI.__mrFastMinimizePatched) {
+                    var prevShowChat = showChatUI;
+                    showChatUI = function(){
+                        var result = prevShowChat.apply(this, arguments);
+                        setTimeout(installFastGrip, 180);
+                        return result;
+                    };
+                    showChatUI.__mrFastMinimizePatched = true;
                 }
+                if (typeof showModal === 'function' && !showModal.__mrFastMinimizePatched) {
+                    var prevShowModal = showModal;
+                    showModal = function(){
+                        var result = prevShowModal.apply(this, arguments);
+                        setTimeout(installFastGrip, 100);
+                        return result;
+                    };
+                    showModal.__mrFastMinimizePatched = true;
+                }
+                document.addEventListener('DOMContentLoaded', function(){ addFastMinimizeStyles(); setTimeout(installFastGrip, 1200); });
+                document.addEventListener('click', function(){ setTimeout(syncMinimizedOverlay, 0); }, true);
+            })();
 
-                // =============== SCREEN VIEW CENTER (agent list modal) ===============
-
-                window.showScreenViewCenter = async function(){
-                    if (!_svCanView()) { showToast('Permission denied.', 'error'); return; }
-
-                    var users = await readData('users', 'ph_users', true) || {};
-                    var me = _svMe();
-                    var entries = Object.keys(users).filter(function(k){ return k !== me; });
-                    var online = (typeof _onlineAgents !== 'undefined') ? (_onlineAgents || {}) : {};
-
-                    entries.sort(function(a,b){
-                        var ao = (typeof _isOnline === 'function' && _isOnline(a)) ? 0 : 1;
-                        var bo = (typeof _isOnline === 'function' && _isOnline(b)) ? 0 : 1;
-                        if (ao !== bo) return ao - bo;
-                        return a.localeCompare(b);
-                    });
-
-                    var rows = entries.map(function(uname){
-                        var u = users[uname] || {};
-                        var isOn = (typeof _isOnline === 'function') ? _isOnline(uname) : false;
-                        var role = u.role || 'agent';
-                        var name = u.name || uname;
-                        var autoBadge = _svHasAutoApprove(u) ? '<span style="background:#27ae60;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;margin-left:6px;">AUTO-APPROVE</span>' : '';
-                        return '' +
-                        '<div class="sv-agent-row" style="display:flex;align-items:center;justify-content:space-between;padding:10px;border:1px solid #eee;border-radius:8px;margin-bottom:8px;">' +
-                            '<div style="display:flex;align-items:center;gap:10px;">' +
-                                '<span style="width:10px;height:10px;border-radius:50%;background:'+(isOn?'#27ae60':'#999')+';display:inline-block;"></span>' +
-                                '<div>' +
-                                    '<div style="font-weight:600;">'+name+' <span style="color:#888;font-weight:400;font-size:12px;">('+uname+' · '+role+')</span>'+autoBadge+'</div>' +
-                                    '<div style="font-size:12px;color:#888;">'+(isOn?'Online':'Offline')+'</div>' +
-                                '</div>' +
-                            '</div>' +
-                            '<button class="btn btn-primary" '+(isOn?'':'disabled')+' onclick="window._svStartFromModal(\''+uname+'\')"><i class="fas fa-desktop"></i> Request View</button>' +
-                        '</div>';
-                    }).join('');
-
-                    if (!rows) rows = '<div style="text-align:center;padding:20px;color:#888;">No other users.</div>';
-
-                    showModal(
-                        '<h3><i class="fas fa-desktop"></i> Screen View</h3>' +
-                        '<div style="background:#fdf6e3;border-left:4px solid #b8860b;padding:10px;margin:10px 0;font-size:13px;">' +
-                            'Every screen-view request requires the target agent to approve, unless they have <b>Auto-approve</b> enabled at login. All sessions are logged. The target will see a red banner while sharing and can stop at any time.' +
-                        '</div>' +
-                        '<div style="max-height:60vh;overflow-y:auto;">'+rows+'</div>' +
-                        '<div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>'
-                    );
-                };
-
-                window._svStartFromModal = function(uname){
+            // MuleRun targeted fix: minimized chat drag/close/restore + reliable S/M/L sizes.
+            (function(){
+                var STYLE_ID = 'mr-minimized-chat-controls-fix-style';
+                var drag = null;
+                function addStyles(){
+                    if (document.getElementById(STYLE_ID)) return;
+                    var st = document.createElement('style');
+                    st.id = STYLE_ID;
+                    st.textContent = '' +
+                        '#modalBox.chat-modal.mr-chat-window{width:var(--mr-chat-width,96vw)!important;height:var(--mr-chat-height,92vh)!important}' +
+                        '#modalBox.chat-modal.mr-chat-minimized{cursor:move!important;width:var(--mr-mini-width,min(420px,calc(100vw - 36px)))!important;height:62px!important}' +
+                        '#modalBox.chat-modal.mr-chat-minimized #modalContent>h3{cursor:pointer!important;padding-right:118px!important}' +
+                        '#modalBox.chat-modal.mr-chat-minimized .mr-chat-window-toolbar{right:10px;top:14px;background:transparent;border:0;padding:0}' +
+                        '#modalBox.chat-modal.mr-chat-minimized .mr-chat-window-toolbar .mr-chat-drag-handle,#modalBox.chat-modal.mr-chat-minimized .mr-chat-window-toolbar #mrChatSmallBtn,#modalBox.chat-modal.mr-chat-minimized .mr-chat-window-toolbar #mrChatMediumBtn,#modalBox.chat-modal.mr-chat-minimized .mr-chat-window-toolbar #mrChatLargeBtn,#modalBox.chat-modal.mr-chat-minimized .mr-chat-window-toolbar #mrChatMaxBtn{display:none!important}' +
+                        '.mr-chat-mini-close{display:none;width:30px;height:30px;border:0;border-radius:999px;background:var(--danger);color:#fff;align-items:center;justify-content:center;cursor:pointer}' +
+                        '#modalBox.chat-modal.mr-chat-minimized .mr-chat-mini-close{display:inline-flex!important}' +
+                        '#modalBox.chat-modal.mr-chat-minimized #mrChatMinBtn{background:var(--primary)!important;color:#fff!important}' +
+                        '#modalBox.chat-modal.mr-chat-minimized:after{content:"Click to open full screen · drag to move";position:absolute;left:18px;bottom:8px;font-size:.68rem;color:var(--text2);pointer-events:none}' +
+                        '@media(max-width:780px){#modalBox.chat-modal.mr-chat-minimized{width:min(360px,calc(100vw - 24px))!important;right:12px!important;bottom:12px!important;left:auto!important;top:auto!important}}';
+                    document.head.appendChild(st);
+                }
+                function box(){ return document.getElementById('modalBox'); }
+                function container(){ return document.getElementById('modalContainer'); }
+                function important(el, prop, value){ el.style.setProperty(prop, value, 'important'); }
+                function setSize(kind){
+                    var b = box(); if (!b) return;
+                    b.classList.remove('mr-chat-minimized','mr-chat-maximized');
+                    var sizes = { small:[760,560], medium:[980,680], large:[1240, Math.round(window.innerHeight * .90)] };
+                    var s = sizes[kind] || sizes.medium;
+                    var w = Math.min(s[0], Math.round(window.innerWidth * .96));
+                    var h = Math.min(s[1], Math.round(window.innerHeight * .92));
+                    b.style.setProperty('--mr-chat-width', w + 'px');
+                    b.style.setProperty('--mr-chat-height', h + 'px');
+                    important(b, 'width', w + 'px');
+                    important(b, 'height', h + 'px');
+                    important(b, 'left', Math.max(8, Math.round((window.innerWidth - w) / 2)) + 'px');
+                    important(b, 'top', Math.max(8, Math.round((window.innerHeight - h) / 2)) + 'px');
+                    important(b, 'right', 'auto');
+                    important(b, 'bottom', 'auto');
+                    var c = container(); if (c) c.classList.remove('mr-chat-overlay-minimized');
+                }
+                function fullScreen(){
+                    var b = box(); if (!b) return;
+                    b.classList.remove('mr-chat-minimized');
+                    b.classList.add('mr-chat-maximized');
+                    b.style.setProperty('--mr-chat-width', '98vw');
+                    b.style.setProperty('--mr-chat-height', '96vh');
+                    important(b, 'width', '98vw');
+                    important(b, 'height', '96vh');
+                    important(b, 'left', '1vw');
+                    important(b, 'top', '1vh');
+                    important(b, 'right', 'auto');
+                    important(b, 'bottom', 'auto');
+                    var c = container(); if (c) c.classList.remove('mr-chat-overlay-minimized');
+                    var min = document.getElementById('mrChatMinBtn');
+                    if (min) min.innerHTML = '<i class="fas fa-window-minimize"></i>';
+                }
+                function minimize(){
+                    var b = box(); if (!b) return;
+                    b.classList.remove('mr-chat-maximized');
+                    b.classList.add('mr-chat-minimized');
+                    important(b, 'left', 'auto');
+                    important(b, 'top', 'auto');
+                    important(b, 'right', '18px');
+                    important(b, 'bottom', '18px');
+                    var c = container(); if (c) c.classList.add('mr-chat-overlay-minimized');
+                    var min = document.getElementById('mrChatMinBtn');
+                    if (min) min.innerHTML = '<i class="fas fa-window-restore"></i>';
+                }
+                function closeChat(ev){
+                    if (ev) { ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); }
+                    var c = container(); if (c) c.classList.remove('mr-chat-overlay-minimized');
                     if (typeof window.closeModal === 'function') window.closeModal();
-                    _svStartRequest(uname);
-                };
-
-                // =============== INCOMING LISTENER (all logged-in users) ===============
-
-                function _svAttachIncomingListener(){
-                    if (!db) return;
-                    var me = _svMe();
-                    if (!me) return;
-                    db.ref('screenSessions').on('value', function(snap){
-                        var all = snap.val() || {};
-                        var meNow = _svMe();
-                        if (!meNow) return;
-                        Object.keys(all).forEach(function(sid){
-                            var s = all[sid] || {};
-                            if (s.to === meNow) {
-                                _svHandleIncoming(sid, s);
-                            }
-                        });
-                    });
                 }
-
-                // =============== LOGIN CONSENT REMINDER ===============
-                // If a user has autoApproveScreenView enabled, show a one-time
-                // notice on login so they know their screen may be viewed by admin.
-
-                function _svShowLoginConsentIfNeeded(){
-                    if (_svState.loginConsentShown) return;
-                    var u = STATE && STATE.currentUser;
-                    if (!u || !u.permissions) return;
-                    if (!u.permissions.autoApproveScreenView) return;
-                    if (_svIsAdmin()) return;
-                    _svState.loginConsentShown = true;
-
-                    setTimeout(function(){
-                        var d = document.createElement('div');
-                        d.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;';
-                        d.innerHTML =
-                            '<div style="background:#fff;border-radius:14px;padding:24px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.4);">' +
-                                '<h3 style="margin:0 0 8px 0;"><i class="fas fa-shield-halved" style="color:#b8860b;"></i> Screen-View Consent Notice</h3>' +
-                                '<p style="font-size:14px;line-height:1.5;">Your account is configured with <b>Auto-approve screen view for admin</b>. This means:</p>' +
-                                '<ul style="font-size:13px;line-height:1.6;">' +
-                                    '<li>An administrator may view your screen without a per-session approval popup.</li>' +
-                                    '<li>You will always see a <b style="color:#c0392b;">red banner</b> at the top of the screen while it is being viewed.</li>' +
-                                    '<li>You can end the session at any time using the "Stop sharing" button.</li>' +
-                                    '<li>All screen-view sessions are logged.</li>' +
-                                '</ul>' +
-                                '<p style="font-size:13px;">Continue only if you consent to this arrangement. Contact your admin to have this changed.</p>' +
-                                '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">' +
-                                    '<button class="btn btn-primary" onclick="this.closest(\'div[style*=fixed]\').remove()">I understand</button>' +
-                                '</div>' +
-                            '</div>';
-                        document.body.appendChild(d);
-                    }, 800);
+                function startMiniDrag(ev){
+                    var b = box();
+                    if (!b || !b.classList.contains('mr-chat-minimized')) return;
+                    var t = ev.target;
+                    if (t && t.closest && (t.closest('button') || t.closest('.mr-chat-window-toolbar'))) return;
+                    ev.preventDefault();
+                    var r = b.getBoundingClientRect();
+                    drag = { x:ev.clientX, y:ev.clientY, left:r.left, top:r.top, w:r.width, h:r.height, moved:false };
+                    document.addEventListener('mousemove', moveMiniDrag, true);
+                    document.addEventListener('mouseup', stopMiniDrag, true);
                 }
-
-                // =============== BADGE UPDATE ===============
-
-                function _svUpdateBadge(){
-                    var b = document.getElementById('screenViewOnlineBadge');
-                    if (!b) return;
-                    try {
-                        var me = _svMe();
-                        var online = (typeof _onlineAgents !== 'undefined') ? (_onlineAgents || {}) : {};
-                        var n = Object.keys(online).filter(function(k){
-                            return k !== me && typeof _isOnline === 'function' && _isOnline(k);
-                        }).length;
-                        b.textContent = n;
-                    } catch(_){}
+                function moveMiniDrag(ev){
+                    if (!drag) return;
+                    var b = box(); if (!b) return;
+                    var left = Math.max(0, Math.min(window.innerWidth - drag.w, drag.left + ev.clientX - drag.x));
+                    var top = Math.max(0, Math.min(window.innerHeight - drag.h, drag.top + ev.clientY - drag.y));
+                    if (Math.abs(ev.clientX - drag.x) + Math.abs(ev.clientY - drag.y) > 4) drag.moved = true;
+                    important(b, 'left', left + 'px');
+                    important(b, 'top', top + 'px');
+                    important(b, 'right', 'auto');
+                    important(b, 'bottom', 'auto');
                 }
-
-                // =============== INIT ===============
-
-                function _svInit(){
-                    // Attach listeners once user is logged in
-                    var check = setInterval(function(){
-                        if (STATE && STATE.currentUser) {
-                            clearInterval(check);
-                            try { _svAttachIncomingListener(); } catch(e){ console.warn('SV listener:', e); }
-                            try { _svShowLoginConsentIfNeeded(); } catch(_){}
-                            setInterval(_svUpdateBadge, 5000);
-                            _svUpdateBadge();
+                function stopMiniDrag(){
+                    setTimeout(function(){ drag = null; }, 0);
+                    document.removeEventListener('mousemove', moveMiniDrag, true);
+                    document.removeEventListener('mouseup', stopMiniDrag, true);
+                }
+                function install(){
+                    addStyles();
+                    var b = box();
+                    if (!b || !b.classList.contains('chat-modal')) return;
+                    b.classList.add('mr-chat-window');
+                    var toolbar = document.getElementById('mrChatWindowToolbar');
+                    if (toolbar && !document.getElementById('mrChatMiniCloseBtn')) {
+                        var close = document.createElement('button');
+                        close.type = 'button';
+                        close.id = 'mrChatMiniCloseBtn';
+                        close.className = 'mr-chat-mini-close';
+                        close.title = 'Close chat';
+                        close.innerHTML = '<i class="fas fa-times"></i>';
+                        close.addEventListener('click', closeChat, true);
+                        toolbar.appendChild(close);
+                    }
+                    [['mrChatSmallBtn','small'],['mrChatMediumBtn','medium'],['mrChatLargeBtn','large']].forEach(function(pair){
+                        var btn = document.getElementById(pair[0]);
+                        if (btn && !btn.__mrReliableSizeBound) {
+                            btn.__mrReliableSizeBound = true;
+                            btn.addEventListener('click', function(ev){ ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); setSize(pair[1]); }, true);
                         }
-                    }, 500);
+                    });
+                    var max = document.getElementById('mrChatMaxBtn');
+                    if (max && !max.__mrReliableMaxBound) {
+                        max.__mrReliableMaxBound = true;
+                        max.addEventListener('click', function(ev){ ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); fullScreen(); }, true);
+                    }
+                    var min = document.getElementById('mrChatMinBtn');
+                    if (min && !min.__mrReliableMinBound) {
+                        min.__mrReliableMinBound = true;
+                        min.addEventListener('click', function(ev){
+                            ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+                            var b = box(); if (!b) return;
+                            if (b.classList.contains('mr-chat-minimized')) fullScreen(); else minimize();
+                        }, true);
+                    }
+                    if (!b.__mrMiniDragBound) {
+                        b.__mrMiniDragBound = true;
+                        b.addEventListener('mousedown', startMiniDrag, true);
+                        b.addEventListener('click', function(ev){
+                            var current = box();
+                            if (!current || !current.classList.contains('mr-chat-minimized')) return;
+                            var t = ev.target;
+                            if (t && t.closest && t.closest('button')) return;
+                            if (drag && drag.moved) return;
+                            ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+                            fullScreen();
+                        }, true);
+                    }
                 }
+                if (typeof showChatUI === 'function' && !showChatUI.__mrMiniControlsPatched) {
+                    var prevShowChat = showChatUI;
+                    showChatUI = function(){ var result = prevShowChat.apply(this, arguments); setTimeout(install, 220); return result; };
+                    showChatUI.__mrMiniControlsPatched = true;
+                }
+                if (typeof showModal === 'function' && !showModal.__mrMiniControlsPatched) {
+                    var prevShowModal = showModal;
+                    showModal = function(){ var result = prevShowModal.apply(this, arguments); setTimeout(install, 120); return result; };
+                    showModal.__mrMiniControlsPatched = true;
+                }
+                document.addEventListener('DOMContentLoaded', function(){ addStyles(); setTimeout(install, 1400); });
+            })();
 
-                document.addEventListener('DOMContentLoaded', function(){ setTimeout(_svInit, 1200); });
+            // MuleRun targeted fix: reliable minimize with unread count, open/fullscreen option, drag, and close.
+            (function(){
+                var STYLE_ID = 'mr-final-minimize-fix-style';
+                var miniDrag = null;
+                var unreadTimer = null;
+                function addStyles(){
+                    if (document.getElementById(STYLE_ID)) return;
+                    var st = document.createElement('style');
+                    st.id = STYLE_ID;
+                    st.textContent = '' +
+                        '#modalContainer.mr-chat-overlay-minimized{pointer-events:none!important;background:transparent!important;backdrop-filter:none!important;animation:none!important}' +
+                        '#modalContainer.mr-chat-overlay-minimized #modalBox{pointer-events:auto!important}' +
+                        '#modalBox.chat-modal.mr-chat-minimized{width:390px!important;height:78px!important;min-height:78px!important;max-width:calc(100vw - 24px)!important;max-height:78px!important;padding:0!important;resize:none!important;overflow:hidden!important;cursor:move!important}' +
+                        '#modalBox.chat-modal.mr-chat-minimized #modalContent,#modalBox.chat-modal.mr-chat-minimized .mr-chat-window-toolbar,#modalBox.chat-modal.mr-chat-minimized .mr-chat-resize-grip{display:none!important}' +
+                        '#mrChatMiniDock{display:none}' +
+                        '#modalBox.chat-modal.mr-chat-minimized #mrChatMiniDock{display:flex!important;align-items:center;gap:10px;width:100%;height:100%;padding:10px 12px;background:linear-gradient(135deg,var(--primary),var(--primary2));color:#fff}' +
+                        '.mr-chat-mini-icon{width:42px;height:42px;border-radius:15px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:1.05rem}' +
+                        '.mr-chat-mini-main{min-width:0;flex:1}.mr-chat-mini-title{font-weight:900;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mr-chat-mini-sub{font-size:.72rem;opacity:.86;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+                        '.mr-chat-mini-badge{min-width:24px;height:24px;padding:0 8px;border-radius:999px;background:#25d366;color:#073b2d;display:inline-flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:900;margin-right:2px}' +
+                        '.mr-chat-mini-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto}.mr-chat-mini-action{width:34px;height:34px;border:1px solid rgba(255,255,255,.24);border-radius:999px;background:rgba(255,255,255,.16);color:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}.mr-chat-mini-action:hover{background:rgba(255,255,255,.28)}.mr-chat-mini-action.close{background:rgba(192,57,43,.95);border-color:rgba(255,255,255,.18)}' +
+                        '@media(max-width:520px){#modalBox.chat-modal.mr-chat-minimized{width:calc(100vw - 20px)!important}.mr-chat-mini-sub{display:none}.mr-chat-mini-icon{width:38px;height:38px}.mr-chat-mini-action{width:32px;height:32px}}';
+                    document.head.appendChild(st);
+                }
+                function box(){ return document.getElementById('modalBox'); }
+                function overlay(){ return document.getElementById('modalContainer'); }
+                function important(el, prop, val){ el.style.setProperty(prop, val, 'important'); }
+                function setOverlayMinimized(on){ var c = overlay(); if (c) c.classList.toggle('mr-chat-overlay-minimized', !!on); }
+                function setSize(kind){
+                    var b = box(); if (!b) return;
+                    b.classList.remove('mr-chat-minimized','mr-chat-maximized');
+                    setOverlayMinimized(false);
+                    var sizes = { small:[760,560], medium:[980,680], large:[1240, Math.round(window.innerHeight * .90)] };
+                    var s = sizes[kind] || sizes.medium;
+                    var w = Math.min(s[0], Math.round(window.innerWidth * .96));
+                    var h = Math.min(s[1], Math.round(window.innerHeight * .92));
+                    b.style.setProperty('--mr-chat-width', w + 'px');
+                    b.style.setProperty('--mr-chat-height', h + 'px');
+                    important(b, 'width', w + 'px');
+                    important(b, 'height', h + 'px');
+                    important(b, 'min-height', '330px');
+                    important(b, 'max-height', 'calc(100vh - 16px)');
+                    important(b, 'left', Math.max(8, Math.round((window.innerWidth - w) / 2)) + 'px');
+                    important(b, 'top', Math.max(8, Math.round((window.innerHeight - h) / 2)) + 'px');
+                    important(b, 'right', 'auto');
+                    important(b, 'bottom', 'auto');
+                }
+                function openFullScreen(ev){
+                    if (ev) { ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); }
+                    var b = box(); if (!b) return;
+                    b.classList.remove('mr-chat-minimized');
+                    b.classList.add('mr-chat-maximized');
+                    setOverlayMinimized(false);
+                    b.style.setProperty('--mr-chat-width', '98vw');
+                    b.style.setProperty('--mr-chat-height', '96vh');
+                    important(b, 'width', '98vw');
+                    important(b, 'height', '96vh');
+                    important(b, 'min-height', '330px');
+                    important(b, 'max-height', '96vh');
+                    important(b, 'left', '1vw');
+                    important(b, 'top', '1vh');
+                    important(b, 'right', 'auto');
+                    important(b, 'bottom', 'auto');
+                    updateMinButtonIcon(false);
+                }
+                function minimizeChat(ev){
+                    if (ev) { ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); }
+                    var b = box(); if (!b) return;
+                    ensureMiniDock();
+                    b.classList.remove('mr-chat-maximized');
+                    b.classList.add('mr-chat-minimized');
+                    important(b, 'width', '390px');
+                    important(b, 'height', '78px');
+                    important(b, 'min-height', '78px');
+                    important(b, 'max-height', '78px');
+                    important(b, 'left', 'auto');
+                    important(b, 'top', 'auto');
+                    important(b, 'right', '18px');
+                    important(b, 'bottom', '18px');
+                    setOverlayMinimized(true);
+                    updateMinButtonIcon(true);
+                    updateUnreadCount();
+                    if (!unreadTimer) unreadTimer = setInterval(function(){ if (box() && box().classList.contains('mr-chat-minimized')) updateUnreadCount(); }, 6000);
+                }
+                function closeChat(ev){
+                    if (ev) { ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); }
+                    setOverlayMinimized(false);
+                    if (typeof window.closeModal === 'function') window.closeModal();
+                }
+                function updateMinButtonIcon(minimized){
+                    var btn = document.getElementById('mrChatMinBtn');
+                    if (btn) btn.innerHTML = minimized ? '<i class="fas fa-window-restore"></i>' : '<i class="fas fa-window-minimize"></i>';
+                }
+                function getUnreadFromBadges(){
+                    var ids = ['chatNotifyBadge','chatCardNotifyBadge'];
+                    for (var i=0;i<ids.length;i++) {
+                        var e = document.getElementById(ids[i]);
+                        if (e) {
+                            var n = parseInt(e.textContent || '0', 10);
+                            if (!isNaN(n) && n > 0) return n;
+                        }
+                    }
+                    return 0;
+                }
+                async function updateUnreadCount(){
+                    var n = getUnreadFromBadges();
+                    try {
+                        if (typeof readData === 'function' && typeof _mrIncoming === 'function') {
+                            var all = await readData('chatMessages', 'ph_chat_messages', true) || {};
+                            n = _mrIncoming(all).length;
+                        }
+                    } catch (_) {}
+                    var badge = document.getElementById('mrChatMiniUnread');
+                    var sub = document.getElementById('mrChatMiniSub');
+                    if (badge) badge.textContent = n > 99 ? '99+' : String(n || 0);
+                    if (sub) sub.textContent = n ? (n + ' new message' + (n === 1 ? '' : 's')) : 'No new messages';
+                }
+                function ensureMiniDock(){
+                    var b = box(); if (!b) return;
+                    var dock = document.getElementById('mrChatMiniDock');
+                    if (!dock) {
+                        dock = document.createElement('div');
+                        dock.id = 'mrChatMiniDock';
+                        dock.innerHTML = '<div class="mr-chat-mini-icon"><i class="fas fa-comments"></i></div><div class="mr-chat-mini-main"><div class="mr-chat-mini-title">Team Messenger</div><div class="mr-chat-mini-sub" id="mrChatMiniSub">Checking messages...</div></div><div class="mr-chat-mini-actions"><span class="mr-chat-mini-badge" id="mrChatMiniUnread">0</span><button type="button" class="mr-chat-mini-action" id="mrChatMiniOpen" title="Open full screen"><i class="fas fa-expand"></i></button><button type="button" class="mr-chat-mini-action close" id="mrChatMiniClose" title="Close chat"><i class="fas fa-times"></i></button></div>';
+                        b.appendChild(dock);
+                    }
+                    var open = document.getElementById('mrChatMiniOpen');
+                    var close = document.getElementById('mrChatMiniClose');
+                    if (open && !open.__mrFinalMiniBound) { open.__mrFinalMiniBound = true; open.addEventListener('click', openFullScreen, true); }
+                    if (close && !close.__mrFinalMiniBound) { close.__mrFinalMiniBound = true; close.addEventListener('click', closeChat, true); }
+                    if (!dock.__mrFinalMiniDockBound) {
+                        dock.__mrFinalMiniDockBound = true;
+                        dock.addEventListener('mousedown', startMiniDrag, true);
+                        dock.addEventListener('click', function(ev){
+                            if (ev.target && ev.target.closest && ev.target.closest('button')) return;
+                            if (miniDrag && miniDrag.moved) return;
+                            openFullScreen(ev);
+                        }, true);
+                    }
+                }
+                function startMiniDrag(ev){
+                    var b = box();
+                    if (!b || !b.classList.contains('mr-chat-minimized')) return;
+                    if (ev.target && ev.target.closest && ev.target.closest('button')) return;
+                    ev.preventDefault();
+                    var r = b.getBoundingClientRect();
+                    miniDrag = { x: ev.clientX, y: ev.clientY, left: r.left, top: r.top, w: r.width, h: r.height, moved: false };
+                    document.addEventListener('mousemove', moveMiniDrag, true);
+                    document.addEventListener('mouseup', stopMiniDrag, true);
+                }
+                function moveMiniDrag(ev){
+                    if (!miniDrag) return;
+                    var b = box(); if (!b) return;
+                    var dx = ev.clientX - miniDrag.x, dy = ev.clientY - miniDrag.y;
+                    if (Math.abs(dx) + Math.abs(dy) > 4) miniDrag.moved = true;
+                    important(b, 'left', Math.max(0, Math.min(window.innerWidth - miniDrag.w, miniDrag.left + dx)) + 'px');
+                    important(b, 'top', Math.max(0, Math.min(window.innerHeight - miniDrag.h, miniDrag.top + dy)) + 'px');
+                    important(b, 'right', 'auto');
+                    important(b, 'bottom', 'auto');
+                }
+                function stopMiniDrag(){
+                    document.removeEventListener('mousemove', moveMiniDrag, true);
+                    document.removeEventListener('mouseup', stopMiniDrag, true);
+                    setTimeout(function(){ miniDrag = null; }, 30);
+                }
+                function replaceAndBind(id, handler){
+                    var old = document.getElementById(id);
+                    if (!old || old.__mrFinalBound) return;
+                    var fresh = old.cloneNode(true);
+                    fresh.__mrFinalBound = true;
+                    fresh.addEventListener('click', handler, true);
+                    old.parentNode.replaceChild(fresh, old);
+                }
+                function install(){
+                    addStyles();
+                    var b = box();
+                    if (!b || !b.classList.contains('chat-modal')) return;
+                    b.classList.add('mr-chat-window');
+                    ensureMiniDock();
+                    replaceAndBind('mrChatMinBtn', function(ev){
+                        var b = box();
+                        if (b && b.classList.contains('mr-chat-minimized')) openFullScreen(ev); else minimizeChat(ev);
+                    });
+                    replaceAndBind('mrChatMaxBtn', openFullScreen);
+                    replaceAndBind('mrChatSmallBtn', function(ev){ ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); setSize('small'); });
+                    replaceAndBind('mrChatMediumBtn', function(ev){ ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); setSize('medium'); });
+                    replaceAndBind('mrChatLargeBtn', function(ev){ ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); setSize('large'); });
+                    var c = overlay();
+                    if (c) c.classList.toggle('mr-chat-overlay-minimized', b.classList.contains('mr-chat-minimized'));
+                    updateUnreadCount();
+                }
+                if (typeof showChatUI === 'function' && !showChatUI.__mrFinalMinimizePatched) {
+                    var prevShowChat = showChatUI;
+                    showChatUI = function(){ var result = prevShowChat.apply(this, arguments); setTimeout(install, 380); return result; };
+                    showChatUI.__mrFinalMinimizePatched = true;
+                }
+                if (typeof showModal === 'function' && !showModal.__mrFinalMinimizePatched) {
+                    var prevShowModal = showModal;
+                    showModal = function(){ var result = prevShowModal.apply(this, arguments); setTimeout(install, 260); return result; };
+                    showModal.__mrFinalMinimizePatched = true;
+                }
+                if (typeof window.closeModal === 'function' && !window.closeModal.__mrFinalMinimizePatched) {
+                    var prevClose = window.closeModal;
+                    window.closeModal = function(){ setOverlayMinimized(false); return prevClose.apply(this, arguments); };
+                    window.closeModal.__mrFinalMinimizePatched = true;
+                }
+                document.addEventListener('DOMContentLoaded', function(){ addStyles(); setTimeout(install, 1500); });
+            })();
+
+            // MuleRun targeted fix: ultra-fast chat dragging that follows the mouse directly.
+            (function(){
+                var STYLE_ID = 'mr-ultra-fast-chat-drag-style';
+                var active = null;
+                function addStyles(){
+                    if (document.getElementById(STYLE_ID)) return;
+                    var st = document.createElement('style');
+                    st.id = STYLE_ID;
+                    st.textContent = '#modalBox.chat-modal.mr-ultra-dragging{transition:none!important;animation:none!important;will-change:left,top!important;user-select:none!important}#modalBox.chat-modal.mr-ultra-dragging *{user-select:none!important}';
+                    document.head.appendChild(st);
+                }
+                function important(el, prop, value){ el.style.setProperty(prop, value, 'important'); }
+                function isDragTarget(t){
+                    if (!t || !t.closest) return false;
+                    if (t.closest('button,input,select,textarea,.chat-contact,.bubble,.messenger-input,.mr-chat-resize-grip')) return false;
+                    return !!(t.closest('#mrChatMiniDock') || t.closest('.mr-chat-drag-handle') || t.closest('#modalBox.chat-modal.mr-chat-minimized'));
+                }
+                function start(ev){
+                    var b = document.getElementById('modalBox');
+                    if (!b || !b.classList.contains('chat-modal') || b.classList.contains('mr-chat-maximized')) return;
+                    if (!isDragTarget(ev.target)) return;
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+                    addStyles();
+                    var r = b.getBoundingClientRect();
+                    b.classList.add('mr-ultra-dragging');
+                    active = { x: ev.clientX, y: ev.clientY, left: r.left, top: r.top, w: r.width, h: r.height };
+                    important(b, 'left', r.left + 'px');
+                    important(b, 'top', r.top + 'px');
+                    important(b, 'right', 'auto');
+                    important(b, 'bottom', 'auto');
+                    document.addEventListener('mousemove', move, true);
+                    document.addEventListener('mouseup', stop, true);
+                }
+                function move(ev){
+                    if (!active) return;
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+                    var b = document.getElementById('modalBox');
+                    if (!b) return;
+                    var left = Math.max(0, Math.min(window.innerWidth - active.w, active.left + ev.clientX - active.x));
+                    var top = Math.max(0, Math.min(window.innerHeight - active.h, active.top + ev.clientY - active.y));
+                    important(b, 'left', left + 'px');
+                    important(b, 'top', top + 'px');
+                    important(b, 'right', 'auto');
+                    important(b, 'bottom', 'auto');
+                }
+                function stop(ev){
+                    if (ev) { ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); }
+                    var b = document.getElementById('modalBox');
+                    if (b) b.classList.remove('mr-ultra-dragging');
+                    active = null;
+                    document.removeEventListener('mousemove', move, true);
+                    document.removeEventListener('mouseup', stop, true);
+                }
+                if (!document.__mrUltraFastChatDragBound) {
+                    document.__mrUltraFastChatDragBound = true;
+                    document.addEventListener('mousedown', start, true);
+                }
+                document.addEventListener('DOMContentLoaded', addStyles);
             })();
 
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
