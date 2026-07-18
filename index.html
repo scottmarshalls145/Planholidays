@@ -2280,11 +2280,16 @@
                     <h4>Chat</h4>
                     <p>Private chat with image upload</p>
                 </div>
-                <div class="dash-card" data-action="calls">
-                    <i class="fas fa-phone-volume"></i>
-                    <h4>Calls</h4>
-                    <p>Online agents &amp; call logs</p>
+                <div class="dash-card" data-action="agentsOnline">
+                    <i class="fas fa-users"></i>
+                    <h4>Agents Online</h4>
+                    <p>See which agents are online</p>
                     <span class="badge-count" id="onlineAgentsBadge">0</span>
+                </div>
+                <div class="dash-card" data-action="callLogs">
+                    <i class="fas fa-clock-rotate-left"></i>
+                    <h4>Call Logs</h4>
+                    <p>Review previous call logs</p>
                 </div>
                 <div class="dash-card" data-action="theme">
                     <i class="fas fa-palette"></i>
@@ -5627,6 +5632,12 @@
                         break;
                     case 'calls':
                         try { showCallsCenter(); } catch(e){ showToast('Calls module not ready.','error'); }
+                        break;
+                    case 'agentsOnline':
+                        try { showCallsCenter('online'); } catch(e){ showToast('Calls module not ready.','error'); }
+                        break;
+                    case 'callLogs':
+                        try { showCallsCenter('logs'); } catch(e){ showToast('Calls module not ready.','error'); }
                         break;
                     case 'calendar':
                         showCalendar();
@@ -12155,15 +12166,21 @@
 
                 // ---------- UI: CALLS CENTER ----------
                 var _ccTab = 'online';
+                var _ccOnlineRefreshTimer = null;
 
-                window.showCallsCenter = function(){
+                window.showCallsCenter = function(initialTab){
                     if(!STATE.currentUser){ showToast('Please login first.','warning'); return; }
                     _attachCallLogListener();
-                    var html = '<h3><i class="fas fa-phone-volume"></i> Calls Center</h3>'+
+                    _ccTab = (initialTab === 'logs') ? 'logs' : 'online';
+                    var onlineActive = _ccTab === 'online' ? ' class="active"' : '';
+                    var logsActive = _ccTab === 'logs' ? ' class="active"' : '';
+                    var headerTitle = _ccTab === 'logs' ? 'Call Logs' : 'Agents Online';
+                    var headerIcon = _ccTab === 'logs' ? 'fa-clock-rotate-left' : 'fa-users';
+                    var html = '<h3><i class="fas '+headerIcon+'"></i> '+headerTitle+'</h3>'+
                         '<p class="text-muted text-sm">See which agents are online and click to start a voice call. Admin can review all call logs.</p>'+
                         '<div class="cc-tabs">'+
-                            '<button data-cc-tab="online" class="active"><i class="fas fa-users"></i> Online Agents</button>'+
-                            '<button data-cc-tab="logs"><i class="fas fa-clock-rotate-left"></i> Call Logs</button>'+
+                            '<button data-cc-tab="online"'+onlineActive+'><i class="fas fa-users"></i> Online Agents</button>'+
+                            '<button data-cc-tab="logs"'+logsActive+'><i class="fas fa-clock-rotate-left"></i> Call Logs</button>'+
                         '</div>'+
                         '<div id="ccPanel"></div>'+
                         '<div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
@@ -12177,6 +12194,18 @@
                         };
                     });
                     _renderCCPanel();
+                    // Refresh the online agents list every 5s while the modal is open
+                    if(_ccOnlineRefreshTimer) clearInterval(_ccOnlineRefreshTimer);
+                    _ccOnlineRefreshTimer = setInterval(function(){
+                        var stillOpen = document.getElementById('ccPanel');
+                        if(!stillOpen){
+                            clearInterval(_ccOnlineRefreshTimer);
+                            _ccOnlineRefreshTimer = null;
+                            return;
+                        }
+                        _updateOnlineBadge();
+                        if(document.getElementById('ccOnlineList')) _renderOnlineAgents();
+                    }, 5000);
                 };
 
                 function _renderCCPanel(){
@@ -12369,7 +12398,13 @@
                 setTimeout(_kickoff, 1500);
                 setInterval(function(){
                     if(STATE.currentUser && !_presenceHeartbeat) _kickoff();
+                    // Refresh presence map (localStorage fallback) and badge every 5s
+                    try{
+                        if(!firebaseConnected || !db){ _attachPresenceListener(); }
+                    }catch(_){}
                     _updateOnlineBadge();
+                    // Live-refresh the Calls Center online list if it's currently visible
+                    if(document.getElementById('ccOnlineList')) _renderOnlineAgents();
                 }, 5000);
             })();
 
@@ -12791,6 +12826,284 @@
                 window.endVoiceCall = endVoiceCall;
 
                 try { if (_confInCall()) _confRenderRoster(); } catch(_){}
+            })();
+
+            // ================================================================
+            // MuleRun call-ringing + individual leave patch
+            //   - Plays a "ringback" tone locally for the caller while any
+            //     invited member is still ringing (not yet accepted).
+            //   - Plays an "incoming call" tone locally for a callee while an
+            //     incoming call popup is showing (before Accept).
+            //   - Redefines endVoiceCall to LEAVE the call for the current user
+            //     only, so cutting yourself off / admin removing a member no
+            //     longer forces everyone else off.
+            // ================================================================
+            (function _mrCallRingingAndLeavePatch(){
+                if (typeof _mrVoice === 'undefined') return;
+
+                // --------- Ringing tone via WebAudio ----------
+                var _ringCtx = null;
+                var _ringNodes = null;      // active nodes for callee incoming ring
+                var _ringbackNodes = null;  // active nodes for caller ringback
+                var _ringbackCallId = null;
+                var _ringbackPoll = null;
+
+                function _ringEnsureCtx(){
+                    try {
+                        if (!_ringCtx){
+                            var AC = window.AudioContext || window.webkitAudioContext;
+                            if (!AC) return null;
+                            _ringCtx = new AC();
+                        }
+                        if (_ringCtx.state === 'suspended') { try { _ringCtx.resume(); } catch(_){} }
+                        return _ringCtx;
+                    } catch(_) { return null; }
+                }
+
+                function _makeRingPattern(freqs, onMs, offMs){
+                    // freqs: array of oscillator frequencies to play together
+                    var ctx = _ringEnsureCtx(); if (!ctx) return null;
+                    var master = ctx.createGain();
+                    master.gain.value = 0;
+                    master.connect(ctx.destination);
+                    var oscs = freqs.map(function(f){
+                        var o = ctx.createOscillator();
+                        o.type = 'sine';
+                        o.frequency.value = f;
+                        o.connect(master);
+                        try { o.start(); } catch(_){}
+                        return o;
+                    });
+                    var stopped = false;
+                    var timer = null;
+                    function cycle(){
+                        if (stopped) return;
+                        var now = ctx.currentTime;
+                        try {
+                            master.gain.cancelScheduledValues(now);
+                            master.gain.setValueAtTime(0.0001, now);
+                            master.gain.exponentialRampToValueAtTime(0.18, now + 0.05);
+                            master.gain.setValueAtTime(0.18, now + (onMs/1000) - 0.05);
+                            master.gain.exponentialRampToValueAtTime(0.0001, now + (onMs/1000));
+                        } catch(_){}
+                        timer = setTimeout(cycle, onMs + offMs);
+                    }
+                    cycle();
+                    return {
+                        stop: function(){
+                            stopped = true;
+                            if (timer) { try { clearTimeout(timer); } catch(_){} timer = null; }
+                            try { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setValueAtTime(0, ctx.currentTime); } catch(_){}
+                            oscs.forEach(function(o){ try { o.stop(); } catch(_){} try { o.disconnect(); } catch(_){} });
+                            try { master.disconnect(); } catch(_){}
+                        }
+                    };
+                }
+
+                function _startIncomingRing(){
+                    if (_ringNodes) return;
+                    // Classic phone ring: 440+480Hz, 2s on / 4s off
+                    _ringNodes = _makeRingPattern([440, 480], 2000, 4000);
+                }
+                function _stopIncomingRing(){
+                    if (_ringNodes) { try { _ringNodes.stop(); } catch(_){} _ringNodes = null; }
+                }
+                function _startRingback(callId){
+                    if (_ringbackNodes && _ringbackCallId === callId) return;
+                    _stopRingback();
+                    _ringbackCallId = callId || (_mrVoice && _mrVoice.callId) || null;
+                    // Ringback tone: 440+480Hz, 1s on / 2s off (audible to caller)
+                    _ringbackNodes = _makeRingPattern([440, 480], 1000, 2000);
+                    // Auto-stop when everyone has accepted or call ended
+                    if (_ringbackPoll) { try { clearInterval(_ringbackPoll); } catch(_){} }
+                    _ringbackPoll = setInterval(function(){
+                        try {
+                            var id = _ringbackCallId;
+                            if (!id) { _stopRingback(); return; }
+                            if (!_mrVoice || _mrVoice.callId !== id){ _stopRingback(); return; }
+                            if (!firebaseConnected || !db){
+                                // Best-effort: stop after 45s
+                                return;
+                            }
+                            db.ref('voiceCalls/'+id).once('value').then(function(snap){
+                                var c = snap.val() || {};
+                                if (!c || c.status === 'ended'){ _stopRingback(); return; }
+                                var me = STATE.currentUser && STATE.currentUser.username;
+                                var members = (c.members || []).filter(function(m){ return m !== me; });
+                                if (!members.length){ _stopRingback(); return; }
+                                var accepted = c.accepted || {};
+                                var stillWaiting = members.some(function(m){ return !accepted[m]; });
+                                if (!stillWaiting) _stopRingback();
+                            }).catch(function(){});
+                        } catch(_){}
+                    }, 1500);
+                    // Absolute safety cap: stop ringback after 60s
+                    setTimeout(function(){
+                        if (_ringbackCallId === callId) _stopRingback();
+                    }, 60000);
+                }
+                function _stopRingback(){
+                    if (_ringbackNodes) { try { _ringbackNodes.stop(); } catch(_){} _ringbackNodes = null; }
+                    if (_ringbackPoll) { try { clearInterval(_ringbackPoll); } catch(_){} _ringbackPoll = null; }
+                    _ringbackCallId = null;
+                }
+
+                // ---------- Hook incoming-call UI: play ring while popup shows ----------
+                if (typeof showVoicePanel === 'function'){
+                    var _origShowVoicePanelForRing = showVoicePanel;
+                    var _wrapped = function(title, incoming, callId){
+                        var r = _origShowVoicePanelForRing.apply(this, arguments);
+                        try {
+                            if (incoming) {
+                                _startIncomingRing();
+                            } else {
+                                _stopIncomingRing();
+                            }
+                        } catch(_){}
+                        return r;
+                    };
+                    showVoicePanel = _wrapped;
+                    window.showVoicePanel = _wrapped;
+                }
+
+                // ---------- Hook acceptVoiceCall: stop incoming ring ----------
+                if (typeof window.acceptVoiceCall === 'function'){
+                    var _origAcceptForRing = window.acceptVoiceCall;
+                    window.acceptVoiceCall = async function(callId){
+                        _stopIncomingRing();
+                        return _origAcceptForRing.apply(this, arguments);
+                    };
+                }
+
+                // ---------- Hook call-start: play ringback for the caller ----------
+                if (typeof window._mrStartVoiceCallWithTargets === 'function'){
+                    var _origStartForRingback = window._mrStartVoiceCallWithTargets;
+                    window._mrStartVoiceCallWithTargets = async function(targets, sourceLabel){
+                        var wasInCall = !!(_mrVoice && _mrVoice.callId);
+                        var r = await _origStartForRingback.apply(this, arguments);
+                        try {
+                            if (!wasInCall && _mrVoice && _mrVoice.callId){
+                                _startRingback(_mrVoice.callId);
+                            }
+                        } catch(_){}
+                        return r;
+                    };
+                }
+                if (typeof window.startVoiceCall === 'function'){
+                    var _origStartVoiceForRingback = window.startVoiceCall;
+                    window.startVoiceCall = async function(){
+                        var wasInCall = !!(_mrVoice && _mrVoice.callId);
+                        var r = await _origStartVoiceForRingback.apply(this, arguments);
+                        try {
+                            if (!wasInCall && _mrVoice && _mrVoice.callId){
+                                _startRingback(_mrVoice.callId);
+                            }
+                        } catch(_){}
+                        return r;
+                    };
+                }
+
+                // ---------- Listen to voiceCalls to stop tones on status changes ----------
+                if (firebaseConnected && db){
+                    try {
+                        db.ref('voiceCalls').on('value', function(snap){
+                            var calls = snap.val() || {};
+                            var me = STATE.currentUser && STATE.currentUser.username;
+                            // Stop incoming ring if the incoming call ended or user no longer in it
+                            var panel = document.getElementById('voicePanel');
+                            var stillIncoming = false;
+                            if (panel){
+                                Object.keys(calls).forEach(function(id){
+                                    var c = calls[id] || {};
+                                    if (c.status === 'ringing' && c.from !== me
+                                        && (c.members||[]).indexOf(me) !== -1
+                                        && !(c.accepted && c.accepted[me])){
+                                        stillIncoming = true;
+                                    }
+                                });
+                            }
+                            if (!stillIncoming) _stopIncomingRing();
+
+                            // Stop ringback if my active call ended or everyone accepted
+                            if (_ringbackCallId){
+                                var c = calls[_ringbackCallId] || {};
+                                if (!c || c.status === 'ended'){ _stopRingback(); }
+                                else {
+                                    var accepted = c.accepted || {};
+                                    var others = (c.members||[]).filter(function(m){ return m !== me; });
+                                    if (!others.length || others.every(function(m){ return accepted[m]; })) _stopRingback();
+                                }
+                            }
+                        });
+                    } catch(_){}
+                }
+
+                // ---------- Individual leave (not full call end) ----------
+                // The existing endVoiceCall (from the conference patch) writes
+                // status='ended' for everyone if the caller hangs up. We
+                // override so that any participant (including admin) leaving
+                // only removes themselves from members[]; the call keeps going
+                // for others. The call auto-ends when 0 or 1 members remain.
+                async function _leaveCurrentCall(){
+                    var callId = _mrVoice && _mrVoice.callId;
+                    var me = STATE.currentUser && STATE.currentUser.username;
+                    _stopIncomingRing();
+                    _stopRingback();
+                    if (!callId){
+                        try { if (typeof window._mrCloseVoiceLocalOnly === 'function') window._mrCloseVoiceLocalOnly('left'); } catch(_){}
+                        return;
+                    }
+                    var newMembers = null;
+                    try {
+                        if (firebaseConnected && db){
+                            var call = await readData('voiceCalls/'+callId, null, true) || {};
+                            var members = (call.members || _mrVoice.members || []).slice();
+                            newMembers = members.filter(function(m){ return m !== me; });
+                            await writeData('voiceCalls/'+callId+'/members', newMembers, null);
+                            try { if (call.accepted && call.accepted[me]) await writeData('voiceCalls/'+callId+'/accepted/'+me, null, null); } catch(_){}
+                            await writeData('voiceCalls/'+callId+'/updatedAt', getNowISO(), null);
+                            await writeData('voiceCalls/'+callId+'/updatedBy', me || 'unknown', null);
+                            // If fewer than 2 members remain, mark the call as
+                            // ended so the last participant's UI closes too.
+                            if (newMembers.length < 2){
+                                await writeData('voiceCalls/'+callId+'/status', 'ended', null);
+                                await writeData('voiceCalls/'+callId+'/endedAt', getNowISO(), null);
+                                await writeData('voiceCalls/'+callId+'/endedBy', me || 'unknown', null);
+                            }
+                        }
+                    } catch(_){}
+                    try { if (typeof window._mrCloseVoiceLocalOnly === 'function') window._mrCloseVoiceLocalOnly('left'); } catch(_){}
+                    try { showToast('You left the call.', 'info'); } catch(_){}
+                }
+                window.endVoiceCall = _leaveCurrentCall;
+                try { endVoiceCall = _leaveCurrentCall; } catch(_){}
+
+                // Admin: remove a specific participant without ending the whole call.
+                window._mrRemoveParticipantFromCall = async function(username){
+                    var callId = _mrVoice && _mrVoice.callId;
+                    if (!callId){ try { showToast('No active call.','warning'); } catch(_){} return; }
+                    if (!firebaseConnected || !db){ try { showToast('Removing a participant needs Firebase connection.','error'); } catch(_){} return; }
+                    try {
+                        var call = await readData('voiceCalls/'+callId, null, true) || {};
+                        var members = (call.members || []).slice();
+                        var idx = members.indexOf(username);
+                        if (idx === -1){ try { showToast('That user is not in the call.','info'); } catch(_){} return; }
+                        members.splice(idx, 1);
+                        await writeData('voiceCalls/'+callId+'/members', members, null);
+                        try { if (call.accepted && call.accepted[username]) await writeData('voiceCalls/'+callId+'/accepted/'+username, null, null); } catch(_){}
+                        await writeData('voiceCalls/'+callId+'/updatedAt', getNowISO(), null);
+                        await writeData('voiceCalls/'+callId+'/updatedBy', (STATE.currentUser && STATE.currentUser.username) || 'admin', null);
+                        // If fewer than 2 remain, end the call for everyone.
+                        if (members.length < 2){
+                            await writeData('voiceCalls/'+callId+'/status', 'ended', null);
+                            await writeData('voiceCalls/'+callId+'/endedAt', getNowISO(), null);
+                            await writeData('voiceCalls/'+callId+'/endedBy', (STATE.currentUser && STATE.currentUser.username) || 'admin', null);
+                        }
+                        try { showToast('Removed ' + username + ' from the call.','success'); } catch(_){}
+                    } catch(e){
+                        try { showToast('Could not remove participant: ' + (e && e.message || e), 'error'); } catch(_){}
+                    }
+                };
             })();
 
             // ================================================================
@@ -13498,9 +13811,921 @@
                 }
             })();
 
+
+            // ================================================================
+            // MuleRun targeted fix: audible call ringing + sent-message editing.
+            // ================================================================
+            (function(){
+                function _mrInjectEditAndRingStyles(){
+                    if (document.getElementById('mrEditRingStyles')) return;
+                    var st = document.createElement('style');
+                    st.id = 'mrEditRingStyles';
+                    st.textContent =
+                        '.mr-ringing-pill{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:6px 10px;border-radius:999px;background:rgba(243,156,18,.16);color:#f6c65b;font-weight:800;font-size:.78rem}' +
+                        '.mr-ringing-dot{width:8px;height:8px;border-radius:50%;background:#f6c65b;box-shadow:0 0 0 0 rgba(246,198,91,.8);animation:mrRingPulse 1.1s infinite}' +
+                        '@keyframes mrRingPulse{70%{box-shadow:0 0 0 9px rgba(246,198,91,0)}100%{box-shadow:0 0 0 0 rgba(246,198,91,0)}}' +
+                        '.chat-msg-head{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:2px}' +
+                        '.chat-msg-edit-btn{border:0;background:rgba(255,255,255,.16);color:inherit;border-radius:999px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;opacity:.75;transition:.2s}' +
+                        '.chat-msg-edit-btn:hover{opacity:1;background:rgba(255,255,255,.28)}' +
+                        '.bubble-row.theirs .chat-msg-edit-btn{background:rgba(0,0,0,.06)}' +
+                        '.bubble-row.theirs .chat-msg-edit-btn:hover{background:rgba(0,0,0,.12)}' +
+                        '.chat-edit-audit{margin-top:8px;padding:8px 10px;border-radius:12px;background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.22);font-size:.76rem;line-height:1.35}' +
+                        '.chat-edit-audit strong{display:inline-block;min-width:58px}' +
+                        '.chat-edit-audit-title{font-weight:800;margin-bottom:5px}' +
+                        '.chat-edit-audit-item{padding-top:6px;margin-top:6px;border-top:1px solid rgba(41,128,185,.18)}' +
+                        '.chat-edited-note{opacity:.72;font-size:.68rem;margin-left:4px}' +
+                        '#editChatMessageText{width:100%;min-height:120px;resize:vertical}';
+                    document.head.appendChild(st);
+                }
+
+                var _mrRing = { ctx:null, timer:null, active:false, label:'', callRef:null, unlockBound:false };
+
+                function _mrUnlockAudio(){
+                    try {
+                        var AC = window.AudioContext || window.webkitAudioContext;
+                        if (!AC) return null;
+                        if (!_mrRing.ctx) _mrRing.ctx = new AC();
+                        if (_mrRing.ctx.state === 'suspended') _mrRing.ctx.resume().catch(function(){});
+                        return _mrRing.ctx;
+                    } catch (_) { return null; }
+                }
+                function _mrBindAudioUnlock(){
+                    if (_mrRing.unlockBound) return;
+                    _mrRing.unlockBound = true;
+                    ['pointerdown','keydown','touchstart','click'].forEach(function(ev){
+                        document.addEventListener(ev, function(){ _mrUnlockAudio(); if (_mrRing.active) _mrPlayRingChime(); }, { passive:true });
+                    });
+                }
+                function _mrPlayRingChime(){
+                    var ctx = _mrUnlockAudio();
+                    if (!ctx || ctx.state === 'suspended') return;
+                    try {
+                        var now = ctx.currentTime;
+                        [0, 0.48].forEach(function(offset){
+                            var gain = ctx.createGain(), o1 = ctx.createOscillator(), o2 = ctx.createOscillator();
+                            o1.type = 'sine'; o2.type = 'sine';
+                            o1.frequency.setValueAtTime(440, now + offset);
+                            o2.frequency.setValueAtTime(554, now + offset);
+                            gain.gain.setValueAtTime(0.0001, now + offset);
+                            gain.gain.exponentialRampToValueAtTime(0.14, now + offset + 0.03);
+                            gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.34);
+                            o1.connect(gain); o2.connect(gain); gain.connect(ctx.destination);
+                            o1.start(now + offset); o2.start(now + offset);
+                            o1.stop(now + offset + 0.38); o2.stop(now + offset + 0.38);
+                        });
+                    } catch (_) {}
+                }
+                function _mrStopRinging(clearWatcher){
+                    _mrRing.active = false;
+                    if (_mrRing.timer) { clearInterval(_mrRing.timer); _mrRing.timer = null; }
+                    var pill = document.getElementById('mrRingingPill'); if (pill) pill.remove();
+                    if (clearWatcher !== false && _mrRing.callRef && _mrRing.callRef.off) {
+                        try { _mrRing.callRef.off(); } catch (_) {}
+                        _mrRing.callRef = null;
+                    }
+                }
+                function _mrSomeoneElseAccepted(call, me){
+                    var accepted = call && call.accepted || {};
+                    return Object.keys(accepted).some(function(name){ return name !== me && accepted[name]; });
+                }
+                function _mrAttachRingWatcher(callId){
+                    if (!callId || !firebaseConnected || !db || !STATE.currentUser) return;
+                    if (_mrRing.callRef && _mrRing.callRef.off) { try { _mrRing.callRef.off(); } catch (_) {} }
+                    _mrRing.callRef = db.ref('voiceCalls/' + callId);
+                    _mrRing.callRef.on('value', function(snap){
+                        var call = snap.val();
+                        var me = STATE.currentUser && STATE.currentUser.username;
+                        if (!call || !me) { _mrStopRinging(true); return; }
+                        var members = call.members || [], accepted = call.accepted || {}, panel = document.getElementById('voicePanel');
+                        if (call.status === 'ended' || members.indexOf(me) === -1) {
+                            _mrStopRinging(true);
+                            if (panel && (!_mrVoice || !_mrVoice.callId || _mrVoice.callId === callId)) panel.remove();
+                            return;
+                        }
+                        if (accepted[me] || (call.from === me && _mrSomeoneElseAccepted(call, me))) {
+                            _mrStopRinging(false);
+                            var status = document.getElementById('voiceStatus');
+                            if (status) status.textContent = 'Connected. Keep this page open for the voice meeting.';
+                        }
+                    });
+                }
+                function _mrStartRinging(label, callId){
+                    _mrInjectEditAndRingStyles();
+                    _mrBindAudioUnlock();
+                    _mrStopRinging(false);
+                    _mrRing.active = true;
+                    _mrRing.label = label || 'Ringing';
+                    _mrPlayRingChime();
+                    _mrRing.timer = setInterval(_mrPlayRingChime, 2600);
+                    var status = document.getElementById('voiceStatus');
+                    if (status && !document.getElementById('mrRingingPill')) {
+                        status.insertAdjacentHTML('afterend', '<div class="mr-ringing-pill" id="mrRingingPill"><span class="mr-ringing-dot"></span><span>' + escapeHTML(_mrRing.label) + '</span></div>');
+                    }
+                    _mrAttachRingWatcher(callId);
+                }
+
+                if (typeof showVoicePanel === 'function') {
+                    var _mrPrevShowVoicePanelForRing = showVoicePanel;
+                    showVoicePanel = function(title, incoming, callId){
+                        var result = _mrPrevShowVoicePanelForRing.apply(this, arguments);
+                        var text = String(title || ''), activeCallId = callId || (_mrVoice && _mrVoice.callId) || '';
+                        if (incoming) _mrStartRinging('Incoming call ringing...', activeCallId);
+                        else if (/^calling\b/i.test(text)) _mrStartRinging('Ringing until the agent answers...', activeCallId);
+                        else if (/connected|active/i.test(text)) _mrStopRinging(false);
+                        return result;
+                    };
+                    window.showVoicePanel = showVoicePanel;
+                }
+                if (typeof acceptVoiceCall === 'function') {
+                    var _mrPrevAcceptVoiceCallForRing = acceptVoiceCall;
+                    acceptVoiceCall = async function(){ _mrStopRinging(false); return _mrPrevAcceptVoiceCallForRing.apply(this, arguments); };
+                    window.acceptVoiceCall = acceptVoiceCall;
+                }
+                if (typeof endVoiceCall === 'function') {
+                    var _mrPrevEndVoiceCallForRing = endVoiceCall;
+                    endVoiceCall = function(){ _mrStopRinging(true); return _mrPrevEndVoiceCallForRing.apply(this, arguments); };
+                    window.endVoiceCall = endVoiceCall;
+                }
+
+                function _mrMsgId(m){ return (typeof _chatMessageId === 'function') ? _chatMessageId(m) : (m && (m._key || m._id || m.id)); }
+                function _mrMsgValues(all){
+                    if (typeof _mrVals === 'function') return _mrVals(all || {});
+                    if (Array.isArray(all)) return all;
+                    return Object.keys(all || {}).map(function(k){ var v = all[k] || {}; if (!v._key) v._key = k; return v; });
+                }
+                function _mrFindMsg(all, id){
+                    if (!all) return null;
+                    if (!Array.isArray(all) && all[id]) return { msg:all[id], key:id, all:all, array:false };
+                    var arr = Array.isArray(all) ? all : Object.keys(all).map(function(k){ var v = all[k] || {}; if (!v._key) v._key = k; return v; });
+                    for (var i = 0; i < arr.length; i++) {
+                        var m = arr[i] || {}, mid = _mrMsgId(m) || m._id || m.id;
+                        if (mid === id) return { msg:m, key:m._key || id, index:i, all:all, array:Array.isArray(all) };
+                    }
+                    return null;
+                }
+                function _mrSenderName(username, mine){
+                    if (mine) return 'You';
+                    var u = (STATE.users || {})[username] || {};
+                    if (typeof _profileNames === 'function') return _profileNames(u, username).display;
+                    return (u && u.name) || username || 'User';
+                }
+                function _mrAvatar(username, display, sys){
+                    if (sys) return '<div class="chat-avatar"><i class="fas fa-bell"></i></div>';
+                    if (typeof _profileAvatarHtml === 'function') return _profileAvatarHtml(username, display, 'chat-avatar');
+                    return '<div class="chat-avatar">' + (typeof _mrInit === 'function' ? _mrInit(display || username || '?') : escapeHTML(String(display || username || '?').slice(0,1).toUpperCase())) + '</div>';
+                }
+                function _mrReturnToActiveChat(saved){
+                    showChatUI();
+                    setTimeout(function(){
+                        if (typeof window._selectChatContact === 'function' && (saved.user || saved.group || saved.pair)) {
+                            window._selectChatContact(saved.user || null, saved.group || null, saved.label || '', saved.pair || null);
+                        }
+                    }, 160);
+                }
+                async function _mrSaveMessageEdit(id, newText){
+                    var all = await readData('chatMessages', 'ph_chat_messages', true) || {}, found = _mrFindMsg(all, id);
+                    if (!found || !found.msg) { showToast('Message not found.', 'error'); return false; }
+                    var me = STATE.currentUser && STATE.currentUser.username;
+                    if (!me || found.msg.from !== me) { showToast('You can only edit your own sent messages.', 'error'); return false; }
+                    var oldText = found.msg.message || '';
+                    if (!newText && !(found.msg.attachment && found.msg.attachment.data)) { showToast('Message cannot be empty.', 'warning'); return false; }
+                    if (newText === oldText) { showToast('No changes to save.', 'info'); return false; }
+                    var now = getNowISO(), history = Array.isArray(found.msg.editHistory) ? found.msg.editHistory.slice() : [];
+                    history.push({ from:oldText, to:newText, at:now, by:me });
+                    var fields = { message:newText, edited:true, editedAt:now, editedBy:me, originalMessage:found.msg.originalMessage != null ? found.msg.originalMessage : oldText, editHistory:history };
+                    if (firebaseConnected && db && !found.array && found.key) await db.ref('chatMessages/' + found.key).update(fields);
+                    else { Object.assign(found.msg, fields); await writeData('chatMessages', found.all, 'ph_chat_messages'); }
+                    try { delete STATE._cache['chatMessages_ph_chat_messages']; } catch (_) {}
+                    showToast('Message edited.', 'success');
+                    return true;
+                }
+                window._mrEditOwnChatMessage = async function(id){
+                    if (!STATE.currentUser) return;
+                    var saved = { user:STATE.activeChatUser || null, group:STATE.activeChatGroup || null, pair:STATE.activeChatPair || null, label:(document.getElementById('chatContactName') || {}).textContent || '' };
+                    var all = await readData('chatMessages', 'ph_chat_messages', true) || {}, found = _mrFindMsg(all, id);
+                    if (!found || !found.msg) return showToast('Message not found.', 'error');
+                    if (found.msg.from !== STATE.currentUser.username) return showToast('You can only edit your own sent messages.', 'error');
+                    showModal('<h3><i class="fas fa-pen"></i> Edit Message</h3>' +
+                        '<p class="text-muted text-sm">Only admin can view the original and edited versions. Other users see the updated message.</p>' +
+                        '<div class="form-group"><label>Message</label><textarea id="editChatMessageText">' + escapeHTML(found.msg.message || '') + '</textarea></div>' +
+                        '<div class="modal-actions"><button class="btn btn-primary" id="btnSaveChatEdit"><i class="fas fa-save"></i> Save Edit</button>' +
+                        '<button class="btn btn-outline" id="btnCancelChatEdit">Back to Chat</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');
+                    var cancel = document.getElementById('btnCancelChatEdit');
+                    if (cancel) cancel.onclick = function(){ _mrReturnToActiveChat(saved); };
+                    var save = document.getElementById('btnSaveChatEdit');
+                    if (save) save.onclick = async function(){
+                        var txt = (document.getElementById('editChatMessageText').value || '').trim();
+                        var ok = await _mrSaveMessageEdit(id, txt);
+                        if (ok) _mrReturnToActiveChat(saved);
+                    };
+                };
+
+                if (typeof renderChatMessages === 'function') {
+                    renderChatMessages = function(messages){
+                        _mrInjectEditAndRingStyles();
+                        var c = document.getElementById('chatMessagesContainer');
+                        if (!c) return;
+                        var context = '';
+                        if (STATE.activeChatPair) context = '<div class="chat-context-label"><i class="fas fa-user-friends"></i> Agent mutual chat</div>';
+                        else if (isAdmin() && STATE.activeChatUser) context = '<div class="chat-context-label"><i class="fas fa-user-shield"></i> Admin direct chat</div>';
+                        else if (STATE.activeChatGroup) context = '<div class="chat-context-label"><i class="fas fa-users"></i> Group chat</div>';
+                        if (!messages || !messages.length) {
+                            c.innerHTML = context + '<div class="chat-empty"><i class="fas fa-comments" style="font-size:2rem;color:var(--primary);"></i><h4>No messages yet</h4><p>Full chat history will be saved here.</p></div>';
+                            return;
+                        }
+                        c.innerHTML = context + _mrMsgValues(messages).map(function(m){
+                            var mine = m.from === STATE.currentUser.username, sys = m.type === 'system', mid = _mrMsgId(m);
+                            var senderName = sys ? 'Group Notice' : _mrSenderName(m.from, mine);
+                            var content = m.message ? '<div>' + escapeHTML(m.message) + '</div>' : '';
+                            if (m.attachment && m.attachment.data) content += '<img class="chat-image" src="' + m.attachment.data + '" alt="Shared image" />';
+                            var adminAudit = '';
+                            if (isAdmin() && m.editedAt) {
+                                var edits = Array.isArray(m.editHistory) ? m.editHistory : [];
+                                if (!edits.length) edits = [{ from: (m.originalMessage != null ? m.originalMessage : ''), to: (m.message || ''), at: m.editedAt || '', by: m.editedBy || '' }];
+                                adminAudit = '<div class="chat-edit-audit"><div class="chat-edit-audit-title">Edit history visible to admin only</div>' +
+                                    edits.map(function(e, idx){
+                                        return '<div class="chat-edit-audit-item"><div><strong>Edit #' + (idx + 1) + ':</strong> ' + formatDateTime(e.at || '') + (e.by ? ' by ' + escapeHTML(e.by) : '') + '</div>' +
+                                            '<div><strong>Before:</strong> ' + escapeHTML((e.from || '') || '(empty)') + '</div>' +
+                                            '<div><strong>After:</strong> ' + escapeHTML((e.to || '') || '(empty)') + '</div></div>';
+                                    }).join('') + '</div>';
+                            }
+                            var check = (isAdmin() && mid) ? '<label class="chat-delete-select" title="Select message to delete"><input type="checkbox" class="chat-delete-check" value="' + escapeHTML(mid) + '" /></label>' : '';
+                            var editBtn = (mine && !sys && mid) ? '<button type="button" class="chat-msg-edit-btn" data-msg-id="' + escapeHTML(mid) + '" title="Edit message"><i class="fas fa-pen"></i></button>' : '';
+                            var editedNote = m.editedAt ? '<span class="chat-edited-note">edited</span>' : '';
+                            var head = '<div class="chat-msg-head"><div class="msg-sender">' + escapeHTML(senderName) + '</div>' + editBtn + '</div>';
+                            return '<div class="bubble-row ' + (mine ? 'mine' : 'theirs') + ' ' + (sys ? 'system' : '') + '">' + check + _mrAvatar(m.from, senderName, sys) +
+                                '<div class="bubble">' + head + content + adminAudit + '<div class="bubble-meta">' + formatTime(m.timestamp || '') + editedNote + '</div></div></div>';
+                        }).join('');
+                        c.querySelectorAll('.chat-msg-edit-btn').forEach(function(btn){
+                            btn.onclick = function(ev){ ev.preventDefault(); ev.stopPropagation(); window._mrEditOwnChatMessage(this.getAttribute('data-msg-id')); };
+                        });
+                        setTimeout(function(){ c.scrollTop = Math.max(0, c.scrollHeight - c.clientHeight); }, 40);
+                    };
+                }
+                if (typeof afterLogin === 'function') {
+                    var _mrPrevAfterLoginForRingUnlock = afterLogin;
+                    afterLogin = async function(){ var result = await _mrPrevAfterLoginForRingUnlock.apply(this, arguments); _mrBindAudioUnlock(); _mrUnlockAudio(); return result; };
+                }
+                _mrInjectEditAndRingStyles();
+            })();
+
+            // MuleRun requested addition: WhatsApp-style emoji picker for chat messages only.
+            (function(){
+                var MR_EMOJI_STYLE_ID = 'mr-whatsapp-emoji-picker-style';
+                function injectWhatsappEmojiStyles(){
+                    if (document.getElementById(MR_EMOJI_STYLE_ID)) return;
+                    var style = document.createElement('style');
+                    style.id = MR_EMOJI_STYLE_ID;
+                    style.textContent = '.messenger-input.has-whatsapp-emoji{position:relative}.mr-whatsapp-emoji-btn{font-size:1.08rem}.mr-whatsapp-emoji-panel{position:absolute;left:14px;right:64px;bottom:66px;z-index:50;display:none;max-width:520px;background:var(--bg2);color:var(--text);border:1px solid var(--card-border);border-radius:18px;box-shadow:0 22px 70px rgba(0,0,0,.28);overflow:hidden;backdrop-filter:blur(18px)}.mr-whatsapp-emoji-panel.open{display:block}.mr-whatsapp-emoji-head{display:flex;gap:6px;align-items:center;overflow-x:auto;padding:9px;border-bottom:1px solid var(--card-border);background:rgba(37,211,102,.08)}.mr-whatsapp-emoji-tab{border:0;background:transparent;color:var(--text);width:34px;height:32px;border-radius:10px;font-size:1.05rem;cursor:pointer;flex:0 0 auto}.mr-whatsapp-emoji-tab.active,.mr-whatsapp-emoji-tab:hover{background:rgba(37,211,102,.18)}.mr-whatsapp-emoji-body{max-height:260px;overflow:auto;padding:10px;background:var(--card)}.mr-whatsapp-emoji-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:4px}.mr-whatsapp-emoji-cell{height:34px;border:0;border-radius:9px;background:transparent;font-size:1.32rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}.mr-whatsapp-emoji-cell:hover{background:rgba(37,211,102,.20);transform:scale(1.08)}.mr-whatsapp-emoji-title{font-size:.72rem;font-weight:800;color:var(--text2);padding:2px 4px 9px;text-transform:uppercase;letter-spacing:.08em}.theme-custom .mr-whatsapp-emoji-panel{background:var(--custom-panel-bg)!important;color:var(--custom-readable)!important;border-color:var(--custom-border)!important}.theme-custom .mr-whatsapp-emoji-title{color:var(--custom-readable-soft)!important}@media(max-width:780px){.mr-whatsapp-emoji-panel{left:8px;right:8px;bottom:62px;max-width:none}.mr-whatsapp-emoji-body{max-height:220px}.mr-whatsapp-emoji-cell{height:32px;font-size:1.22rem}}';
+                    document.head.appendChild(style);
+                }
+                function cpRange(start, end){
+                    var out = [];
+                    for (var i = start; i <= end; i++) {
+                        if (i >= 0xD800 && i <= 0xDFFF) continue;
+                        out.push(String.fromCodePoint(i));
+                    }
+                    return out;
+                }
+                function words(str){ return String(str || '').trim().split(/\s+/).filter(Boolean); }
+                function unique(list){
+                    var seen = {}, out = [];
+                    list.forEach(function(e){ if (e && !seen[e]) { seen[e] = true; out.push(e); } });
+                    return out;
+                }
+                function addSkinTones(list){
+                    var tones = words('🏻 🏼 🏽 🏾 🏿'), out = list.slice();
+                    list.forEach(function(e){ tones.forEach(function(t){ out.push(e + t); }); });
+                    return out;
+                }
+                function flagFromCode(code){
+                    return code.replace(/[A-Z]/g, function(ch){ return String.fromCodePoint(0x1F1E6 + ch.charCodeAt(0) - 65); });
+                }
+                function allFlags(){
+                    var codes = words('AC AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CP CR CU CV CW CX CY CZ DE DG DJ DK DM DO DZ EA EC EE EG EH ER ES ET EU FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU IC ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TA TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM UN US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW');
+                    return codes.map(flagFromCode).concat(words('🏳️ 🏴 🏁 🚩 🏳️‍🌈 🏳️‍⚧️ 🏴‍☠️'));
+                }
+                function whatsappEmojiCategories(){
+                    var handBases = words('👋 🤚 🖐️ ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 🖕 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 🫶 👐 🤲 🤝 🙏 ✍️ 💅 🤳 💪 🦾 🦿 🦵 🦶 👂 🦻 👃');
+                    var peopleBases = words('👶 🧒 👦 👧 🧑 👱 👨 🧔 🧔‍♂️ 🧔‍♀️ 👩 🧓 👴 👵 🙍 🙎 🙅 🙆 💁 🙋 🧏 🙇 🤦 🤷 👮 🕵️ 💂 🥷 👷 🫅 🤴 👸 👳 👲 🧕 🤵 👰 🤰 🫃 🫄 🤱 👩‍🍼 👨‍🍼 🧑‍🍼 👼 🎅 🤶 🧑‍🎄 🦸 🦹 🧙 🧚 🧛 🧜 🧝 🧞 🧟 💆 💇 🚶 🧍 🧎 🏃 💃 🕺 🕴️ 👯 🧖 🧗 🤺 🏇 ⛷️ 🏂 🏌️ 🏄 🚣 🏊 ⛹️ 🏋️ 🚴 🚵 🤸 🤼 🤽 🤾 🤹 🧘 🛀 🛌');
+                    var family = words('👭 👫 👬 💏 👩‍❤️‍💋‍👨 👨‍❤️‍💋‍👨 👩‍❤️‍💋‍👩 💑 👩‍❤️‍👨 👨‍❤️‍👨 👩‍❤️‍👩 👪 👨‍👩‍👦 👨‍👩‍👧 👨‍👩‍👧‍👦 👨‍👩‍👦‍👦 👨‍👩‍👧‍👧 👨‍👨‍👦 👨‍👨‍👧 👨‍👨‍👧‍👦 👨‍👨‍👦‍👦 👨‍👨‍👧‍👧 👩‍👩‍👦 👩‍👩‍👧 👩‍👩‍👧‍👦 👩‍👩‍👦‍👦 👩‍👩‍👧‍👧 👨‍👦 👨‍👦‍👦 👨‍👧 👨‍👧‍👦 👨‍👧‍👧 👩‍👦 👩‍👦‍👦 👩‍👧 👩‍👧‍👦 👩‍👧‍👧');
+                    var categories = [
+                        { name: 'Smileys', icon: '🙂', emojis: unique(cpRange(0x1F600,0x1F64F).concat(cpRange(0x1FAE0,0x1FAEF), words('☺️ ☹️ ☠️ ❣️ ❤️‍🔥 ❤️‍🩹')))},
+                        { name: 'People', icon: '👋', emojis: unique(addSkinTones(handBases).concat(addSkinTones(peopleBases), family, cpRange(0x1F9B0,0x1F9B3)))},
+                        { name: 'Animals', icon: '🐻', emojis: unique(cpRange(0x1F400,0x1F43F).concat(cpRange(0x1F980,0x1F9AE), words('🐾 🪶 🪸 🪼 🪿 🫎 🫏')))},
+                        { name: 'Food', icon: '🍔', emojis: unique(cpRange(0x1F32D,0x1F37F).concat(words('🫐 🫒 🫑 🫓 🫔 🫕 🧄 🧅 🥐 🥑 🥒 🥓 🥔 🥕 🥖 🥗 🥘 🥙 🥚 🥛 🥜 🥝 🥞 🥟 🥠 🥡 🥢 🥣 🥤 🥥 🥦 🥧 🥨 🥩 🥪 🥫 🥬 🥭 🥮 🥯 🧇 🧈 🧉 🧃 🧆 🧊 🫚 🫛 🫜')))},
+                        { name: 'Travel', icon: '🚗', emojis: unique(cpRange(0x1F680,0x1F6FF).concat(cpRange(0x1F300,0x1F320), words('⌚ ⌛ ⏩ ⏪ ⏫ ⏬ ⏰ ⏱️ ⏲️ 🕰️ 🗺️ 🗿 🛕 🛖 🛻 🛞 🛟 🛝 🛤️ 🛣️ 🏔️ 🏕️ 🏖️ 🏜️ 🏝️ 🏞️ 🏟️ 🏛️ 🏗️ 🏘️ 🏚️ 🏠 🏡 🏢 🏣 🏤 🏥 🏦 🏨 🏩 🏪 🏫 🏬 🏭 🏯 🏰 💒 🗼 🗽 ⛪ 🕌 🛐 🕍 ⛩️ 🕋 ⛲ ⛺ 🌋 🌁 🌃 🌄 🌅 🌆 🌇 🌉 ♨️ 🎠 🎡 🎢 💈 🎪 🚂 🚃 🚄 🚅 🚆 🚇 🚈 🚉 🚊 🚝 🚞 🚋 🚌 🚍 🚎 🚐 🚑 🚒 🚓 🚔 🚕 🚖 🚗 🚘 🚙 🚚 🚛 🚜 🏎️ 🏍️ 🛵 🦽 🦼 🛺 🚲 🛴 🛹 🛼 🚏 ⛽ 🛢️ 🚨 🚥 🚦 🛑 🚧 ⚓ ⛵ 🛶 🚤 🛳️ ⛴️ 🚢 ✈️ 🛩️ 🛫 🛬 🪂 💺 🚁 🚟 🚠 🚡 🛰️ 🚀 🛸')))},
+                        { name: 'Activities', icon: '⚽', emojis: unique(cpRange(0x1F380,0x1F3FF).concat(words('⚽ ⚾ 🥎 🏀 🏐 🏈 🏉 🎾 🥏 🎳 🏏 🏑 🏒 🥍 🏓 🏸 🥊 🥋 🥅 ⛳ ⛸️ 🎣 🤿 🎽 🎿 🛷 🥌 🎯 🪀 🪁 🔫 🎱 🔮 🪄 🎮 🕹️ 🎰 🎲 🧩 🧸 🪅 🪩 🪆 ♠️ ♥️ ♦️ ♣️ ♟️ 🃏 🀄 🎴 🎭 🖼️ 🎨 🧵 🪡 🧶 🪢')))},
+                        { name: 'Objects', icon: '💡', emojis: unique(cpRange(0x1F4A0,0x1F5FF).concat(words('🪬 🧿 🪧 🪪 🩼 🩺 🩻 🪮 🪭 🧰 🧲 🧪 🧫 🧬 🧯 🧴 🧵 🧶 🧷 🧹 🧺 🧻 🧼 🧽 🧾 🧸 🪆 🪔 🪄 🪅 🪩 🪫 🪙 🪃 🪚 🪛 🪝 🪜 🪠 🪤 🪞 🪟 🪑 🪒 🪓 🪦 🪧 🛒 🛍️ 🛎️ 🛏️ 🛋️ 🚪 🪵 🪨 🛗 🪥 🪣 🪄')))},
+                        { name: 'Symbols', icon: '❤️', emojis: unique(cpRange(0x2600,0x27BF).concat(cpRange(0x1F7E0,0x1F7FF), words('❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 ❤️‍🔥 ❤️‍🩹 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ☮️ ✝️ ☪️ 🕉️ ☸️ ✡️ 🔯 🕎 ☯️ ☦️ 🛐 ⛎ ♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓ 🆔 ⚛️ 🉑 ☢️ ☣️ 📴 📳 🈶 🈚 🈸 🈺 🈷️ ✴️ 🆚 💮 🉐 ㊙️ ㊗️ 🈴 🈵 🈹 🈲 🅰️ 🅱️ 🆎 🆑 🅾️ 🆘 ❌ ⭕ 🛑 ⛔ 📛 🚫 💯 💢 ♨️ 🚷 🚯 🚳 🚱 🔞 📵 🚭 ❗ ❕ ❓ ❔ ‼️ ⁉️ 🔅 🔆 〽️ ⚠️ 🚸 🔱 ⚜️ 🔰 ♻️ ✅ 🈯 💹 ❇️ ✳️ ❎ 🌐 💠 Ⓜ️ 🌀 💤 🏧 🚾 ♿ 🅿️ 🛗 🈳 🈂️ 🛂 🛃 🛄 🛅 🚹 🚺 🚼 ⚧️ 🚻 🚮 🎦 📶 🈁 🔣 ℹ️ 🔤 🔡 🔠 🆖 🆗 🆙 🆒 🆕 🆓 0️⃣ 1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ 6️⃣ 7️⃣ 8️⃣ 9️⃣ 🔟 🔢 #️⃣ *️⃣ ▶️ ⏸️ ⏯️ ⏹️ ⏺️ ⏭️ ⏮️ ⏩ ⏪ 🔀 🔁 🔂 ◀️ 🔼 🔽 ⏫ ⏬ ➡️ ⬅️ ⬆️ ⬇️ ↗️ ↘️ ↙️ ↖️ ↕️ ↔️ ↪️ ↩️ ⤴️ ⤵️ 🔃 🔄 🔙 🔚 🔛 🔜 🔝 🛐 ⚕️ ♾️ ✔️ ➕ ➖ ➗ ✖️ 🟰 💲 💱 ™️ ©️ ®️ 〰️ ➰ ➿ 🔘 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ 🟤 🔺 🔻 🔸 🔹 🔶 🔷 🔳 🔲 ▪️ ▫️ ◾ ◽ ◼️ ◻️ 🟥 🟧 🟨 🟩 🟦 🟪 ⬛ ⬜ 🟫')))},
+                        { name: 'Flags', icon: '🏳️', emojis: unique(allFlags())}
+                    ];
+                    return categories;
+                }
+                var mrWhatsappEmojiData = null;
+                function getEmojiData(){ if (!mrWhatsappEmojiData) mrWhatsappEmojiData = whatsappEmojiCategories(); return mrWhatsappEmojiData; }
+                function insertEmoji(input, emoji){
+                    if (!input || input.disabled) return;
+                    var start = typeof input.selectionStart === 'number' ? input.selectionStart : input.value.length;
+                    var end = typeof input.selectionEnd === 'number' ? input.selectionEnd : input.value.length;
+                    var before = input.value.slice(0, start), after = input.value.slice(end);
+                    input.value = before + emoji + after;
+                    var pos = start + emoji.length;
+                    input.focus();
+                    if (input.setSelectionRange) input.setSelectionRange(pos, pos);
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                function installWhatsappEmojiPicker(){
+                    injectWhatsappEmojiStyles();
+                    var bar = document.querySelector('.messenger-input');
+                    var input = document.getElementById('chatInput');
+                    if (!bar || !input || document.getElementById('mrWhatsappEmojiBtn')) return;
+                    bar.classList.add('has-whatsapp-emoji');
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.id = 'mrWhatsappEmojiBtn';
+                    btn.className = 'icon-btn mr-whatsapp-emoji-btn';
+                    btn.title = 'WhatsApp emojis';
+                    btn.setAttribute('aria-label', 'Open WhatsApp emoji picker');
+                    btn.innerHTML = '<i class="far fa-face-smile"></i>';
+                    var panel = document.createElement('div');
+                    panel.id = 'mrWhatsappEmojiPanel';
+                    panel.className = 'mr-whatsapp-emoji-panel';
+                    panel.setAttribute('role', 'dialog');
+                    panel.setAttribute('aria-label', 'WhatsApp emoji picker');
+                    var head = document.createElement('div');
+                    head.className = 'mr-whatsapp-emoji-head';
+                    var body = document.createElement('div');
+                    body.className = 'mr-whatsapp-emoji-body';
+                    panel.appendChild(head);
+                    panel.appendChild(body);
+                    var data = getEmojiData();
+                    function draw(index){
+                        index = index || 0;
+                        head.querySelectorAll('.mr-whatsapp-emoji-tab').forEach(function(t, i){ t.classList.toggle('active', i === index); });
+                        var cat = data[index];
+                        body.innerHTML = '<div class="mr-whatsapp-emoji-title">' + cat.name + ' · WhatsApp emoji set</div><div class="mr-whatsapp-emoji-grid"></div>';
+                        var grid = body.querySelector('.mr-whatsapp-emoji-grid');
+                        cat.emojis.forEach(function(emoji){
+                            var cell = document.createElement('button');
+                            cell.type = 'button';
+                            cell.className = 'mr-whatsapp-emoji-cell';
+                            cell.textContent = emoji;
+                            cell.title = emoji;
+                            cell.onclick = function(ev){ ev.preventDefault(); insertEmoji(input, emoji); };
+                            grid.appendChild(cell);
+                        });
+                    }
+                    data.forEach(function(cat, index){
+                        var tab = document.createElement('button');
+                        tab.type = 'button';
+                        tab.className = 'mr-whatsapp-emoji-tab';
+                        tab.textContent = cat.icon;
+                        tab.title = cat.name;
+                        tab.onclick = function(ev){ ev.preventDefault(); draw(index); };
+                        head.appendChild(tab);
+                    });
+                    draw(0);
+                    btn.onclick = function(ev){
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        if (input.disabled) { if (typeof showToast === 'function') showToast('This chat is view-only.', 'warning'); return; }
+                        panel.classList.toggle('open');
+                    };
+                    panel.onclick = function(ev){ ev.stopPropagation(); };
+                    bar.insertBefore(btn, input);
+                    bar.appendChild(panel);
+                    if (!document.__mrWhatsappEmojiOutsideClickBound) {
+                        document.__mrWhatsappEmojiOutsideClickBound = true;
+                        document.addEventListener('click', function(){
+                            var p = document.getElementById('mrWhatsappEmojiPanel');
+                            if (p) p.classList.remove('open');
+                        });
+                        document.addEventListener('keydown', function(ev){
+                            if (ev.key === 'Escape') {
+                                var p = document.getElementById('mrWhatsappEmojiPanel');
+                                if (p) p.classList.remove('open');
+                            }
+                        });
+                    }
+                }
+                if (typeof showChatUI === 'function' && !showChatUI.__mrWhatsappEmojiPatched) {
+                    var _mrPrevWhatsappEmojiShowChatUI = showChatUI;
+                    showChatUI = function(){
+                        var result = _mrPrevWhatsappEmojiShowChatUI.apply(this, arguments);
+                        setTimeout(installWhatsappEmojiPicker, 90);
+                        return result;
+                    };
+                    showChatUI.__mrWhatsappEmojiPatched = true;
+                }
+                document.addEventListener('DOMContentLoaded', function(){ setTimeout(installWhatsappEmojiPicker, 700); });
+            })();
+
+
+
+            // ================================================================
+            // MuleRun chat window controls: move, resize, minimize, maximize, sidebar and online agents
+            // ================================================================
+            (function(){
+                var _mrChatOnlineTimer = null;
+
+                function _mrInjectChatWindowStyles(){
+                    if (document.getElementById('mrChatWindowControlStyles')) return;
+                    var st = document.createElement('style');
+                    st.id = 'mrChatWindowControlStyles';
+                    st.textContent =
+                        '.modal-overlay.mr-chat-floating{background:transparent!important;backdrop-filter:none!important;pointer-events:none!important;padding:0!important;align-items:flex-start!important;justify-content:flex-start!important;}' +
+                        '.modal-overlay.mr-chat-floating #modalBox{pointer-events:auto!important;}' +
+                        '#modalBox.chat-modal.mr-chat-resizable{position:fixed!important;resize:both!important;overflow:hidden!important;min-width:380px!important;min-height:330px!important;max-width:calc(100vw - 12px)!important;max-height:calc(100vh - 12px)!important;}' +
+                        '#modalBox.chat-modal.mr-chat-maximized{left:6px!important;top:6px!important;width:calc(100vw - 12px)!important;height:calc(100vh - 12px)!important;max-width:calc(100vw - 12px)!important;max-height:calc(100vh - 12px)!important;resize:none!important;}' +
+                        '#modalBox.chat-modal.mr-chat-minimized{left:auto!important;top:auto!important;right:18px!important;bottom:18px!important;width:min(420px,calc(100vw - 36px))!important;height:58px!important;min-height:58px!important;max-height:58px!important;padding:8px 10px!important;resize:none!important;overflow:hidden!important;}' +
+                        '#modalBox.chat-modal.mr-chat-minimized #modalContent>:not(.mr-chat-window-bar){display:none!important;}' +
+                        '.mr-chat-window-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-8px -8px 12px;padding:9px 10px;border:1px solid var(--card-border);border-radius:16px;background:linear-gradient(135deg,rgba(184,134,11,.16),rgba(255,255,255,.08));cursor:move;user-select:none;touch-action:none;}' +
+                        '.mr-chat-window-title{display:flex;align-items:center;gap:8px;font-weight:900;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+                        '.mr-chat-window-title i{color:var(--primary);}' +
+                        '.mr-chat-window-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;}' +
+                        '.mr-chat-window-actions button{height:32px;min-width:32px;border-radius:999px;border:1px solid var(--card-border);background:var(--input-bg);color:var(--text);cursor:pointer;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 10px;}' +
+                        '.mr-chat-window-actions button:hover{background:var(--primary);border-color:var(--primary);color:#fff;}' +
+                        '.mr-chat-window-actions .mr-chat-text-btn{font-size:.76rem;min-width:auto;}' +
+                        '.mr-online-count{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;background:rgba(39,174,96,.14);color:#1f8b4c;font-size:.72rem;font-weight:900;}' +
+                        '.mr-online-count:before{content:"";width:7px;height:7px;border-radius:50%;background:#27ae60;box-shadow:0 0 0 4px rgba(39,174,96,.14);}' +
+                        '.mr-chat-min-badge{display:none;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:var(--danger);color:#fff;font-size:.72rem;font-weight:900;box-shadow:0 8px 20px rgba(192,57,43,.34);}' +
+                        '#modalBox.chat-modal.mr-chat-minimized .mr-chat-min-badge.has-new{display:inline-flex;}' +
+                        '#modalBox.chat-modal.mr-chat-minimized.mr-chat-has-new .mr-chat-window-title i{animation:mrChatNewPulse 1.1s infinite;}' +
+                        '@keyframes mrChatNewPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}' +
+                        '.mr-chat-resize-handle{position:absolute;z-index:9999;pointer-events:auto;opacity:.72;background:transparent;}' +
+                        '.mr-chat-resize-handle.se{right:0;bottom:0;width:34px;height:34px;cursor:nwse-resize;}' +
+                        '.mr-chat-resize-handle.se:before{content:"";position:absolute;right:7px;bottom:7px;width:15px;height:15px;border-right:3px solid var(--primary);border-bottom:3px solid var(--primary);border-radius:2px;}' +
+                        '.mr-chat-resize-handle.e{right:0;top:64px;bottom:18px;width:14px;cursor:ew-resize;}' +
+                        '.mr-chat-resize-handle.w{left:0;top:64px;bottom:18px;width:14px;cursor:ew-resize;}' +
+                        '.mr-chat-resize-handle.s{left:18px;right:42px;bottom:0;height:14px;cursor:ns-resize;}' +
+                        '.mr-chat-resize-handle.n{left:18px;right:18px;top:0;height:14px;cursor:ns-resize;}' +
+                        '.mr-chat-resize-handle.nw{left:-4px;top:-4px;width:18px;height:18px;cursor:nwse-resize;}' +
+                        '.mr-chat-resize-handle.ne{right:-4px;top:-4px;width:18px;height:18px;cursor:nesw-resize;}' +
+                        '.mr-chat-resize-handle.sw{left:-4px;bottom:-4px;width:18px;height:18px;cursor:nesw-resize;}' +
+                        '#modalBox.chat-modal.mr-chat-minimized .mr-chat-resize-handle,#modalBox.chat-modal.mr-chat-maximized .mr-chat-resize-handle{display:none!important;}' +
+                        '.chat-shell.mr-sidebar-hidden{grid-template-columns:minmax(260px,1fr)!important;}' +
+                        '.chat-shell.mr-sidebar-hidden .chat-sidebar{display:none!important;}' +
+                        '.mr-online-panel{margin:10px;border:1px solid var(--card-border);border-radius:16px;background:var(--input-bg);overflow:hidden;flex:0 0 auto;}' +
+                        '.mr-online-panel.hidden{display:none!important;}' +
+                        '.mr-online-panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid var(--card-border);font-weight:900;font-size:.82rem;}' +
+                        '#mrChatOnlineList{max-height:240px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;}' +
+                        '#mrChatOnlineList::-webkit-scrollbar{width:10px;}' +
+                        '#mrChatOnlineList::-webkit-scrollbar-thumb{background:var(--primary);border-radius:999px;border:3px solid transparent;background-clip:content-box;}' +
+                        '.mr-online-agent{display:flex;align-items:center;gap:9px;padding:9px 12px;border-bottom:1px solid rgba(0,0,0,.05);cursor:pointer;}' +
+                        '.mr-online-agent:last-child{border-bottom:0;}' +
+                        '.mr-online-agent:hover{background:rgba(184,134,11,.12);}' +
+                        '.mr-online-agent.offline{opacity:.74;}' +
+                        '.mr-online-agent-dot,.mr-agent-presence-dot{width:9px;height:9px;border-radius:50%;background:#27ae60;box-shadow:0 0 0 4px rgba(39,174,96,.13);flex:0 0 auto;}' +
+                        '.mr-online-agent.offline .mr-online-agent-dot{background:#a0a0a0;box-shadow:none;}' +
+                        '.mr-online-agent-main{min-width:0;flex:1;}' +
+                        '.mr-online-agent-name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+                        '.mr-online-agent-sub{font-size:.72rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+                        '.mr-online-agent-status{font-weight:800;color:#1f8b4c;}' +
+                        '.mr-online-agent.offline .mr-online-agent-status{color:var(--text2);}' +
+                        '.mr-agent-presence{display:inline-flex;align-items:center;gap:5px;margin-left:4px;font-weight:800;color:#1f8b4c;}' +
+                        '.mr-agent-presence.offline{color:var(--text2);opacity:.72;}' +
+                        '.mr-agent-presence.offline .mr-agent-presence-dot{background:#a0a0a0;box-shadow:none;}' +
+                        '@media(max-width:780px){#modalBox.chat-modal.mr-chat-resizable{left:6px!important;top:6px!important;width:calc(100vw - 12px)!important;height:calc(100vh - 12px)!important}.mr-chat-window-actions .mr-chat-text-btn span{display:none}.mr-chat-window-actions button{padding:0 8px}.mr-chat-window-bar{gap:6px}}';
+                    document.head.appendChild(st);
+                }
+
+                function _mrClamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+                function _mrSetImportant(el, name, value){ if (el) el.style.setProperty(name, value, 'important'); }
+                function _mrPositionChatBox(){
+                    var box = document.getElementById('modalBox');
+                    var container = document.getElementById('modalContainer');
+                    if (!box || !container || !box.classList.contains('chat-modal')) return;
+                    container.classList.add('mr-chat-floating');
+                    box.classList.add('mr-chat-resizable');
+                    if (!box.dataset.mrChatPositioned) {
+                        var r = box.getBoundingClientRect();
+                        var w = Math.min(r.width || (window.innerWidth * 0.92), window.innerWidth - 16);
+                        var h = Math.min(r.height || (window.innerHeight * 0.88), window.innerHeight - 16);
+                        var l = _mrClamp(r.left || ((window.innerWidth - w) / 2), 6, Math.max(6, window.innerWidth - w - 6));
+                        var t = _mrClamp(r.top || ((window.innerHeight - h) / 2), 6, Math.max(6, window.innerHeight - h - 6));
+                        _mrSetImportant(box, 'position', 'fixed');
+                        _mrSetImportant(box, 'left', l + 'px');
+                        _mrSetImportant(box, 'top', t + 'px');
+                        _mrSetImportant(box, 'right', 'auto');
+                        _mrSetImportant(box, 'bottom', 'auto');
+                        _mrSetImportant(box, 'width', w + 'px');
+                        _mrSetImportant(box, 'height', h + 'px');
+                        box.dataset.mrChatPositioned = '1';
+                    }
+                }
+
+                function _mrMakeDraggable(){
+                    var box = document.getElementById('modalBox');
+                    var bar = document.getElementById('mrChatWindowBar');
+                    if (!box || !bar || bar.dataset.dragReady) return;
+                    bar.dataset.dragReady = '1';
+                    bar.addEventListener('pointerdown', function(ev){
+                        if (ev.target && ev.target.closest('button')) return;
+                        if (box.classList.contains('mr-chat-maximized')) return;
+                        ev.preventDefault();
+                        box.classList.remove('mr-chat-minimized');
+                        var r = box.getBoundingClientRect();
+                        var startX = ev.clientX, startY = ev.clientY, startL = r.left, startT = r.top;
+                        try { bar.setPointerCapture(ev.pointerId); } catch (_) {}
+                        function move(e){
+                            var w = box.offsetWidth || r.width, h = box.offsetHeight || r.height;
+                            var l = _mrClamp(startL + e.clientX - startX, 0, Math.max(0, window.innerWidth - w));
+                            var t = _mrClamp(startT + e.clientY - startY, 0, Math.max(0, window.innerHeight - Math.min(h, window.innerHeight)));
+                            _mrSetImportant(box, 'left', l + 'px');
+                            _mrSetImportant(box, 'top', t + 'px');
+                            _mrSetImportant(box, 'right', 'auto');
+                            _mrSetImportant(box, 'bottom', 'auto');
+                        }
+                        function up(){
+                            document.removeEventListener('pointermove', move);
+                            document.removeEventListener('pointerup', up);
+                        }
+                        document.addEventListener('pointermove', move);
+                        document.addEventListener('pointerup', up);
+                    });
+                }
+
+                function _mrMakeResizable(){
+                    var box = document.getElementById('modalBox');
+                    if (!box || box.dataset.mrResizeReady) return;
+                    box.dataset.mrResizeReady = '1';
+                    function bindResizeGrip(grip, dir){
+                        function startResize(ev){
+                            if (ev.type === 'mousedown' && window.PointerEvent) return;
+                            if (box.classList.contains('mr-chat-maximized') || box.classList.contains('mr-chat-minimized')) return;
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                            var point = (ev.touches && ev.touches[0]) || ev;
+                            var r = box.getBoundingClientRect();
+                            var startX = point.clientX, startY = point.clientY, startL = r.left, startT = r.top, startW = r.width, startH = r.height;
+                            var minW = 380, minH = 330;
+                            try { if (ev.pointerId != null) grip.setPointerCapture(ev.pointerId); } catch (_) {}
+                            document.body.style.userSelect = 'none';
+                            function move(e){
+                                var p = (e.touches && e.touches[0]) || e;
+                                var dx = p.clientX - startX, dy = p.clientY - startY;
+                                var left = startL, top = startT, width = startW, height = startH;
+                                if (dir.indexOf('e') !== -1) width = _mrClamp(startW + dx, minW, window.innerWidth - startL - 6);
+                                if (dir.indexOf('s') !== -1) height = _mrClamp(startH + dy, minH, window.innerHeight - startT - 6);
+                                if (dir.indexOf('w') !== -1) {
+                                    left = _mrClamp(startL + dx, 6, startL + startW - minW);
+                                    width = startW + (startL - left);
+                                }
+                                if (dir.indexOf('n') !== -1) {
+                                    top = _mrClamp(startT + dy, 6, startT + startH - minH);
+                                    height = startH + (startT - top);
+                                }
+                                _mrSetImportant(box, 'left', left + 'px');
+                                _mrSetImportant(box, 'top', top + 'px');
+                                _mrSetImportant(box, 'right', 'auto');
+                                _mrSetImportant(box, 'bottom', 'auto');
+                                _mrSetImportant(box, 'width', width + 'px');
+                                _mrSetImportant(box, 'height', height + 'px');
+                            }
+                            function up(){
+                                document.body.style.userSelect = '';
+                                document.removeEventListener('pointermove', move);
+                                document.removeEventListener('pointerup', up);
+                                document.removeEventListener('pointercancel', up);
+                                document.removeEventListener('mousemove', move);
+                                document.removeEventListener('mouseup', up);
+                                document.removeEventListener('touchmove', move);
+                                document.removeEventListener('touchend', up);
+                                document.removeEventListener('touchcancel', up);
+                            }
+                            document.addEventListener('pointermove', move);
+                            document.addEventListener('pointerup', up);
+                            document.addEventListener('pointercancel', up);
+                            document.addEventListener('mousemove', move);
+                            document.addEventListener('mouseup', up);
+                            document.addEventListener('touchmove', move, { passive:false });
+                            document.addEventListener('touchend', up);
+                            document.addEventListener('touchcancel', up);
+                        }
+                        grip.addEventListener('pointerdown', startResize);
+                        grip.addEventListener('mousedown', startResize);
+                        grip.addEventListener('touchstart', startResize, { passive:false });
+                    }
+                    ['n','e','s','w','nw','ne','sw','se'].forEach(function(dir){
+                        var grip = document.createElement('div');
+                        grip.className = 'mr-chat-resize-handle ' + dir;
+                        grip.dataset.resizeDir = dir;
+                        grip.title = 'Drag to resize chat window';
+                        box.appendChild(grip);
+                        bindResizeGrip(grip, dir);
+                    });
+                    function startDirectCornerResize(ev){
+                        if (ev.type === 'mousedown' && window.PointerEvent) return;
+                        if (box.classList.contains('mr-chat-maximized') || box.classList.contains('mr-chat-minimized')) return;
+                        if (ev.target && ev.target.closest && ev.target.closest('button,input,select,textarea,a,.chat-contact,.bubble,.mr-online-agent')) return;
+                        var point = (ev.touches && ev.touches[0]) || ev;
+                        var r = box.getBoundingClientRect();
+                        if (!point || point.clientX < r.right - 64 || point.clientY < r.bottom - 64) return;
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        var startX = point.clientX, startY = point.clientY, startW = r.width, startH = r.height, startL = r.left, startT = r.top;
+                        document.body.style.userSelect = 'none';
+                        function move(e){
+                            var p = (e.touches && e.touches[0]) || e;
+                            var w = _mrClamp(startW + p.clientX - startX, 380, window.innerWidth - startL - 6);
+                            var h = _mrClamp(startH + p.clientY - startY, 330, window.innerHeight - startT - 6);
+                            _mrSetImportant(box, 'width', w + 'px');
+                            _mrSetImportant(box, 'height', h + 'px');
+                            _mrSetImportant(box, 'left', startL + 'px');
+                            _mrSetImportant(box, 'top', startT + 'px');
+                            _mrSetImportant(box, 'right', 'auto');
+                            _mrSetImportant(box, 'bottom', 'auto');
+                        }
+                        function up(){
+                            document.body.style.userSelect = '';
+                            document.removeEventListener('pointermove', move);
+                            document.removeEventListener('pointerup', up);
+                            document.removeEventListener('pointercancel', up);
+                            document.removeEventListener('mousemove', move);
+                            document.removeEventListener('mouseup', up);
+                            document.removeEventListener('touchmove', move);
+                            document.removeEventListener('touchend', up);
+                            document.removeEventListener('touchcancel', up);
+                        }
+                        document.addEventListener('pointermove', move);
+                        document.addEventListener('pointerup', up);
+                        document.addEventListener('pointercancel', up);
+                        document.addEventListener('mousemove', move);
+                        document.addEventListener('mouseup', up);
+                        document.addEventListener('touchmove', move, { passive:false });
+                        document.addEventListener('touchend', up);
+                        document.addEventListener('touchcancel', up);
+                    }
+                    box.addEventListener('pointerdown', startDirectCornerResize, true);
+                    box.addEventListener('mousedown', startDirectCornerResize, true);
+                    box.addEventListener('touchstart', startDirectCornerResize, { capture:true, passive:false });
+                    box.addEventListener('mousemove', function(ev){
+                        if (box.classList.contains('mr-chat-maximized') || box.classList.contains('mr-chat-minimized')) return;
+                        var r = box.getBoundingClientRect();
+                        box.style.cursor = (ev.clientX >= r.right - 64 && ev.clientY >= r.bottom - 64) ? 'nwse-resize' : '';
+                    });
+                }
+
+                function _mrToggleSidebar(force){
+                    var shell = document.querySelector('.chat-shell');
+                    if (!shell) return;
+                    var hide = (typeof force === 'boolean') ? force : !shell.classList.contains('mr-sidebar-hidden');
+                    shell.classList.toggle('mr-sidebar-hidden', hide);
+                    try { localStorage.setItem('ph_chat_sidebar_hidden', hide ? '1' : '0'); } catch (_) {}
+                    var btn = document.getElementById('mrChatSidebarToggle');
+                    if (btn) btn.innerHTML = hide ? '<i class="fas fa-table-columns"></i><span>Show agents</span>' : '<i class="fas fa-table-columns"></i><span>Hide agents</span>';
+                }
+
+                async function _mrPresenceMap(){
+                    var map = {};
+                    try {
+                        if (typeof readData === 'function') map = await readData('presence', null, true) || {};
+                    } catch (_) {}
+                    try {
+                        for (var i = 0; i < localStorage.length; i++) {
+                            var k = localStorage.key(i);
+                            if (k && k.indexOf('ph_presence_') === 0) {
+                                try { var v = JSON.parse(localStorage.getItem(k)); if (v && v.username) map[v.username] = Object.assign({}, map[v.username] || {}, v); } catch (_) {}
+                            }
+                        }
+                    } catch (_) {}
+                    return map;
+                }
+                function _mrIsOnlinePresence(p){
+                    if (!p || p.offline) return false;
+                    var ls = parseInt(p.lastSeen || 0, 10);
+                    return !!ls && (Date.now() - ls) < 70000;
+                }
+                function _mrUserDisplayName(username){
+                    var u = (STATE.users || {})[username] || {};
+                    return u.name || username;
+                }
+
+                async function _mrDecoratePresence(){
+                    var shell = document.querySelector('.chat-shell');
+                    if (!shell) return;
+                    var users = STATE.users || {};
+                    var presence = await _mrPresenceMap();
+                    try {
+                        var loadedUsers = await readData('users', 'ph_users', true) || {};
+                        if (Object.keys(loadedUsers).length) users = loadedUsers;
+                    } catch (_) {}
+                    Object.keys(presence || {}).forEach(function(k){
+                        if (!users[k]) users[k] = { name: presence[k].name || k, role: presence[k].role || 'agent' };
+                    });
+                    STATE.users = users;
+                    var agentNames = Object.keys(users).filter(function(k){
+                        var u = users[k] || {};
+                        if (k === 'Plan') return false;
+                        if (u.disabled || u.active === false || u.role === 'readonly') return false;
+                        return true;
+                    }).sort(function(a,b){
+                        var ao = _mrIsOnlinePresence(presence[a]) ? 0 : 1;
+                        var bo = _mrIsOnlinePresence(presence[b]) ? 0 : 1;
+                        if (ao !== bo) return ao - bo;
+                        return _mrUserDisplayName(a).localeCompare(_mrUserDisplayName(b));
+                    });
+                    var onlineNames = agentNames.filter(function(k){ return _mrIsOnlinePresence(presence[k]); });
+                    var count = document.getElementById('mrChatOnlineCount');
+                    if (count) count.textContent = onlineNames.length + ' online';
+                    document.querySelectorAll('.chat-contact[data-key^="user_"]').forEach(function(row){
+                        var username = (row.dataset.key || '').slice(5);
+                        var sub = row.querySelector('.chat-contact-sub');
+                        if (!sub) return;
+                        var oldPresence = sub.querySelector('.mr-agent-presence');
+                        if (oldPresence) {
+                            var prev = oldPresence.previousSibling;
+                            oldPresence.remove();
+                            if (prev && prev.nodeType === 3 && /·\s*$/.test(prev.nodeValue || '')) prev.nodeValue = (prev.nodeValue || '').replace(/\s*·\s*$/, '');
+                        }
+                        var online = _mrIsOnlinePresence(presence[username]);
+                        sub.insertAdjacentHTML('beforeend', ' · <span class="mr-agent-presence ' + (online ? '' : 'offline') + '"><span class="mr-agent-presence-dot"></span>' + (online ? 'Online' : 'Offline') + '</span>');
+                    });
+                    _mrRenderOnlinePanel(users, presence, agentNames, onlineNames);
+                }
+
+                function _mrRenderOnlinePanel(users, presence, agentNames, onlineNames){
+                    var list = document.getElementById('mrChatOnlineList');
+                    var panelCount = document.getElementById('mrChatOnlinePanelCount');
+                    if (!list) return;
+                    agentNames = agentNames || [];
+                    onlineNames = onlineNames || [];
+                    if (panelCount) panelCount.textContent = onlineNames.length + '/' + agentNames.length;
+                    if (!agentNames.length) {
+                        list.innerHTML = '<div class="text-muted text-sm" style="padding:12px;">No agents found.</div>';
+                        return;
+                    }
+                    var me = STATE.currentUser && STATE.currentUser.username;
+                    list.innerHTML = agentNames.map(function(k){
+                        var u = users[k] || {}, name = u.name || k;
+                        var online = _mrIsOnlinePresence(presence[k]);
+                        return '<div class="mr-online-agent ' + (online ? '' : 'offline') + '" data-online-user="' + escapeHTML(k) + '">' +
+                            '<span class="mr-online-agent-dot"></span><div class="mr-online-agent-main">' +
+                            '<div class="mr-online-agent-name">' + escapeHTML(name) + (k === me ? ' <span class="text-muted text-xs">(You)</span>' : '') + '</div>' +
+                            '<div class="mr-online-agent-sub">@' + escapeHTML(k) + ' · ' + escapeHTML(u.role || 'agent') + ' · <span class="mr-online-agent-status">' + (online ? 'Online' : 'Offline') + '</span></div>' +
+                            '</div></div>';
+                    }).join('');
+                    list.querySelectorAll('[data-online-user]').forEach(function(el){
+                        el.onclick = function(){
+                            var username = this.getAttribute('data-online-user');
+                            if (!username || (STATE.currentUser && username === STATE.currentUser.username)) return;
+                            var display = _mrUserDisplayName(username);
+                            if (typeof window._selectChatContact === 'function') window._selectChatContact(username, null, display, null);
+                        };
+                    });
+                }
+
+                function _mrToggleOnlinePanel(force){
+                    var panel = document.getElementById('mrChatOnlinePanel');
+                    var shell = document.querySelector('.chat-shell');
+                    if (!panel) return;
+                    if (shell && shell.classList.contains('mr-sidebar-hidden')) _mrToggleSidebar(false);
+                    var open = (typeof force === 'boolean') ? force : panel.classList.contains('hidden');
+                    panel.classList.toggle('hidden', !open);
+                    var btn = document.getElementById('mrChatOnlineToggle');
+                    if (btn) btn.classList.toggle('active', open);
+                    if (open) _mrDecoratePresence();
+                }
+
+                function _mrInstallChatControls(){
+                    _mrInjectChatWindowStyles();
+                    _mrPositionChatBox();
+                    var content = document.getElementById('modalContent');
+                    var box = document.getElementById('modalBox');
+                    if (!content || !box || !box.classList.contains('chat-modal')) return;
+                    if (!document.getElementById('mrChatWindowBar')) {
+                        content.insertAdjacentHTML('afterbegin',
+                            '<div class="mr-chat-window-bar" id="mrChatWindowBar">' +
+                                '<div class="mr-chat-window-title"><i class="fas fa-comments"></i><span>Team Messenger</span><span class="mr-online-count" id="mrChatOnlineCount">0 online</span><span class="mr-chat-min-badge" id="mrChatMinNotifyBadge">0</span></div>' +
+                                '<div class="mr-chat-window-actions">' +
+                                    '<button type="button" class="mr-chat-text-btn" id="mrChatSidebarToggle" title="Hide or show the agent list"><i class="fas fa-table-columns"></i><span>Hide agents</span></button>' +
+                                    '<button type="button" class="mr-chat-text-btn" id="mrChatOnlineToggle" title="Show online agents"><i class="fas fa-user-check"></i><span>Online agents</span></button>' +
+                                    '<button type="button" id="mrChatMinBtn" title="Minimize chat"><i class="fas fa-minus"></i></button>' +
+                                    '<button type="button" id="mrChatMaxBtn" title="Maximize or restore chat"><i class="fas fa-up-right-and-down-left-from-center"></i></button>' +
+                                    '<button type="button" id="mrChatCloseBtn" title="Close chat"><i class="fas fa-times"></i></button>' +
+                                '</div>' +
+                            '</div>');
+                    }
+                    var sidebar = document.querySelector('.chat-sidebar');
+                    if (sidebar && !document.getElementById('mrChatOnlinePanel')) {
+                        var head = sidebar.querySelector('.chat-sidebar-head') || sidebar;
+                        head.insertAdjacentHTML('afterend', '<div class="mr-online-panel hidden" id="mrChatOnlinePanel"><div class="mr-online-panel-head"><span><i class="fas fa-user-check"></i> Online agents</span><span class="mini-badge" id="mrChatOnlinePanelCount">0</span></div><div id="mrChatOnlineList"></div></div>');
+                    }
+                    _mrMakeDraggable();
+                    _mrMakeResizable();
+                    var sideBtn = document.getElementById('mrChatSidebarToggle');
+                    if (sideBtn && !sideBtn.dataset.bound) { sideBtn.dataset.bound = '1'; sideBtn.onclick = function(){ _mrToggleSidebar(); }; }
+                    var onlineBtn = document.getElementById('mrChatOnlineToggle');
+                    if (onlineBtn && !onlineBtn.dataset.bound) { onlineBtn.dataset.bound = '1'; onlineBtn.onclick = function(){ _mrToggleOnlinePanel(); }; }
+                    var minBtn = document.getElementById('mrChatMinBtn');
+                    if (minBtn && !minBtn.dataset.bound) { minBtn.dataset.bound = '1'; minBtn.onclick = function(){ box.classList.toggle('mr-chat-minimized'); if (box.classList.contains('mr-chat-minimized')) box.classList.remove('mr-chat-maximized'); }; }
+                    var maxBtn = document.getElementById('mrChatMaxBtn');
+                    if (maxBtn && !maxBtn.dataset.bound) {
+                        maxBtn.dataset.bound = '1';
+                        maxBtn.onclick = function(){
+                            box.classList.remove('mr-chat-minimized');
+                            if (box.classList.contains('mr-chat-maximized')) {
+                                box.classList.remove('mr-chat-maximized');
+                                if (box.dataset.mrRestore) {
+                                    try {
+                                        var r = JSON.parse(box.dataset.mrRestore);
+                                        ['left','top','width','height'].forEach(function(k){ if (r[k]) _mrSetImportant(box, k, r[k]); });
+                                        _mrSetImportant(box, 'right', 'auto'); _mrSetImportant(box, 'bottom', 'auto');
+                                    } catch (_) {}
+                                }
+                            } else {
+                                var rect = box.getBoundingClientRect();
+                                box.dataset.mrRestore = JSON.stringify({ left:rect.left + 'px', top:rect.top + 'px', width:rect.width + 'px', height:rect.height + 'px' });
+                                box.classList.add('mr-chat-maximized');
+                            }
+                        };
+                    }
+                    var closeBtn = document.getElementById('mrChatCloseBtn');
+                    if (closeBtn && !closeBtn.dataset.bound) { closeBtn.dataset.bound = '1'; closeBtn.onclick = function(){ window.closeModal(); }; }
+                    try { _mrToggleSidebar(localStorage.getItem('ph_chat_sidebar_hidden') === '1'); } catch (_) {}
+                    _mrDecoratePresence();
+                    if (_mrChatOnlineTimer) clearInterval(_mrChatOnlineTimer);
+                    _mrChatOnlineTimer = setInterval(function(){
+                        if (!document.querySelector('.chat-shell')) { clearInterval(_mrChatOnlineTimer); _mrChatOnlineTimer = null; return; }
+                        _mrDecoratePresence();
+                    }, 5000);
+                }
+
+                if (typeof showModal === 'function' && !showModal.__mrChatWindowControlsPatched) {
+                    var _mrPrevShowModalForChatWindow = showModal;
+                    showModal = function(html){
+                        var result = _mrPrevShowModalForChatWindow.apply(this, arguments);
+                        var isChat = String(html || '').indexOf('chat-shell') !== -1;
+                        if (!isChat) {
+                            var container = document.getElementById('modalContainer');
+                            var box = document.getElementById('modalBox');
+                            if (container) container.classList.remove('mr-chat-floating');
+                            if (box) {
+                                box.classList.remove('mr-chat-resizable','mr-chat-maximized','mr-chat-minimized');
+                                ['position','left','top','right','bottom','width','height'].forEach(function(k){ box.style.removeProperty(k); });
+                                delete box.dataset.mrChatPositioned;
+                            }
+                        }
+                        return result;
+                    };
+                    showModal.__mrChatWindowControlsPatched = true;
+                }
+
+                if (typeof showChatUI === 'function' && !showChatUI.__mrWindowControlsPatched) {
+                    var _mrPrevShowChatUIWindowControls = showChatUI;
+                    showChatUI = function(){
+                        var result = _mrPrevShowChatUIWindowControls.apply(this, arguments);
+                        setTimeout(_mrInstallChatControls, 80);
+                        return result;
+                    };
+                    showChatUI.__mrWindowControlsPatched = true;
+                }
+
+                if (typeof loadChatContacts === 'function' && !loadChatContacts.__mrPresenceDecorPatched) {
+                    var _mrPrevLoadChatContactsPresence = loadChatContacts;
+                    loadChatContacts = async function(){
+                        var result = await _mrPrevLoadChatContactsPresence.apply(this, arguments);
+                        setTimeout(_mrDecoratePresence, 30);
+                        return result;
+                    };
+                    loadChatContacts.__mrPresenceDecorPatched = true;
+                }
+
+                function _mrUpdateMinimizedChatBadge(n){
+                    var badge = document.getElementById('mrChatMinNotifyBadge');
+                    if (!badge) return;
+                    n = parseInt(n || 0, 10) || 0;
+                    badge.textContent = n > 99 ? '99+' : String(n);
+                    badge.classList.toggle('has-new', n > 0);
+                    var box = document.getElementById('modalBox');
+                    if (box) box.classList.toggle('mr-chat-has-new', n > 0);
+                }
+                if (typeof _mrSetBadge === 'function' && !_mrSetBadge.__mrMinimizedChatBadgePatched) {
+                    var _mrPrevSetBadgeForMinimizedChat = _mrSetBadge;
+                    _mrSetBadge = function(n){
+                        var result = _mrPrevSetBadgeForMinimizedChat.apply(this, arguments);
+                        _mrUpdateMinimizedChatBadge(n);
+                        return result;
+                    };
+                    _mrSetBadge.__mrMinimizedChatBadgePatched = true;
+                }
+                setInterval(function(){
+                    var source = document.getElementById('chatNotifyBadge') || document.getElementById('chatCardNotifyBadge');
+                    if (source) _mrUpdateMinimizedChatBadge(source.textContent || 0);
+                }, 2500);
+
+                window._mrToggleChatSidebar = _mrToggleSidebar;
+                window._mrToggleChatOnlineAgents = _mrToggleOnlinePanel;
+            })();
+
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
