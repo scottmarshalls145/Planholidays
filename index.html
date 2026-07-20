@@ -14622,505 +14622,653 @@
                 document.addEventListener('DOMContentLoaded', function(){ setTimeout(_mrInstallChatControls, 900); });
             })();
 
-            // MuleRun requested addition: permission-gated standalone Screen View and admin chat filters.
-            (function _mrStandaloneScreenViewAndAdminChatPatch(){
-                var SV_STYLE_ID = 'mr-standalone-screen-view-style';
-                var _svActiveViewerId = null;
-                var _svActiveShareId = null;
-                var _svViewerPcs = {};
-                var _svSharePcs = {};
-                var _svStreams = {};
-                var _svRefs = {};
-                var _svSeenCandidates = {};
-                var _svAdminChatFilter = '';
 
-                try {
-                    if (typeof DEFAULT_ADMIN !== 'undefined') {
-                        DEFAULT_ADMIN.permissions = DEFAULT_ADMIN.permissions || {};
-                        DEFAULT_ADMIN.permissions.canScreenView = true;
+
+            // ==============================================================
+            // SCREEN VIEW: permission-gated dashboard tab + request/accept
+            // live screen viewing between online agents.
+            // ==============================================================
+            (function(){
+                var SCREEN_VIEW_PERMISSION = 'canScreenView';
+                var SCREEN_VIEW_LABEL = 'Screen View';
+                var _sv = {
+                    requestListener: null,
+                    promptOpen: {},
+                    requestWatchers: {},
+                    signalWatchers: {},
+                    frameWatchers: {},
+                    sessions: {},
+                    presenceRefreshTimer: null
+                };
+
+                try { DEFAULT_ADMIN.permissions[SCREEN_VIEW_PERMISSION] = true; } catch (_) {}
+
+                function _svEscape(value){
+                    try { return escapeHTML(value); } catch (_) {
+                        return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch]; });
                     }
-                } catch (_) {}
-
-                function svEsc(v){ return (typeof escapeHTML === 'function') ? escapeHTML(v == null ? '' : String(v)) : String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
-                function svMe(){ return STATE.currentUser && STATE.currentUser.username; }
-                function svCan(){ return (typeof isAdmin === 'function' && isAdmin()) || (typeof hasPermission === 'function' && hasPermission('canScreenView')); }
-                function svSafePath(v){ return String(v || '').replace(/[.#$\[\]\/]/g, '_'); }
-                function svOnline(p){ if (!p || p.offline) return false; var ls = parseInt(p.lastSeen || 0, 10); return !!ls && (Date.now() - ls) < 65000; }
-                function svToast(msg, type){ if (typeof showToast === 'function') showToast(msg, type || 'info'); }
-                function svDisplayName(users, key){ var u = (users || {})[key] || {}; try { if (typeof _profileNames === 'function') return _profileNames(u, key).display; } catch (_) {} return u.name || key; }
-                function svInitials(name){ name = String(name || '?').trim(); var p = name.split(/\s+/); return svEsc(((p[0] || '?')[0] || '?') + (p[1] ? (p[1][0] || '') : '')).toUpperCase(); }
-                async function svUsers(){ var users = STATE.users || {}; if (!Object.keys(users).length) { try { users = await readData('users', 'ph_users', true) || {}; STATE.users = users; } catch (_) {} } return users || {}; }
-                async function svPresence(){
-                    var out = {};
-                    try { var fb = await readData('presence', null, true); if (fb && typeof fb === 'object') out = fb; } catch (_) {}
+                }
+                function _svNow(){ return (typeof getNowISO === 'function') ? getNowISO() : new Date().toISOString(); }
+                function _svId(){ return (typeof genId === 'function') ? genId() : (Date.now().toString(36) + Math.random().toString(36).slice(2,8)); }
+                function _svMe(){ return STATE && STATE.currentUser ? STATE.currentUser.username : ''; }
+                function _svToast(msg, type, duration){ try { showToast(msg, type || 'info', duration); } catch (_) { console.log(msg); } }
+                function _svAllowed(){ return (typeof isAdmin === 'function' && isAdmin()) || (typeof hasPermission === 'function' && hasPermission(SCREEN_VIEW_PERMISSION)); }
+                function _svNeedsFirebase(){
+                    if (!firebaseConnected || !db) {
+                        _svToast('Screen View needs an active Firebase connection for live requests.', 'error');
+                        return false;
+                    }
+                    return true;
+                }
+                async function _svIceServers(){
+                    try { if (typeof _mrIceServers === 'function') return await _mrIceServers(); } catch (_) {}
+                    return [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun.relay.metered.ca:80' }];
+                }
+                async function _svRead(path, fallback, bypass){ return await readData(path, fallback || null, bypass !== false); }
+                async function _svWrite(path, data, fallback){ return await writeData(path, data, fallback || null); }
+                function _svRef(path){ return (firebaseConnected && db) ? db.ref(path) : null; }
+                function _svPresenceOnline(p){
+                    if (!p) return false;
+                    if (p.offline) return false;
+                    var last = p.lastSeen || 0;
+                    return (Date.now() - last) < 65000;
+                }
+                async function _svReadPresence(){
+                    var presence = {};
+                    try { presence = await _svRead('presence', null, true) || {}; } catch (_) { presence = {}; }
                     try {
                         for (var i = 0; i < localStorage.length; i++) {
                             var k = localStorage.key(i);
                             if (k && k.indexOf('ph_presence_') === 0) {
-                                try { var v = JSON.parse(localStorage.getItem(k)); if (v && v.username && !out[v.username]) out[v.username] = v; } catch (_) {}
+                                try {
+                                    var v = JSON.parse(localStorage.getItem(k));
+                                    if (v && v.username && !presence[v.username]) presence[v.username] = v;
+                                } catch (_) {}
                             }
                         }
                     } catch (_) {}
-                    return out;
+                    return presence;
                 }
-                async function svIceServers(){
-                    try { if (typeof _mrIceServers === 'function') return await _mrIceServers(); } catch (_) {}
-                    return [{ urls: 'stun:stun.l.google.com:19302' }];
+                async function _svReadUsers(){
+                    try { return await _svRead('users', 'ph_users', true) || {}; } catch (_) { return {}; }
                 }
-                function svInstallStyles(){
-                    if (document.getElementById(SV_STYLE_ID)) return;
+                function _svUserName(users, username){
+                    var u = (users || {})[username] || {};
+                    return u.name || username;
+                }
+                function _svInitials(name){
+                    return String(name || '?').split(/\s+/).filter(Boolean).slice(0,2).map(function(x){ return x.charAt(0).toUpperCase(); }).join('') || '?';
+                }
+
+                function _svInjectStyles(){
+                    if (document.getElementById('mr-screen-view-style')) return;
                     var st = document.createElement('style');
-                    st.id = SV_STYLE_ID;
-                    st.textContent =
-                        '.sv-agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin:14px 0}.sv-agent-card{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--card-border);border-radius:16px;background:var(--input-bg);cursor:pointer;transition:.18s}.sv-agent-card:hover{transform:translateY(-2px);border-color:var(--primary);box-shadow:0 12px 28px rgba(0,0,0,.10)}.sv-avatar{width:42px;height:42px;border-radius:15px;background:linear-gradient(135deg,var(--primary),var(--primary2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;position:relative;flex:0 0 auto}.sv-dot{position:absolute;right:-2px;bottom:-2px;width:12px;height:12px;border-radius:50%;background:var(--success);border:2px solid var(--bg2);box-shadow:0 0 0 4px rgba(39,174,96,.16)}.sv-agent-main{min-width:0;flex:1}.sv-agent-name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sv-agent-sub{font-size:.78rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sv-request-popup,.sv-share-panel,.sv-viewer{position:fixed;z-index:999999;background:var(--toast-bg);color:var(--toast-text);border:1px solid rgba(255,255,255,.14);box-shadow:0 24px 75px rgba(0,0,0,.38);border-radius:20px}.sv-request-popup{right:22px;bottom:22px;width:min(390px,calc(100vw - 44px));padding:18px}.sv-request-popup h4{margin:0 0 8px}.sv-request-actions,.sv-window-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.sv-share-panel{right:22px;bottom:22px;width:390px;min-width:260px;min-height:150px;max-width:94vw;max-height:86vh;resize:both;overflow:auto}.sv-window-top{height:46px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);cursor:move;user-select:none}.sv-window-title{font-weight:900;font-size:.86rem;display:flex;align-items:center;gap:8px;min-width:0}.sv-window-actions button{width:30px;height:30px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.1);color:#fff;cursor:pointer}.sv-window-body{padding:14px}.sv-share-panel.sv-minimized{width:270px!important;height:46px!important;min-height:46px!important;resize:none;overflow:hidden}.sv-share-panel.sv-minimized .sv-window-body{display:none}.sv-viewer{left:20px;top:52px;width:calc(100vw - 40px);height:calc(100vh - 76px);min-width:320px;min-height:240px;display:flex;flex-direction:column;resize:both;overflow:hidden;background:#070a10}.sv-viewer.sv-minimized{left:auto!important;top:auto!important;right:22px!important;bottom:22px!important;width:300px!important;height:46px!important;min-height:46px!important;resize:none}.sv-viewer.sv-minimized .sv-video-stage{display:none}.sv-video-stage{position:relative;flex:1;min-height:0;background:#05070d;display:flex;align-items:center;justify-content:center}.sv-video-stage video{width:100%;height:100%;object-fit:contain;background:#05070d}.sv-status-pill{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:999px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.14);font-size:.78rem}.sv-empty{color:rgba(255,255,255,.72);text-align:center;padding:24px}.sv-filterbar{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.sv-filterbar button.active,#mrToggleOnlineAgentsBtn.sv-active{background:var(--primary)!important;color:#fff!important;border-color:var(--primary)!important}.sv-hidden{display:none!important}@media(max-width:720px){.sv-viewer{left:8px!important;top:48px!important;width:calc(100vw - 16px)!important;height:calc(100vh - 60px)!important}.sv-share-panel,.sv-request-popup{right:8px;bottom:8px;width:calc(100vw - 16px)}}';
+                    st.id = 'mr-screen-view-style';
+                    st.textContent = '' +
+                        '.mr-sv-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px;}' +
+                        '.mr-sv-modal-head h3{margin:0;display:flex;align-items:center;gap:9px;}' +
+                        '.mr-sv-agent-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:14px 0;}' +
+                        '.mr-sv-agent-card{display:flex;align-items:center;gap:11px;padding:13px;border:1px solid var(--card-border);border-radius:18px;background:var(--input-bg);transition:transform .2s,border-color .2s,background .2s;}' +
+                        '.mr-sv-agent-card.online{cursor:pointer;}' +
+                        '.mr-sv-agent-card.online:hover{transform:translateY(-2px);border-color:var(--primary);background:rgba(184,134,11,.12);}' +
+                        '.mr-sv-agent-card.offline{opacity:.55;}' +
+                        '.mr-sv-avatar{width:42px;height:42px;border-radius:15px;background:linear-gradient(135deg,var(--primary),var(--primary2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;flex:0 0 auto;box-shadow:0 10px 24px rgba(184,134,11,.25);}' +
+                        '.mr-sv-agent-main{min-width:0;flex:1;}' +
+                        '.mr-sv-agent-name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+                        '.mr-sv-agent-sub{font-size:.76rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+                        '.mr-sv-dot{display:inline-block;width:9px;height:9px;border-radius:999px;background:var(--success);box-shadow:0 0 0 4px rgba(39,174,96,.16);margin-right:5px;}' +
+                        '.mr-sv-dot.offline{background:var(--text2);box-shadow:none;}' +
+                        '.mr-sv-window{position:fixed;right:22px;bottom:22px;z-index:999998;width:min(900px,calc(100vw - 44px));height:min(620px,calc(100vh - 44px));background:#05070d;color:#fff;border:1px solid rgba(255,255,255,.16);border-radius:22px;box-shadow:0 28px 90px rgba(0,0,0,.48);overflow:hidden;display:flex;flex-direction:column;}' +
+                        '.mr-sv-window.max{left:12px!important;right:12px!important;top:12px!important;bottom:12px!important;width:auto!important;height:auto!important;}' +
+                        '.mr-sv-window.minimized{height:48px!important;width:min(390px,calc(100vw - 24px))!important;}' +
+                        '.mr-sv-window.minimized .mr-sv-stage{display:none!important;}' +
+                        '.mr-sv-bar{height:48px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border-bottom:1px solid rgba(255,255,255,.12);cursor:move;user-select:none;}' +
+                        '.mr-sv-title{min-width:0;font-weight:800;font-size:.9rem;display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+                        '.mr-sv-actions{display:flex;gap:7px;flex:0 0 auto;}' +
+                        '.mr-sv-actions button{width:32px;height:32px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.09);color:#fff;cursor:pointer;}' +
+                        '.mr-sv-actions button:hover{background:rgba(255,255,255,.18);}' +
+                        '.mr-sv-stage{position:relative;flex:1;min-height:220px;background:#05070d;display:flex;align-items:center;justify-content:center;}' +
+                        '.mr-sv-stage video,.mr-sv-stage img{width:100%;height:100%;object-fit:contain;background:#05070d;}' +
+                        '.mr-sv-empty{color:rgba(255,255,255,.72);text-align:center;padding:24px;font-size:.95rem;}' +
+                        '.mr-sv-badge{position:absolute;left:16px;bottom:14px;background:rgba(0,0,0,.62);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:7px 12px;font-size:.82rem;}' +
+                        '.mr-sv-quality{position:absolute;right:16px;bottom:14px;background:rgba(184,134,11,.92);color:#111;border-radius:999px;padding:7px 12px;font-size:.78rem;font-weight:900;}' +
+                        '@media(max-width:720px){.mr-sv-window{left:8px!important;right:8px!important;bottom:8px!important;width:auto!important;height:70vh;border-radius:16px}.mr-sv-agent-grid{grid-template-columns:1fr}}';
                     document.head.appendChild(st);
                 }
-                function svMakeMovable(el, handle){
-                    if (!el || !handle || el._svMovable) return;
-                    el._svMovable = true;
-                    var saved = null;
-                    function save(){ var r = el.getBoundingClientRect(); saved = { left:r.left, top:r.top, width:r.width, height:r.height }; el.style.left = r.left + 'px'; el.style.top = r.top + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.width = r.width + 'px'; el.style.height = r.height + 'px'; }
-                    el._svRestore = function(){ if (!saved) return; el.style.left = saved.left + 'px'; el.style.top = saved.top + 'px'; el.style.width = saved.width + 'px'; el.style.height = saved.height + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto'; };
-                    handle.addEventListener('pointerdown', function(e){
-                        if (e.target.closest('button')) return;
-                        save();
-                        var r = el.getBoundingClientRect(), sx = e.clientX, sy = e.clientY, sl = r.left, st = r.top;
-                        function move(ev){ el.style.left = Math.max(6, Math.min(window.innerWidth - 80, sl + ev.clientX - sx)) + 'px'; el.style.top = Math.max(6, Math.min(window.innerHeight - 46, st + ev.clientY - sy)) + 'px'; }
-                        function up(){ document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); }
-                        document.addEventListener('pointermove', move);
-                        document.addEventListener('pointerup', up);
-                    });
+
+                function _svEnsureDashboardCard(){
+                    try {
+                        _svInjectStyles();
+                        var grid = document.getElementById('dashGrid') || document.querySelector('.dashboard-grid');
+                        if (!grid) return;
+                        var existing = grid.querySelector('.dash-card[data-action="screenView"]');
+                        if (existing) {
+                            existing.dataset.perm = SCREEN_VIEW_PERMISSION;
+                            existing.style.display = _svAllowed() ? 'block' : 'none';
+                            return;
+                        }
+                        var card = document.createElement('div');
+                        card.className = 'dash-card';
+                        card.dataset.action = 'screenView';
+                        card.dataset.perm = SCREEN_VIEW_PERMISSION;
+                        card.innerHTML = '<i class="fas fa-desktop"></i><h4>Screen View</h4><p>Request and view an online agent screen</p>';
+                        card.addEventListener('click', function(){ handleDashAction('screenView'); });
+                        var agents = grid.querySelector('.dash-card[data-action="agentsOnline"]');
+                        if (agents && agents.nextSibling) grid.insertBefore(card, agents.nextSibling); else grid.appendChild(card);
+                        card.style.display = _svAllowed() ? 'block' : 'none';
+                    } catch (_) {}
                 }
-                function svEnsureDashboardCard(){
-                    var grid = document.getElementById('dashGrid') || document.querySelector('.dashboard-grid');
-                    if (!grid || grid.querySelector('.dash-card[data-action="screenView"]')) return;
-                    var card = document.createElement('div');
-                    card.className = 'dash-card';
-                    card.dataset.action = 'screenView';
-                    card.dataset.perm = 'canScreenView';
-                    card.innerHTML = '<i class="fas fa-display"></i><h4>Screen View</h4><p>Request live screen view from online agents</p>';
-                    card.addEventListener('click', function(){ handleDashAction('screenView'); });
-                    var anchor = grid.querySelector('.dash-card[data-action="agentsOnline"]') || grid.querySelector('.dash-card[data-action="chat"]') || grid.querySelector('.dash-card[data-action="help"]');
-                    if (anchor && anchor.parentNode === grid) grid.insertBefore(card, anchor); else grid.appendChild(card);
+
+                function _svAppendPermissionCheckbox(className, checked, disabled){
+                    try {
+                        var inputClass = className || 'perm-check';
+                        var content = document.getElementById('modalContent') || document;
+                        if (content.querySelector('input[value="' + SCREEN_VIEW_PERMISSION + '"]')) return;
+                        var any = content.querySelector('.' + inputClass);
+                        if (!any) return;
+                        var wrap = any.parentElement && any.parentElement.parentElement ? any.parentElement.parentElement : null;
+                        if (!wrap) return;
+                        var label = document.createElement('label');
+                        label.innerHTML = '<input type="checkbox" class="' + inputClass + '" value="' + SCREEN_VIEW_PERMISSION + '" ' + (checked ? 'checked ' : '') + (disabled ? 'disabled ' : '') + '/> ' + SCREEN_VIEW_LABEL;
+                        wrap.appendChild(label);
+                    } catch (_) {}
                 }
-                function svApplyDashboardVisibility(){
-                    var card = document.querySelector('.dash-card[data-action="screenView"]');
-                    if (!card) return;
-                    card.style.display = svCan() ? 'block' : 'none';
-                }
-                if (typeof showDashboard === 'function' && !showDashboard.__svScreenViewCardPatched) {
-                    var _svPrevShowDashboard = showDashboard;
-                    showDashboard = function(){
-                        svEnsureDashboardCard();
-                        var result = _svPrevShowDashboard.apply(this, arguments);
-                        svEnsureDashboardCard();
-                        svApplyDashboardVisibility();
-                        return result;
-                    };
-                    showDashboard.__svScreenViewCardPatched = true;
-                }
-                if (typeof reapplyPermissionsUI === 'function' && !reapplyPermissionsUI.__svPatched) {
-                    var _svPrevReapplyPermissions = reapplyPermissionsUI;
-                    reapplyPermissionsUI = function(){
-                        var result = _svPrevReapplyPermissions.apply(this, arguments);
-                        svEnsureDashboardCard();
-                        svApplyDashboardVisibility();
-                        return result;
-                    };
-                    reapplyPermissionsUI.__svPatched = true;
-                }
-                if (typeof handleDashAction === 'function' && !handleDashAction.__svScreenViewPatched) {
-                    var _svPrevHandleDashAction = handleDashAction;
-                    handleDashAction = function(action){
-                        if (action === 'screenView') { showScreenView(); return; }
-                        return _svPrevHandleDashAction.apply(this, arguments);
-                    };
-                    handleDashAction.__svScreenViewPatched = true;
-                }
-                function svInjectPermission(kind, username){
-                    var cls = kind === 'edit' ? 'edit-perm' : 'perm-check';
-                    if (document.querySelector('input.' + cls + '[value="canScreenView"]')) return;
-                    var first = document.querySelector('input.' + cls);
-                    if (!first || !first.parentNode || !first.parentNode.parentNode) return;
-                    var wrap = first.parentNode.parentNode;
-                    var isAdminUser = username === 'Plan';
-                    var checked = isAdminUser;
-                    if (kind === 'edit' && username) {
-                        var users = STATE.users || {};
-                        var u = users[username] || {};
-                        checked = !!((u.permissions || {}).canScreenView || isAdminUser);
+
+                function _svPatchPermissionsForms(){
+                    if (typeof showAddUser === 'function' && !showAddUser.__screenViewPatched) {
+                        var prevAdd = showAddUser;
+                        showAddUser = function(){
+                            var result = prevAdd.apply(this, arguments);
+                            setTimeout(function(){ _svAppendPermissionCheckbox('perm-check', false, false); }, 30);
+                            return result;
+                        };
+                        showAddUser.__screenViewPatched = true;
                     }
-                    var label = document.createElement('label');
-                    label.innerHTML = '<input type="checkbox" class="' + cls + '" value="canScreenView" ' + (checked ? 'checked ' : '') + (isAdminUser ? 'disabled ' : '') + '/> Screen View';
-                    wrap.appendChild(label);
-                }
-                if (typeof showAddUser === 'function' && !showAddUser.__svPermPatched) {
-                    var _svPrevShowAddUser = showAddUser;
-                    showAddUser = function(){
-                        var result = _svPrevShowAddUser.apply(this, arguments);
-                        setTimeout(function(){ svInjectPermission('add'); }, 30);
-                        return result;
-                    };
-                    showAddUser.__svPermPatched = true;
-                }
-                if (typeof showEditUser === 'function' && !showEditUser.__svPermPatched) {
-                    var _svPrevShowEditUser = showEditUser;
-                    showEditUser = function(username){
-                        var result = _svPrevShowEditUser.apply(this, arguments);
-                        setTimeout(function(){ svInjectPermission('edit', username); }, 120);
-                        setTimeout(function(){ svInjectPermission('edit', username); }, 450);
-                        return result;
-                    };
-                    showEditUser.__svPermPatched = true;
-                }
-                async function showScreenView(){
-                    svInstallStyles();
-                    if (!svCan()) { svToast('Screen View permission is required.', 'error'); return; }
-                    if (!firebaseConnected || !db) { svToast('Screen View needs Firebase connection.', 'error'); return; }
-                    var users = await svUsers(), presence = await svPresence(), me = svMe();
-                    var online = Object.keys(users || {}).filter(function(k){ return k !== me && svOnline(presence[k]); }).sort(function(a,b){ return svDisplayName(users,a).localeCompare(svDisplayName(users,b)); });
-                    var cards = online.map(function(k){
-                        var u = users[k] || {}, display = svDisplayName(users, k), enc = encodeURIComponent(k);
-                        return '<div class="sv-agent-card" onclick="window._svRequestScreen(decodeURIComponent(\'' + enc + '\'))"><div class="sv-avatar">' + svInitials(display) + '<span class="sv-dot"></span></div><div class="sv-agent-main"><div class="sv-agent-name">' + svEsc(display) + '</div><div class="sv-agent-sub">@' + svEsc(k) + ' · ' + svEsc(u.role || 'agent') + '</div></div><button class="btn btn-sm btn-primary">Request</button></div>';
-                    }).join('');
-                    showModal('<h3><i class="fas fa-display"></i> Screen View</h3><p class="text-muted text-sm">Only online agents are shown. The selected agent must accept before sharing starts.</p><div class="sv-agent-grid">' + (cards || '<div class="sv-empty" style="background:var(--input-bg);color:var(--text2);border-radius:16px;">No online agents available.</div>') + '</div><div class="modal-actions"><button class="btn btn-outline" onclick="showScreenView()"><i class="fas fa-rotate"></i> Refresh</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');
-                }
-                window.showScreenView = showScreenView;
-                async function svRequestScreen(target){
-                    var me = svMe();
-                    if (!me || !target) return;
-                    if (!svCan()) { svToast('Screen View permission is required.', 'error'); return; }
-                    if (!firebaseConnected || !db) { svToast('Screen View needs Firebase connection.', 'error'); return; }
-                    var id = (typeof genId === 'function' ? genId() : ('sv_' + Date.now() + '_' + Math.random().toString(36).slice(2)));
-                    var req = { id:id, from:me, fromName:(STATE.currentUser && (STATE.currentUser.name || me)) || me, to:target, status:'pending', createdAt:getNowISO ? getNowISO() : new Date().toISOString() };
-                    await writeData('screenViewRequests/' + id, req, null);
-                    _svActiveViewerId = id;
-                    svOpenViewerWindow(id, target, 'Waiting for ' + target + ' to accept...');
-                    svAttachViewerRequest(id, target);
-                    svAttachViewerSignal(id, target);
-                    svToast('Screen view request sent to ' + target + '.', 'success');
-                }
-                window._svRequestScreen = svRequestScreen;
-                function svOpenViewerWindow(id, target, statusText){
-                    svInstallStyles();
-                    var old = document.getElementById('svViewer');
-                    if (old) old.remove();
-                    var w = document.createElement('div');
-                    w.id = 'svViewer';
-                    w.className = 'sv-viewer';
-                    w.innerHTML = '<div class="sv-window-top"><div class="sv-window-title"><i class="fas fa-display"></i><span>Viewing ' + svEsc(target) + '</span><span class="sv-status-pill" id="svViewerStatus">' + svEsc(statusText || 'Connecting...') + '</span></div><div class="sv-window-actions"><button type="button" id="svViewerMin" title="Minimize"><i class="fas fa-minus"></i></button><button type="button" id="svViewerClose" title="End"><i class="fas fa-xmark"></i></button></div></div><div class="sv-video-stage" id="svVideoStage"><div class="sv-empty"><i class="fas fa-display" style="font-size:2rem;margin-bottom:10px;display:block;"></i>Waiting for live screen...</div></div>';
-                    document.body.appendChild(w);
-                    svMakeMovable(w, w.querySelector('.sv-window-top'));
-                    document.getElementById('svViewerMin').onclick = function(){ if (!w.classList.contains('sv-minimized')) { var r = w.getBoundingClientRect(); w._svSaved = {left:r.left,top:r.top,width:r.width,height:r.height}; } w.classList.toggle('sv-minimized'); if (!w.classList.contains('sv-minimized') && w._svSaved) { w.style.left=w._svSaved.left+'px'; w.style.top=w._svSaved.top+'px'; w.style.width=w._svSaved.width+'px'; w.style.height=w._svSaved.height+'px'; } };
-                    document.getElementById('svViewerClose').onclick = function(){ svEndViewer(id); };
-                }
-                function svSetViewerStatus(text){ var s = document.getElementById('svViewerStatus'); if (s) s.textContent = text; }
-                function svShowRemoteStream(target, stream){
-                    var stage = document.getElementById('svVideoStage');
-                    if (!stage) return;
-                    stage.innerHTML = '';
-                    var video = document.createElement('video');
-                    video.autoplay = true; video.playsInline = true; video.controls = true; video.srcObject = stream;
-                    stage.appendChild(video);
-                    setTimeout(function(){ try { video.play().catch(function(){}); } catch (_) {} }, 40);
-                    svSetViewerStatus('Live');
-                }
-                function svAttachViewerRequest(id, target){
-                    if (!firebaseConnected || !db) return;
-                    var ref = db.ref('screenViewRequests/' + id);
-                    if (_svRefs['viewerReq_' + id]) { try { _svRefs['viewerReq_' + id].off(); } catch (_) {} }
-                    _svRefs['viewerReq_' + id] = ref;
-                    ref.on('value', function(snap){
-                        var r = snap.val() || {};
-                        if (!r.status) return;
-                        if (r.status === 'accepted') svSetViewerStatus('Accepted. Starting live preview...');
-                        if (r.status === 'declined') { svSetViewerStatus('Declined'); svToast(target + ' declined the screen view request.', 'warning'); }
-                        if (r.status === 'ended') { svSetViewerStatus('Ended'); svCleanupViewer(id, false); }
-                    });
-                }
-                function svAttachViewerSignal(id, target){
-                    if (!firebaseConnected || !db) return;
-                    var me = svMe(), ref = db.ref('screenViewSignals/' + id);
-                    if (_svRefs['viewerSig_' + id]) { try { _svRefs['viewerSig_' + id].off(); } catch (_) {} }
-                    _svRefs['viewerSig_' + id] = ref;
-                    ref.on('value', async function(snap){
-                        var sig = snap.val() || {};
-                        try {
-                            if (sig.offer && sig.offer.to === me) {
-                                var pc = _svViewerPcs[id];
-                                if (!pc) {
-                                    pc = new RTCPeerConnection({ iceServers: await svIceServers() });
-                                    _svViewerPcs[id] = pc;
-                                    pc.ontrack = function(ev){ svShowRemoteStream(target, ev.streams[0]); };
-                                    pc.onicecandidate = function(ev){ if (ev.candidate && firebaseConnected && db) db.ref('screenViewSignals/' + id + '/candidates/' + svSafePath(me)).push(ev.candidate.toJSON()); };
-                                    pc.onconnectionstatechange = function(){ if (pc.connectionState === 'disconnected' || pc.connectionState === 'closed' || pc.connectionState === 'failed') svSetViewerStatus('Disconnected'); };
+                    if (typeof showEditUser === 'function' && !showEditUser.__screenViewPatched) {
+                        var prevEdit = showEditUser;
+                        showEditUser = function(username){
+                            var result = prevEdit.apply(this, arguments);
+                            (async function(){
+                                var users = await _svReadUsers();
+                                var u = users[username] || {};
+                                var checked = username === 'Plan' || !!((u.permissions || {})[SCREEN_VIEW_PERMISSION]);
+                                var disabled = username === 'Plan';
+                                var tries = 0;
+                                function attempt(){
+                                    tries += 1;
+                                    _svAppendPermissionCheckbox('edit-perm', checked, disabled);
+                                    if (!document.querySelector('#modalContent input[value="' + SCREEN_VIEW_PERMISSION + '"]') && tries < 20) setTimeout(attempt, 80);
                                 }
-                                if (!pc.remoteDescription) {
-                                    await pc.setRemoteDescription(new RTCSessionDescription(sig.offer.sdp));
-                                    var ans = await pc.createAnswer();
-                                    await pc.setLocalDescription(ans);
-                                    await writeData('screenViewSignals/' + id + '/answer', { from:me, to:target, sdp:ans, at:getNowISO ? getNowISO() : new Date().toISOString() }, null);
-                                }
-                                svApplyCandidates(id, pc, sig.candidates, target);
-                            }
-                        } catch (e) { svSetViewerStatus('Connection error'); }
-                    });
-                }
-                function svApplyCandidates(id, pc, all, fromUser){
-                    if (!pc || !all) return;
-                    _svSeenCandidates[id] = _svSeenCandidates[id] || {};
-                    var bucket = all[svSafePath(fromUser)] || {};
-                    Object.keys(bucket).forEach(function(k){
-                        var seenKey = id + '_' + fromUser + '_' + k;
-                        if (_svSeenCandidates[id][seenKey]) return;
-                        _svSeenCandidates[id][seenKey] = true;
-                        try { pc.addIceCandidate(new RTCIceCandidate(bucket[k])).catch(function(){}); } catch (_) {}
-                    });
-                }
-                async function svEndViewer(id){
-                    id = id || _svActiveViewerId;
-                    if (id && firebaseConnected && db) {
-                        try { await writeData('screenViewRequests/' + id + '/status', 'ended', null); } catch (_) {}
+                                setTimeout(attempt, 60);
+                            })();
+                            return result;
+                        };
+                        showEditUser.__screenViewPatched = true;
                     }
-                    svCleanupViewer(id, true);
                 }
-                function svCleanupViewer(id, removeWindow){
-                    if (id && _svViewerPcs[id]) { try { _svViewerPcs[id].close(); } catch (_) {} delete _svViewerPcs[id]; }
-                    ['viewerReq_', 'viewerSig_'].forEach(function(p){ var k = p + id; if (_svRefs[k]) { try { _svRefs[k].off(); } catch (_) {} delete _svRefs[k]; } });
-                    if (removeWindow !== false) { var w = document.getElementById('svViewer'); if (w) w.remove(); }
-                    if (_svActiveViewerId === id) _svActiveViewerId = null;
+
+                async function _svShowCenter(){
+                    if (!_svAllowed()) { _svToast('You do not have permission to use Screen View.', 'error'); return; }
+                    _svInjectStyles();
+                    var users = await _svReadUsers();
+                    var presence = await _svReadPresence();
+                    var me = _svMe();
+                    var entries = Object.keys(users || {}).filter(function(k){
+                        if (!k || k === me || k === 'Plan') return false;
+                        var role = (users[k].role || '').toLowerCase();
+                        return role === 'agent' || role === 'manager' || role === 'accounts' || role === 'readonly' || !role;
+                    }).sort(function(a,b){
+                        var ao = _svPresenceOnline(presence[a]) ? 1 : 0;
+                        var bo = _svPresenceOnline(presence[b]) ? 1 : 0;
+                        if (ao !== bo) return bo - ao;
+                        return _svUserName(users,a).localeCompare(_svUserName(users,b));
+                    });
+                    var onlineCount = entries.filter(function(k){ return _svPresenceOnline(presence[k]); }).length;
+                    var cards = entries.length ? entries.map(function(k){
+                        var u = users[k] || {}, p = presence[k] || {}, online = _svPresenceOnline(p), display = u.name || p.name || k;
+                        return '<div class="mr-sv-agent-card ' + (online ? 'online' : 'offline') + '" ' + (online ? 'onclick="window._mrRequestScreenView(\'' + _svEscape(k) + '\')"' : '') + '>' +
+                            '<div class="mr-sv-avatar">' + _svEscape(_svInitials(display)) + '</div>' +
+                            '<div class="mr-sv-agent-main"><div class="mr-sv-agent-name">' + _svEscape(display) + '</div>' +
+                            '<div class="mr-sv-agent-sub"><span class="mr-sv-dot ' + (online ? '' : 'offline') + '"></span>@' + _svEscape(k) + ' · ' + _svEscape(u.role || 'agent') + ' · ' + (online ? 'Online' : 'Offline') + '</div></div>' +
+                            '<button class="btn btn-sm ' + (online ? 'btn-primary' : 'btn-outline') + '" ' + (online ? '' : 'disabled') + '><i class="fas fa-eye"></i> Request</button>' +
+                            '</div>';
+                    }).join('') : '<p class="text-muted">No agents found. Create agents in User Management first.</p>';
+                    showModal(
+                        '<div class="mr-sv-modal-head"><div><h3><i class="fas fa-desktop"></i> Screen View</h3>' +
+                        '<p class="text-muted text-sm">Select an online agent to request view-only access to their live screen. They must accept before sharing starts.</p></div>' +
+                        '<button class="btn btn-sm btn-outline" onclick="window._mrShowScreenViewCenter()"><i class="fas fa-rotate"></i> Refresh</button></div>' +
+                        '<div class="text-muted text-sm"><strong>' + onlineCount + '</strong> online agent' + (onlineCount === 1 ? '' : 's') + ' available.</div>' +
+                        '<div class="mr-sv-agent-grid">' + cards + '</div>' +
+                        '<div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>'
+                    );
                 }
-                function svAttachIncomingRequests(){
+
+                async function _svRequestScreenView(target){
+                    if (!_svAllowed()) { _svToast('You do not have permission to use Screen View.', 'error'); return; }
+                    if (!_svNeedsFirebase()) return;
+                    var me = _svMe();
+                    if (!me || !target || target === me) return;
+                    var users = await _svReadUsers();
+                    var presence = await _svReadPresence();
+                    if (!_svPresenceOnline(presence[target])) { _svToast('That agent is not online right now.', 'warning'); return; }
+                    var id = _svId();
+                    var req = {
+                        id: id,
+                        from: me,
+                        fromName: _svUserName(users, me),
+                        to: target,
+                        toName: _svUserName(users, target),
+                        status: 'pending',
+                        createdAt: _svNow(),
+                        updatedAt: _svNow()
+                    };
+                    await _svWrite('screenViewRequests/' + id, req, null);
+                    _svWatchRequest(id, 'viewer');
+                    showModal(
+                        '<h3><i class="fas fa-desktop"></i> Screen View Request Sent</h3>' +
+                        '<p class="text-muted" style="margin:12px 0;">Waiting for <strong>' + _svEscape(req.toName) + '</strong> to accept your screen view request.</p>' +
+                        '<div id="mrSvWaitingStatus" style="margin:16px 0;padding:12px;background:var(--input-bg);border-radius:12px;text-align:center;"><i class="fas fa-circle-notch fa-spin"></i> Pending approval…</div>' +
+                        '<div class="modal-actions"><button class="btn btn-danger" onclick="window._mrCancelScreenViewRequest(\'' + id + '\')"><i class="fas fa-xmark"></i> Cancel Request</button></div>'
+                    );
+                }
+
+                async function _svCancelRequest(id){
+                    try { await _svWrite('screenViewRequests/' + id + '/status', 'cancelled', null); await _svWrite('screenViewRequests/' + id + '/updatedAt', _svNow(), null); } catch (_) {}
+                    _svCleanup(id, true);
+                    try { window.closeModal(); } catch (_) {}
+                    _svToast('Screen View request cancelled.', 'info');
+                }
+
+                function _svAttachIncomingRequests(){
                     if (!firebaseConnected || !db || !STATE.currentUser) return;
-                    if (_svRefs.incomingRequests) return;
-                    _svRefs.incomingRequests = db.ref('screenViewRequests');
-                    _svRefs.incomingRequests.on('value', function(snap){
-                        var all = snap.val() || {}, me = svMe();
+                    if (_sv.requestListener) { try { _sv.requestListener.off(); } catch (_) {} _sv.requestListener = null; }
+                    _sv.requestListener = db.ref('screenViewRequests');
+                    _sv.requestListener.on('value', function(snap){
+                        var all = snap.val() || {}, me = _svMe();
                         Object.keys(all).forEach(function(id){
                             var r = all[id] || {};
-                            if (r.to === me && r.status === 'pending') svShowIncomingRequest(r);
-                            if (r.to === me && r.status === 'ended' && _svActiveShareId === id) svStopShare(id, false);
+                            if (r.to !== me || r.from === me || r.status !== 'pending') return;
+                            if (_sv.promptOpen[id]) return;
+                            _sv.promptOpen[id] = true;
+                            _svShowIncomingPrompt(id, r);
                         });
                     });
                 }
-                function svShowIncomingRequest(req){
-                    svInstallStyles();
-                    var id = req.id;
-                    if (document.getElementById('svReq_' + svSafePath(id))) return;
-                    var d = document.createElement('div');
-                    d.id = 'svReq_' + svSafePath(id);
-                    d.className = 'sv-request-popup';
-                    d.innerHTML = '<h4><i class="fas fa-display"></i> Screen View Request</h4><p class="text-sm">' + svEsc(req.fromName || req.from) + ' wants to view your screen.</p><p class="text-muted text-xs" style="color:rgba(255,255,255,.72);">Accepting will open your browser screen picker. Choose the screen/window to share.</p><div class="sv-request-actions"><button class="btn btn-success btn-sm" id="svAccept_' + svSafePath(id) + '"><i class="fas fa-check"></i> Accept</button><button class="btn btn-danger btn-sm" id="svDecline_' + svSafePath(id) + '"><i class="fas fa-times"></i> Decline</button></div>';
-                    document.body.appendChild(d);
-                    document.getElementById('svAccept_' + svSafePath(id)).onclick = function(){ svAcceptRequest(req); };
-                    document.getElementById('svDecline_' + svSafePath(id)).onclick = async function(){ try { await writeData('screenViewRequests/' + id + '/status', 'declined', null); } catch (_) {} d.remove(); };
+
+                function _svShowIncomingPrompt(id, req){
+                    _svInjectStyles();
+                    showModal(
+                        '<h3><i class="fas fa-desktop"></i> Screen View Request</h3>' +
+                        '<p style="margin:12px 0;"><strong>' + _svEscape(req.fromName || req.from) + '</strong> wants to view your screen.</p>' +
+                        '<p class="text-muted text-sm">If you accept, your browser will ask which screen or window to share. Only share if you trust this request.</p>' +
+                        '<div class="modal-actions">' +
+                        '<button class="btn btn-success" onclick="window._mrAcceptScreenViewRequest(\'' + id + '\')"><i class="fas fa-check"></i> Accept & Share Screen</button>' +
+                        '<button class="btn btn-danger" onclick="window._mrDenyScreenViewRequest(\'' + id + '\')"><i class="fas fa-ban"></i> Deny</button>' +
+                        '</div>'
+                    );
+                    try { document.title = 'Screen View Request'; } catch (_) {}
                 }
-                async function svAcceptRequest(req){
-                    var popup = document.getElementById('svReq_' + svSafePath(req.id));
-                    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) { svToast('Screen capture is not supported in this browser.', 'error'); return; }
-                    var stream;
-                    try {
-                        stream = await navigator.mediaDevices.getDisplayMedia({ video:{ cursor:'always', frameRate:30 }, audio:false });
-                    } catch (e) {
-                        try { await writeData('screenViewRequests/' + req.id + '/status', 'declined', null); } catch (_) {}
-                        if (popup) popup.remove();
-                        svToast('Screen sharing was not started.', 'warning');
+
+                async function _svDenyRequest(id){
+                    await _svWrite('screenViewRequests/' + id + '/status', 'denied', null);
+                    await _svWrite('screenViewRequests/' + id + '/updatedAt', _svNow(), null);
+                    delete _sv.promptOpen[id];
+                    try { window.closeModal(); } catch (_) {}
+                    _svToast('Screen View request denied.', 'info');
+                }
+
+                async function _svAcceptRequest(id){
+                    if (!_svNeedsFirebase()) return;
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                        _svToast('Screen sharing is not supported in this browser.', 'error');
                         return;
                     }
-                    if (popup) popup.remove();
-                    _svActiveShareId = req.id;
-                    _svStreams[req.id] = stream;
-                    await writeData('screenViewRequests/' + req.id + '/status', 'accepted', null);
-                    await writeData('screenViewRequests/' + req.id + '/acceptedAt', getNowISO ? getNowISO() : new Date().toISOString(), null);
-                    svOpenSharePanel(req);
-                    await svCreateShareOffer(req, stream);
-                    var t = stream.getVideoTracks()[0];
-                    if (t) t.onended = function(){ svStopShare(req.id, true); };
-                }
-                async function svCreateShareOffer(req, stream){
-                    var me = svMe(), id = req.id, target = req.from;
-                    var pc = new RTCPeerConnection({ iceServers: await svIceServers() });
-                    _svSharePcs[id] = pc;
-                    stream.getTracks().forEach(function(t){ try { pc.addTrack(t, stream); } catch (_) {} });
-                    pc.onicecandidate = function(ev){ if (ev.candidate && firebaseConnected && db) db.ref('screenViewSignals/' + id + '/candidates/' + svSafePath(me)).push(ev.candidate.toJSON()); };
-                    pc.onconnectionstatechange = function(){ var s = document.getElementById('svShareStatus'); if (s) s.textContent = pc.connectionState === 'connected' ? 'Live to ' + target : pc.connectionState; };
-                    var offer = await pc.createOffer({ offerToReceiveAudio:false, offerToReceiveVideo:false });
-                    await pc.setLocalDescription(offer);
-                    await writeData('screenViewSignals/' + id + '/offer', { from:me, to:target, sdp:offer, at:getNowISO ? getNowISO() : new Date().toISOString() }, null);
-                    svAttachShareSignal(req);
-                }
-                function svAttachShareSignal(req){
-                    var id = req.id, target = req.from, me = svMe();
-                    var ref = db.ref('screenViewSignals/' + id);
-                    if (_svRefs['shareSig_' + id]) { try { _svRefs['shareSig_' + id].off(); } catch (_) {} }
-                    _svRefs['shareSig_' + id] = ref;
-                    ref.on('value', async function(snap){
-                        var sig = snap.val() || {}, pc = _svSharePcs[id];
-                        if (!pc) return;
-                        try {
-                            if (sig.answer && sig.answer.to === me && !pc.remoteDescription) await pc.setRemoteDescription(new RTCSessionDescription(sig.answer.sdp));
-                            svApplyCandidates(id, pc, sig.candidates, target);
-                        } catch (_) {}
-                    });
-                    var reqRef = db.ref('screenViewRequests/' + id + '/status');
-                    _svRefs['shareReq_' + id] = reqRef;
-                    reqRef.on('value', function(snap){ if (snap.val() === 'ended') svStopShare(id, false); });
-                }
-                function svOpenSharePanel(req){
-                    svInstallStyles();
-                    var old = document.getElementById('svSharePanel');
-                    if (old) old.remove();
-                    var p = document.createElement('div');
-                    p.id = 'svSharePanel';
-                    p.className = 'sv-share-panel';
-                    p.innerHTML = '<div class="sv-window-top"><div class="sv-window-title"><i class="fas fa-display"></i><span>Sharing screen</span></div><div class="sv-window-actions"><button type="button" id="svShareMin" title="Minimize"><i class="fas fa-minus"></i></button><button type="button" id="svShareStop" title="Stop"><i class="fas fa-xmark"></i></button></div></div><div class="sv-window-body"><div id="svShareStatus" class="sv-status-pill">Starting live preview to ' + svEsc(req.from) + '...</div><p class="text-xs" style="margin-top:10px;color:rgba(255,255,255,.72);">You can drag this dialog, resize it from the corner, or minimize it so your shared screen stays clear.</p></div>';
-                    document.body.appendChild(p);
-                    svMakeMovable(p, p.querySelector('.sv-window-top'));
-                    document.getElementById('svShareMin').onclick = function(){ p.classList.toggle('sv-minimized'); };
-                    document.getElementById('svShareStop').onclick = function(){ svStopShare(req.id, true); };
-                }
-                async function svStopShare(id, notifyViewer){
-                    id = id || _svActiveShareId;
-                    if (!id) return;
-                    try { if (_svStreams[id]) _svStreams[id].getTracks().forEach(function(t){ try { t.stop(); } catch (_) {} }); } catch (_) {}
-                    delete _svStreams[id];
-                    if (_svSharePcs[id]) { try { _svSharePcs[id].close(); } catch (_) {} delete _svSharePcs[id]; }
-                    ['shareSig_', 'shareReq_'].forEach(function(p){ var k = p + id; if (_svRefs[k]) { try { _svRefs[k].off(); } catch (_) {} delete _svRefs[k]; } });
-                    var panel = document.getElementById('svSharePanel'); if (panel) panel.remove();
-                    if (notifyViewer && firebaseConnected && db) { try { await writeData('screenViewRequests/' + id + '/status', 'ended', null); } catch (_) {} }
-                    if (firebaseConnected && db) { try { db.ref('screenViewSignals/' + id).remove(); } catch (_) {} }
-                    if (_svActiveShareId === id) _svActiveShareId = null;
-                    svToast('Screen sharing stopped.', 'info');
-                }
-                window._svStopShare = svStopShare;
-                function svMessageUsers(allMsgs, me){
-                    var out = {};
-                    function each(m){
-                        if (!m || m.deleted || m.groupId) return;
-                        if (m.from === me && m.to) out[m.to] = true;
-                        if (m.to === me && m.from) out[m.from] = true;
-                    }
-                    if (Array.isArray(allMsgs)) allMsgs.forEach(each); else Object.keys(allMsgs || {}).forEach(function(k){ each(allMsgs[k]); });
-                    return out;
-                }
-                function svRefreshSectionVisibility(){
-                    document.querySelectorAll('#chatContactsList .chat-contact-section').forEach(function(sec){
-                        var n = sec.nextElementSibling, show = false;
-                        while (n && !n.classList.contains('chat-contact-section')) {
-                            if (n.classList && n.classList.contains('chat-contact') && n.style.display !== 'none') { show = true; break; }
-                            n = n.nextElementSibling;
-                        }
-                        sec.style.display = show ? 'block' : 'none';
-                    });
-                }
-                async function svApplyNormalChatLimit(){
-                    if (!STATE.currentUser || (typeof isAdmin === 'function' && isAdmin())) return;
-                    var me = svMe(), presence = await svPresence(), msgs = {};
-                    try { msgs = await readData('chatMessages', 'ph_chat_messages', true) || {}; } catch (_) {}
-                    var hasChat = svMessageUsers(msgs, me);
-                    document.querySelectorAll('#chatContactsList .chat-contact').forEach(function(el){
-                        var key = el.dataset.key || '';
-                        if (key.indexOf('pair_') === 0 || el.classList.contains('mutual-chat')) { el.style.display = 'none'; return; }
-                        if (key.indexOf('user_') === 0) {
-                            var user = key.replace(/^user_/, '');
-                            el.style.display = (svOnline(presence[user]) || hasChat[user]) ? 'flex' : 'none';
-                        }
-                    });
-                    svRefreshSectionVisibility();
-                }
-                async function svApplyAdminChatFilter(){
-                    if (!STATE.currentUser || !(typeof isAdmin === 'function' && isAdmin())) return;
-                    var presence = await svPresence();
-                    document.querySelectorAll('#chatContactsList .chat-contact').forEach(function(el){
-                        var key = el.dataset.key || '', show = true;
-                        var isUser = key.indexOf('user_') === 0;
-                        var isPair = key.indexOf('pair_') === 0 || el.classList.contains('mutual-chat');
-                        if (_svAdminChatFilter === 'online') show = isUser && svOnline(presence[key.replace(/^user_/, '')]);
-                        else if (_svAdminChatFilter === 'mutual') show = isPair;
-                        else if (_svAdminChatFilter === 'agents') show = isUser;
-                        else show = true;
-                        el.style.display = show ? 'flex' : 'none';
-                    });
-                    svRefreshSectionVisibility();
-                    document.querySelectorAll('#svAdminChatFilters button,#mrToggleOnlineAgentsBtn').forEach(function(b){ b.classList.remove('active'); b.classList.remove('sv-active'); });
-                    if (_svAdminChatFilter === 'online') { var ob = document.getElementById('mrToggleOnlineAgentsBtn'); if (ob) ob.classList.add('sv-active'); }
-                    var ab = document.getElementById('svAdminAgentsBtn'); if (ab) ab.classList.toggle('active', _svAdminChatFilter === 'agents');
-                    var mb = document.getElementById('svAdminMutualBtn'); if (mb) mb.classList.toggle('active', _svAdminChatFilter === 'mutual');
-                }
-                function svSetAdminChatFilter(f){
-                    _svAdminChatFilter = (_svAdminChatFilter === f) ? '' : f;
-                    var panel = document.getElementById('mrChatOnlinePanel'); if (panel) panel.classList.remove('open');
-                    svApplyAdminChatFilter();
-                }
-                function svInstallChatFilters(){
-                    if (!document.querySelector('.chat-shell')) return;
-                    var namesBtn = document.getElementById('mrToggleChatNamesBtn');
-                    if (namesBtn && !(typeof isAdmin === 'function' && isAdmin())) namesBtn.style.display = 'none';
-                    if (typeof isAdmin === 'function' && isAdmin()) {
-                        var onlineBtn = document.getElementById('mrToggleOnlineAgentsBtn');
-                        if (onlineBtn) {
-                            onlineBtn.innerHTML = '<i class="fas fa-signal"></i> Online Agents';
-                            onlineBtn.onclick = function(e){ e.preventDefault(); svSetAdminChatFilter('online'); };
-                        }
-                        var head = document.querySelector('.chat-sidebar-head');
-                        if (head && !document.getElementById('svAdminChatFilters')) {
-                            var bar = document.createElement('div');
-                            bar.id = 'svAdminChatFilters';
-                            bar.className = 'sv-filterbar';
-                            bar.innerHTML = '<button type="button" class="btn btn-sm btn-outline" id="svAdminAgentsBtn"><i class="fas fa-users"></i> Agents</button><button type="button" class="btn btn-sm btn-outline" id="svAdminMutualBtn"><i class="fas fa-user-friends"></i> Mutual Agents</button>';
-                            head.appendChild(bar);
-                            document.getElementById('svAdminAgentsBtn').onclick = function(){ svSetAdminChatFilter('agents'); };
-                            document.getElementById('svAdminMutualBtn').onclick = function(){ svSetAdminChatFilter('mutual'); };
-                        }
-                        svApplyAdminChatFilter();
-                    } else {
-                        svApplyNormalChatLimit();
-                    }
-                }
-                if (typeof showChatUI === 'function' && !showChatUI.__svAdminFiltersPatched) {
-                    var _svPrevShowChatUI = showChatUI;
-                    showChatUI = function(){
-                        var result = _svPrevShowChatUI.apply(this, arguments);
-                        setTimeout(svInstallChatFilters, 180);
-                        setTimeout(svInstallChatFilters, 520);
-                        return result;
-                    };
-                    showChatUI.__svAdminFiltersPatched = true;
-                }
-                if (typeof loadChatContacts === 'function' && !loadChatContacts.__svRoleFilterPatched) {
-                    var _svPrevLoadChatContacts = loadChatContacts;
-                    loadChatContacts = async function(){
-                        var result = await _svPrevLoadChatContacts.apply(this, arguments);
-                        setTimeout(svInstallChatFilters, 60);
-                        return result;
-                    };
-                    loadChatContacts.__svRoleFilterPatched = true;
-                }
-                if (typeof afterLogin === 'function' && !afterLogin.__svScreenViewListenerPatched) {
-                    var _svPrevAfterLogin = afterLogin;
-                    afterLogin = async function(user){
-                        var result = await _svPrevAfterLogin.apply(this, arguments);
-                        svEnsureDashboardCard();
-                        svApplyDashboardVisibility();
-                        setTimeout(svAttachIncomingRequests, 700);
-                        return result;
-                    };
-                    afterLogin.__svScreenViewListenerPatched = true;
-                }
-                setInterval(function(){
+                    var req = await _svRead('screenViewRequests/' + id, null, true);
+                    if (!req || req.to !== _svMe()) { _svToast('Screen View request is no longer available.', 'error'); return; }
+                    var stream;
                     try {
-                        if (STATE.currentUser) {
-                            svEnsureDashboardCard();
-                            svApplyDashboardVisibility();
-                            svAttachIncomingRequests();
-                            if (document.querySelector('.chat-shell')) svInstallChatFilters();
+                        stream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'always' }, audio: false });
+                    } catch (e) {
+                        if (e && e.name !== 'NotAllowedError') _svToast('Could not start screen sharing: ' + (e.message || e.name), 'error');
+                        await _svWrite('screenViewRequests/' + id + '/status', 'denied', null);
+                        await _svWrite('screenViewRequests/' + id + '/updatedAt', _svNow(), null);
+                        return;
+                    }
+                    await _svWrite('screenViewRequests/' + id + '/status', 'accepted', null);
+                    await _svWrite('screenViewRequests/' + id + '/acceptedAt', _svNow(), null);
+                    await _svWrite('screenViewRequests/' + id + '/updatedAt', _svNow(), null);
+                    _svStartSharing(id, req, stream);
+                    _svWatchRequest(id, 'sharer');
+                    try { window.closeModal(); } catch (_) {}
+                }
+
+                async function _svStartSharing(id, req, stream){
+                    var sess = _sv.sessions[id] = _sv.sessions[id] || {};
+                    sess.role = 'sharer';
+                    sess.stream = stream;
+                    _svShowScreenWindow(id, req.fromName || req.from, stream, true);
+                    _svStartFrameRelay(id, stream);
+                    var track = stream.getVideoTracks()[0];
+                    if (track) track.onended = function(){ _svEnd(id); };
+                    var ice = await _svIceServers();
+                    var pc = new RTCPeerConnection({ iceServers: ice });
+                    sess.pc = pc;
+                    stream.getTracks().forEach(function(t){ try { pc.addTrack(t, stream); } catch (_) {} });
+                    pc.onicecandidate = function(ev){
+                        if (ev.candidate && firebaseConnected && db) db.ref('screenViewSignals/' + id + '/candidates/sharer').push(ev.candidate.toJSON());
+                    };
+                    var sigRef = _svRef('screenViewSignals/' + id);
+                    if (sigRef) {
+                        if (_sv.signalWatchers[id]) { try { _sv.signalWatchers[id].off(); } catch (_) {} }
+                        _sv.signalWatchers[id] = sigRef;
+                        sigRef.on('value', async function(snap){
+                            var sig = snap.val() || {};
+                            try {
+                                if (sig.answer && sig.answer.to === _svMe() && !pc.currentRemoteDescription) {
+                                    await pc.setRemoteDescription(new RTCSessionDescription(sig.answer.sdp));
+                                }
+                            } catch (_) {}
+                            _svAddCandidates(pc, sig.candidates && sig.candidates.viewer, sess, 'viewer');
+                        });
+                    }
+                    try {
+                        var offer = await pc.createOffer();
+                        await pc.setLocalDescription(offer);
+                        await _svWrite('screenViewSignals/' + id + '/offer', { from: _svMe(), to: req.from, sdp: offer, at: _svNow() }, null);
+                    } catch (e) { _svToast('Could not create Screen View connection.', 'error'); }
+                }
+
+                function _svWatchRequest(id, role){
+                    if (!_svNeedsFirebase()) return;
+                    if (_sv.requestWatchers[id]) { try { _sv.requestWatchers[id].off(); } catch (_) {} }
+                    var ref = db.ref('screenViewRequests/' + id);
+                    _sv.requestWatchers[id] = ref;
+                    ref.on('value', function(snap){
+                        var req = snap.val();
+                        if (!req) { _svCleanup(id, true); return; }
+                        if (role === 'viewer') _svHandleViewerRequestState(id, req);
+                        if (role === 'sharer' && ['ended','cancelled','denied'].indexOf(req.status) !== -1) _svCleanup(id, false);
+                    });
+                }
+
+                function _svHandleViewerRequestState(id, req){
+                    var statusEl = document.getElementById('mrSvWaitingStatus');
+                    if (req.status === 'accepted') {
+                        if (statusEl) statusEl.innerHTML = '<i class="fas fa-check-circle" style="color:var(--success);"></i> Accepted. Connecting to live screen…';
+                        setTimeout(function(){ var el=document.getElementById('mrSvWaitingStatus'); if(el) el.innerHTML='<i class="fas fa-circle-notch fa-spin"></i> Connecting… If direct video is blocked, fallback live view will open automatically.'; }, 3500);
+                        _svStartViewing(id, req);
+                    } else if (req.status === 'denied') {
+                        if (statusEl) statusEl.innerHTML = '<i class="fas fa-ban" style="color:var(--danger);"></i> Request denied.';
+                        _svToast('Screen View request denied.', 'warning');
+                        _svCleanup(id, true);
+                    } else if (req.status === 'cancelled') {
+                        _svCleanup(id, true);
+                    } else if (req.status === 'ended') {
+                        _svToast('Screen View ended.', 'info');
+                        _svCleanup(id, false);
+                    }
+                }
+
+                async function _svStartViewing(id, req){
+                    var sess = _sv.sessions[id] = _sv.sessions[id] || {};
+                    if (sess.viewerStarted) return;
+                    sess.viewerStarted = true;
+                    sess.role = 'viewer';
+                    _svAttachFrameListener(id, req.toName || req.to || 'Shared screen');
+                    var sigRef = _svRef('screenViewSignals/' + id);
+                    if (!sigRef) return;
+                    if (_sv.signalWatchers[id]) { try { _sv.signalWatchers[id].off(); } catch (_) {} }
+                    _sv.signalWatchers[id] = sigRef;
+                    sigRef.on('value', async function(snap){
+                        var sig = snap.val() || {};
+                        if (!sig.offer || sig.offer.to !== _svMe()) return;
+                        var pc = sess.pc;
+                        if (!pc) {
+                            var ice = await _svIceServers();
+                            pc = new RTCPeerConnection({ iceServers: ice });
+                            sess.pc = pc;
+                            pc.ontrack = function(ev){
+                                var stream = ev.streams && ev.streams[0];
+                                if (stream) {
+                                    try { window.closeModal(); } catch (_) {}
+                                    _svShowScreenWindow(id, req.toName || sig.offer.from, stream, false);
+                                }
+                            };
+                            pc.onicecandidate = function(ev){
+                                if (ev.candidate && firebaseConnected && db) db.ref('screenViewSignals/' + id + '/candidates/viewer').push(ev.candidate.toJSON());
+                            };
                         }
-                    } catch (_) {}
-                }, 5000);
-                window.addEventListener('beforeunload', function(){
-                    try { if (_svActiveShareId) svStopShare(_svActiveShareId, true); } catch (_) {}
-                    try { if (_svActiveViewerId) writeData('screenViewRequests/' + _svActiveViewerId + '/status', 'ended', null); } catch (_) {}
-                });
+                        try {
+                            if (!pc.currentRemoteDescription) {
+                                await pc.setRemoteDescription(new RTCSessionDescription(sig.offer.sdp));
+                                var answer = await pc.createAnswer();
+                                await pc.setLocalDescription(answer);
+                                await _svWrite('screenViewSignals/' + id + '/answer', { from: _svMe(), to: sig.offer.from, sdp: answer, at: _svNow() }, null);
+                            }
+                        } catch (e) { _svToast('Could not connect to shared screen.', 'error'); }
+                        _svAddCandidates(pc, sig.candidates && sig.candidates.sharer, sess, 'sharer');
+                    });
+                }
+
+                function _svAddCandidates(pc, bucket, sess, source){
+                    if (!pc || !bucket) return;
+                    sess.addedCandidates = sess.addedCandidates || {};
+                    sess.pendingCandidates = sess.pendingCandidates || {};
+                    if (!pc.remoteDescription) {
+                        sess.pendingCandidates[source] = Object.assign(sess.pendingCandidates[source] || {}, bucket || {});
+                        return;
+                    }
+                    var combined = Object.assign({}, sess.pendingCandidates[source] || {}, bucket || {});
+                    sess.pendingCandidates[source] = {};
+                    Object.keys(combined || {}).forEach(function(k){
+                        var key = source + ':' + k;
+                        if (sess.addedCandidates[key]) return;
+                        try {
+                            pc.addIceCandidate(new RTCIceCandidate(combined[k])).then(function(){
+                                sess.addedCandidates[key] = true;
+                            }).catch(function(){
+                                sess.pendingCandidates[source][k] = combined[k];
+                            });
+                        } catch (_) { sess.pendingCandidates[source][k] = combined[k]; }
+                    });
+                }
+
+                function _svStartFrameRelay(id, stream){
+                    if (!firebaseConnected || !db || !stream) return;
+                    var sess = _sv.sessions[id] = _sv.sessions[id] || {};
+                    if (sess.frameTimer) return;
+                    var video = document.createElement('video');
+                    video.muted = true; video.playsInline = true; video.autoplay = true;
+                    video.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
+                    video.srcObject = stream;
+                    document.body.appendChild(video);
+                    sess.frameVideo = video;
+                    try { video.play().catch(function(){}); } catch (_) {}
+                    var canvas = document.createElement('canvas');
+                    var ctx = canvas.getContext('2d');
+                    async function pushFrame(){
+                        try {
+                            if (!video.videoWidth || !video.videoHeight) return;
+                            var maxW = 960;
+                            var scale = Math.min(1, maxW / video.videoWidth);
+                            canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+                            canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            var image = canvas.toDataURL('image/jpeg', 0.56);
+                            await _svWrite('screenViewFrames/' + id, { image: image, at: _svNow(), from: _svMe(), width: canvas.width, height: canvas.height }, null);
+                        } catch (_) {}
+                    }
+                    setTimeout(pushFrame, 350);
+                    sess.frameTimer = setInterval(pushFrame, 900);
+                }
+
+                function _svAttachFrameListener(id, peerLabel){
+                    if (!firebaseConnected || !db) return;
+                    if (_sv.frameWatchers[id]) { try { _sv.frameWatchers[id].off(); } catch (_) {} }
+                    var ref = db.ref('screenViewFrames/' + id);
+                    _sv.frameWatchers[id] = ref;
+                    ref.on('value', function(snap){
+                        var frame = snap.val();
+                        if (!frame || !frame.image) return;
+                        var sess = _sv.sessions[id] || {};
+                        if (sess.videoConnected) return;
+                        try { window.closeModal(); } catch (_) {}
+                        _svShowFrameWindow(id, peerLabel || 'Shared screen', frame.image, frame.at);
+                    });
+                }
+
+                function _svMakeWindowMovable(win){
+                    if (!win || win.__svMovable) return;
+                    win.__svMovable = true;
+                    var bar = win.querySelector('.mr-sv-bar');
+                    if (!bar) return;
+                    var dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+                    bar.addEventListener('pointerdown', function(e){
+                        if (e.target.closest('button')) return;
+                        if (win.classList.contains('max')) return;
+                        dragging = true;
+                        var r = win.getBoundingClientRect();
+                        startX = e.clientX; startY = e.clientY; startLeft = r.left; startTop = r.top;
+                        win.style.left = r.left + 'px'; win.style.top = r.top + 'px'; win.style.right = 'auto'; win.style.bottom = 'auto';
+                        try { bar.setPointerCapture(e.pointerId); } catch (_) {}
+                    });
+                    bar.addEventListener('pointermove', function(e){
+                        if (!dragging) return;
+                        var nx = Math.max(4, Math.min(window.innerWidth - 80, startLeft + e.clientX - startX));
+                        var ny = Math.max(4, Math.min(window.innerHeight - 48, startTop + e.clientY - startY));
+                        win.style.left = nx + 'px'; win.style.top = ny + 'px';
+                    });
+                    function done(e){ dragging = false; try { bar.releasePointerCapture(e.pointerId); } catch (_) {} }
+                    bar.addEventListener('pointerup', done); bar.addEventListener('pointercancel', done);
+                }
+
+                function _svShowFrameWindow(id, peerLabel, image, at){
+                    _svInjectStyles();
+                    var win = document.getElementById('mrScreenViewWindow');
+                    if (!win || win.dataset.mode === 'video') {
+                        if (win) win.remove();
+                        win = document.createElement('div');
+                        win.id = 'mrScreenViewWindow';
+                        win.className = 'mr-sv-window';
+                        win.dataset.mode = 'frame';
+                        win.innerHTML = '<div class="mr-sv-bar"><div class="mr-sv-title"><i class="fas fa-desktop"></i> Viewing ' + _svEscape(peerLabel || 'agent') + '</div>' +
+                            '<div class="mr-sv-actions"><button type="button" title="Minimize" id="mrSvMinBtn"><i class="fas fa-window-minimize"></i></button><button type="button" title="Maximize" id="mrSvMaxBtn"><i class="fas fa-expand"></i></button><button type="button" title="End" id="mrSvEndBtn"><i class="fas fa-xmark"></i></button></div></div>' +
+                            '<div class="mr-sv-stage"><img alt="Live shared screen"/><div class="mr-sv-badge">Live screen</div><div class="mr-sv-quality">fallback live view</div></div>';
+                        document.body.appendChild(win);
+                        _svWireWindowButtons(win, id);
+                    }
+                    var img = win.querySelector('img');
+                    if (img) img.src = image;
+                    _svMakeWindowMovable(win);
+                }
+
+                function _svWireWindowButtons(win, id){
+                    var max = win.querySelector('#mrSvMaxBtn');
+                    var min = win.querySelector('#mrSvMinBtn');
+                    var end = win.querySelector('#mrSvEndBtn');
+                    if (max) max.onclick = function(){ win.classList.toggle('max'); win.classList.remove('minimized'); };
+                    if (min) min.onclick = function(){ win.classList.toggle('minimized'); win.classList.remove('max'); };
+                    if (end) end.onclick = function(){ _svEnd(id); };
+                    _svMakeWindowMovable(win);
+                }
+
+                function _svShowScreenWindow(id, peerLabel, stream, local){
+                    _svInjectStyles();
+                    var old = document.getElementById('mrScreenViewWindow');
+                    if (old) old.remove();
+                    var win = document.createElement('div');
+                    win.id = 'mrScreenViewWindow';
+                    win.className = 'mr-sv-window';
+                    win.dataset.mode = 'video';
+                    win.innerHTML = '<div class="mr-sv-bar"><div class="mr-sv-title"><i class="fas fa-desktop"></i> ' + (local ? 'Sharing your screen with ' : 'Viewing ') + _svEscape(peerLabel || 'agent') + '</div>' +
+                        '<div class="mr-sv-actions"><button type="button" title="Minimize" id="mrSvMinBtn"><i class="fas fa-window-minimize"></i></button><button type="button" title="Maximize" id="mrSvMaxBtn"><i class="fas fa-expand"></i></button><button type="button" title="End" id="mrSvEndBtn"><i class="fas fa-xmark"></i></button></div></div>' +
+                        '<div class="mr-sv-stage"><video autoplay playsinline ' + (local ? 'muted ' : '') + '></video><div class="mr-sv-badge">' + (local ? 'You are sharing' : 'Live screen') + '</div></div>';
+                    document.body.appendChild(win);
+                    var video = win.querySelector('video');
+                    video.srcObject = stream;
+                    try { video.play().catch(function(){}); } catch (_) {}
+                    if (!local) {
+                        var sess = _sv.sessions[id] = _sv.sessions[id] || {};
+                        sess.videoConnected = true;
+                    }
+                    _svWireWindowButtons(win, id);
+                }
+
+                async function _svEnd(id){
+                    try { await _svWrite('screenViewRequests/' + id + '/status', 'ended', null); await _svWrite('screenViewRequests/' + id + '/endedAt', _svNow(), null); await _svWrite('screenViewRequests/' + id + '/updatedAt', _svNow(), null); } catch (_) {}
+                    _svCleanup(id, false);
+                }
+
+                function _svCleanup(id, silent){
+                    var sess = _sv.sessions[id] || {};
+                    try { if (sess.stream) sess.stream.getTracks().forEach(function(t){ t.stop(); }); } catch (_) {}
+                    try { if (sess.pc) sess.pc.close(); } catch (_) {}
+                    try { if (sess.frameTimer) clearInterval(sess.frameTimer); } catch (_) {}
+                    try { if (sess.frameVideo) sess.frameVideo.remove(); } catch (_) {}
+                    try { if (_sv.frameWatchers[id]) { _sv.frameWatchers[id].off(); delete _sv.frameWatchers[id]; } } catch (_) {}
+                    try { if (firebaseConnected && db) db.ref('screenViewFrames/' + id).remove(); } catch (_) {}
+                    try { if (_sv.requestWatchers[id]) { _sv.requestWatchers[id].off(); delete _sv.requestWatchers[id]; } } catch (_) {}
+                    try { if (_sv.signalWatchers[id]) { _sv.signalWatchers[id].off(); delete _sv.signalWatchers[id]; } } catch (_) {}
+                    delete _sv.sessions[id];
+                    delete _sv.promptOpen[id];
+                    var win = document.getElementById('mrScreenViewWindow');
+                    if (win) win.remove();
+                    if (!silent) _svToast('Screen View session ended.', 'info');
+                }
+
+                function _svPatchDashboardHandlers(){
+                    if (typeof handleDashAction === 'function' && !handleDashAction.__screenViewPatched) {
+                        var prevHandle = handleDashAction;
+                        handleDashAction = function(action){
+                            if (action === 'screenView') { _svShowCenter(); return; }
+                            return prevHandle.apply(this, arguments);
+                        };
+                        handleDashAction.__screenViewPatched = true;
+                    }
+                    if (typeof showDashboard === 'function' && !showDashboard.__screenViewPatched) {
+                        var prevShowDashboard = showDashboard;
+                        showDashboard = function(){
+                            _svEnsureDashboardCard();
+                            var result = prevShowDashboard.apply(this, arguments);
+                            _svEnsureDashboardCard();
+                            return result;
+                        };
+                        showDashboard.__screenViewPatched = true;
+                    }
+                    if (typeof reapplyPermissionsUI === 'function' && !reapplyPermissionsUI.__screenViewPatched) {
+                        var prevReapply = reapplyPermissionsUI;
+                        reapplyPermissionsUI = function(){
+                            _svEnsureDashboardCard();
+                            var result = prevReapply.apply(this, arguments);
+                            _svEnsureDashboardCard();
+                            return result;
+                        };
+                        reapplyPermissionsUI.__screenViewPatched = true;
+                    }
+                    if (typeof afterLogin === 'function' && !afterLogin.__screenViewPatched) {
+                        var prevAfterLogin = afterLogin;
+                        afterLogin = async function(user){
+                            var result = await prevAfterLogin.apply(this, arguments);
+                            try { _svEnsureDashboardCard(); } catch (_) {}
+                            try { _svAttachIncomingRequests(); } catch (_) {}
+                            return result;
+                        };
+                        afterLogin.__screenViewPatched = true;
+                    }
+                }
+
+                window._mrShowScreenViewCenter = _svShowCenter;
+                window._mrRequestScreenView = _svRequestScreenView;
+                window._mrCancelScreenViewRequest = _svCancelRequest;
+                window._mrAcceptScreenViewRequest = _svAcceptRequest;
+                window._mrDenyScreenViewRequest = _svDenyRequest;
+                window._mrEndScreenView = _svEnd;
+
+                _svInjectStyles();
+                _svPatchPermissionsForms();
+                _svPatchDashboardHandlers();
+                setTimeout(function(){ _svPatchPermissionsForms(); _svPatchDashboardHandlers(); _svEnsureDashboardCard(); if (STATE.currentUser) _svAttachIncomingRequests(); }, 500);
+                setTimeout(function(){ _svPatchPermissionsForms(); _svPatchDashboardHandlers(); _svEnsureDashboardCard(); if (STATE.currentUser) _svAttachIncomingRequests(); }, 1800);
             })();
 
             document.addEventListener('DOMContentLoaded', init);
