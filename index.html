@@ -15,6 +15,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js">
     </script>
 
+    <!-- jsPDF for precise multi-page Hotel Voucher PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
+    </script>
+
     <!-- html2pdf for PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js">
     </script>
@@ -2210,34 +2214,44 @@
         }
         .voucher-preview-card {
             color: #172033;
-            background: #fff;
-            border-radius: 18px;
-            border: 1px solid #e7dcc4;
+            background:
+                radial-gradient(circle at 12% 0%, rgba(184,134,11,.13), transparent 34%),
+                linear-gradient(180deg, #fffdf7 0%, #ffffff 34%, #fffaf0 100%);
+            border-radius: 22px;
+            border: 1px solid #dcc48c;
             overflow: hidden;
-            box-shadow: 0 18px 55px rgba(18, 18, 26, .12);
+            box-shadow: 0 24px 70px rgba(18, 18, 26, .16);
+            position: relative;
         }
         .voucher-preview-head {
             display: grid;
             grid-template-columns: auto 1fr auto;
-            gap: 16px;
+            gap: 22px;
             align-items: center;
-            padding: 22px;
-            border-bottom: 4px solid #b8860b;
-            background: linear-gradient(135deg, #fffaf0, #ffffff);
+            padding: 28px 30px;
+            border-bottom: 5px double #b8860b;
+            background:
+                linear-gradient(135deg, rgba(255,250,240,.96), rgba(255,255,255,.98)),
+                repeating-linear-gradient(45deg, rgba(184,134,11,.08) 0 1px, transparent 1px 10px);
         }
         .voucher-preview-logo {
-            width: 74px;
-            height: 54px;
+            width: 132px;
+            height: 94px;
             object-fit: contain;
-            border-radius: 10px;
-            background: #f8f1df;
+            border-radius: 16px;
+            background: #fff8e8;
+            border: 1px solid rgba(184,134,11,.28);
+            padding: 8px;
+            box-shadow: 0 12px 26px rgba(139,105,20,.14);
         }
         .voucher-preview-title {
             text-align: right;
-            font-size: 1.45rem;
+            font-family: var(--font-serif);
+            font-size: clamp(1.65rem, 3vw, 2.25rem);
             font-weight: 900;
             color: #8b6914;
-            letter-spacing: .08em;
+            letter-spacing: .12em;
+            line-height: 1;
         }
         .voucher-preview-body {
             padding: 22px;
@@ -2253,6 +2267,8 @@
             border-radius: 14px;
             padding: 14px;
             background: #fffdf8;
+            break-inside: avoid;
+            page-break-inside: avoid;
         }
         .voucher-preview-section h4 {
             color: #8b6914;
@@ -2274,8 +2290,15 @@
         .voucher-preview-terms {
             white-space: pre-wrap;
             overflow-wrap: anywhere;
+            word-break: break-word;
             line-height: 1.72;
             color: #242435;
+            break-inside: auto;
+            page-break-inside: auto;
+        }
+        .voucher-preview-section.voucher-terms-section {
+            break-inside: auto;
+            page-break-inside: auto;
         }
         .voucher-status-chip {
             display: inline-flex;
@@ -8490,6 +8513,7 @@
                     customerEmail: '',
                     customerPhone: '',
                     hotelName: '',
+                    hotelAddress: '',
                     roomType: '',
                     hotelConfirmationNumber: '',
                     checkInDate: '',
@@ -8515,6 +8539,7 @@
                     customerEmail: (document.getElementById('hvCustomerEmail').value || '').trim(),
                     customerPhone: (document.getElementById('hvCustomerPhone').value || '').trim(),
                     hotelName: (document.getElementById('hvHotelName').value || '').trim(),
+                    hotelAddress: (document.getElementById('hvHotelAddress') ? document.getElementById('hvHotelAddress').value : '').trim(),
                     roomType: (document.getElementById('hvRoomType').value || '').trim(),
                     hotelConfirmationNumber: (document.getElementById('hvConfirmationNumber').value || '').trim(),
                     checkInDate: document.getElementById('hvCheckInDate').value || '',
@@ -8578,6 +8603,7 @@
                         '<div class="form-card"><h3><i class="fas fa-bookmark"></i> Booking Information</h3><div class="form-row">' +
                         '<div class="form-group"><label>Invoice Number <span class="required">*</span></label><input type="text" id="hvInvoiceNumber" value="' + escapeHTML(v.invoiceNumber) + '" /></div>' +
                         '<div class="form-group"><label>Hotel Name <span class="required">*</span></label><input type="text" id="hvHotelName" value="' + escapeHTML(v.hotelName) + '" /></div>' +
+                        '<div class="form-group" style="grid-column:1/-1;"><label>Hotel Complete Address</label><textarea id="hvHotelAddress" rows="3" placeholder="Full hotel address, city, postcode, country" style="min-height:90px;resize:vertical;">' + escapeHTML(v.hotelAddress || '') + '</textarea></div>' +
                         '<div class="form-group"><label>Room Type</label><input type="text" id="hvRoomType" value="' + escapeHTML(v.roomType) + '" /></div>' +
                         '<div class="form-group"><label>Hotel Confirmation Number</label><input type="text" id="hvConfirmationNumber" value="' + escapeHTML(v.hotelConfirmationNumber) + '" /></div>' +
                         '<div class="form-group"><label>Check-in Date</label><input type="date" id="hvCheckInDate" value="' + escapeHTML(v.checkInDate) + '" /></div>' +
@@ -8649,8 +8675,8 @@
                     '<div class="voucher-preview-grid">' +
                     '<div class="voucher-preview-section"><h4>Voucher Details</h4>' + row('Voucher Number', v.voucherNumber) + row('Invoice Number', v.invoiceNumber) + row('Issue Date', formatDateDisplay(v.createdAt || getToday())) + row('Status', v.status || 'Saved') + '</div>' +
                     '<div class="voucher-preview-section"><h4>Customer Details</h4>' + row('Customer Name', v.customerName) + row('Email Address', v.customerEmail) + row('Contact Number', v.customerPhone) + '</div>' +
-                    '<div class="voucher-preview-section" style="grid-column:1/-1;"><h4>Hotel Details</h4>' + row('Hotel Name', v.hotelName) + row('Room Type', v.roomType) + row('Hotel Confirmation No.', v.hotelConfirmationNumber) + row('Check-in Date', formatDateDisplay(v.checkInDate)) + row('Check-out Date', formatDateDisplay(v.checkOutDate)) + row('Number of Passengers', v.passengerCount) + '</div>' +
-                    '</div><div class="voucher-preview-section"><h4>Terms & Conditions</h4><div class="voucher-preview-terms">' + escapeHTML(v.terms || '—') + '</div></div>' +
+                    '<div class="voucher-preview-section" style="grid-column:1/-1;"><h4>Hotel Details</h4>' + row('Hotel Name', v.hotelName) + row('Hotel Complete Address', v.hotelAddress) + row('Room Type', v.roomType) + row('Hotel Confirmation No.', v.hotelConfirmationNumber) + row('Check-in Date', formatDateDisplay(v.checkInDate)) + row('Check-out Date', formatDateDisplay(v.checkOutDate)) + row('Number of Passengers', v.passengerCount) + '</div>' +
+                    '</div><div class="voucher-preview-section voucher-terms-section"><h4>Terms & Conditions</h4><div class="voucher-preview-terms">' + escapeHTML(v.terms || '—') + '</div></div>' +
                     '<div style="margin-top:16px;color:#61576a;font-size:.86rem;text-align:center;">Thank you for choosing ' + escapeHTML(brand.companyName || 'Plan Holidays') + '. This voucher is computer generated and does not require a signature.</div>' +
                     '</div></div>';
             }
@@ -8725,19 +8751,98 @@
                 var lineHeight = options.lineHeight || 13;
                 var bottom = options.bottom || 760;
                 var newPage = options.newPage;
-                var parts = String(text == null ? '' : text).split('\n');
-                parts.forEach(function(part, idx) {
-                    var lines = part === '' ? [''] : pdf.splitTextToSize(part, maxWidth);
-                    lines.forEach(function(line) {
-                        if (y + lineHeight > bottom) { y = newPage(); }
-                        pdf.text(line || ' ', x, y);
-                        y += lineHeight;
+                function forceBreakWord(word) {
+                    var chunks = [], buf = '';
+                    String(word || '').split('').forEach(function(ch) {
+                        var test = buf + ch;
+                        if (buf && pdf.getTextWidth(test) > maxWidth) {
+                            chunks.push(buf);
+                            buf = ch;
+                        } else {
+                            buf = test;
+                        }
                     });
-                    if (idx < parts.length - 1 && part !== '') {
-                        if (y + lineHeight > bottom) { y = newPage(); }
-                    }
+                    if (buf) chunks.push(buf);
+                    return chunks.length ? chunks : [''];
+                }
+                function wrapLine(line) {
+                    line = String(line == null ? '' : line);
+                    if (!line.trim()) return [''];
+                    var out = [], current = '';
+                    line.trim().split(/\s+/).forEach(function(word) {
+                        var pieces = pdf.getTextWidth(word) > maxWidth ? forceBreakWord(word) : [word];
+                        pieces.forEach(function(piece) {
+                            if (!current) {
+                                current = piece;
+                            } else if (pdf.getTextWidth(current + ' ' + piece) <= maxWidth) {
+                                current += ' ' + piece;
+                            } else {
+                                out.push(current);
+                                current = piece;
+                            }
+                        });
+                    });
+                    if (current) out.push(current);
+                    return out.length ? out : [''];
+                }
+                String(text == null ? '' : text).replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').forEach(function(part) {
+                    wrapLine(part).forEach(function(line) {
+                        if (y + lineHeight > bottom) y = newPage();
+                        if (line) pdf.text(line, x, y);
+                        y += line ? lineHeight : lineHeight * .65;
+                    });
                 });
                 return y;
+            }
+
+            function safePdfText(v) {
+                return String(v == null || v === '' ? '—' : v);
+            }
+
+            function drawHotelVoucherBox(pdf, x, y, w, h, title, value, colors) {
+                colors = colors || {};
+                pdf.setDrawColor.apply(pdf, colors.border || [229, 215, 183]);
+                pdf.setFillColor.apply(pdf, colors.fill || [255, 253, 247]);
+                pdf.roundedRect(x, y, w, h, 8, 8, 'FD');
+                pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.5); pdf.setTextColor.apply(pdf, colors.gold || [184, 134, 11]);
+                pdf.text(String(title || '').toUpperCase(), x + 12, y + 16);
+                pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10); pdf.setTextColor.apply(pdf, colors.dark || [31, 34, 48]);
+                var lines = pdf.splitTextToSize(safePdfText(value), w - 24);
+                pdf.text(lines.slice(0, 3), x + 12, y + 32);
+            }
+
+            function drawHotelVoucherFullBox(pdf, x, y, w, title, value, colors) {
+                colors = colors || {};
+                var contentLines = [];
+                String(value == null || value === '' ? '—' : value).replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').forEach(function(part) {
+                    contentLines = contentLines.concat(pdf.splitTextToSize(part || ' ', w - 24));
+                });
+                var h = Math.max(62, 34 + contentLines.length * 12);
+                pdf.setDrawColor.apply(pdf, colors.border || [229, 215, 183]);
+                pdf.setFillColor.apply(pdf, colors.fill || [255, 253, 247]);
+                pdf.roundedRect(x, y, w, h, 8, 8, 'FD');
+                pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.5); pdf.setTextColor.apply(pdf, colors.gold || [184, 134, 11]);
+                pdf.text(String(title || '').toUpperCase(), x + 12, y + 16);
+                pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10.5); pdf.setTextColor.apply(pdf, colors.dark || [31, 34, 48]);
+                pdf.text(contentLines, x + 12, y + 34);
+                return h;
+            }
+
+            function addHotelVoucherSectionTitle(pdf, title, x, y, w, colors) {
+                colors = colors || {};
+                pdf.setFillColor.apply(pdf, colors.gold || [184, 134, 11]);
+                pdf.roundedRect(x, y, 6, 18, 3, 3, 'F');
+                pdf.setFont('helvetica', 'bold'); pdf.setFontSize(12); pdf.setTextColor.apply(pdf, colors.dark || [31, 34, 48]);
+                pdf.text(String(title || '').toUpperCase(), x + 14, y + 13);
+                pdf.setDrawColor.apply(pdf, colors.border || [229, 215, 183]);
+                pdf.line(x, y + 25, x + w, y + 25);
+                return y + 40;
+            }
+
+            function getHotelVoucherImageType(src) {
+                if (/^data:image\/png/i.test(src || '')) return 'PNG';
+                if (/^data:image\/webp/i.test(src || '')) return 'WEBP';
+                return 'JPEG';
             }
 
             async function downloadHotelVoucherPDF(v) {
@@ -8754,31 +8859,49 @@
                 var pdf = new jsPDFCtor({ unit: 'pt', format: 'a4', orientation: 'portrait' });
                 var pageW = pdf.internal.pageSize.getWidth();
                 var pageH = pdf.internal.pageSize.getHeight();
-                var margin = 42, bottom = pageH - 72, y = 112;
-                var gold = [184, 134, 11], dark = [31, 34, 48], muted = [98, 94, 112], light = [248, 244, 235];
+                var margin = 38, bottom = pageH - 78, y = 140;
+                var gold = [184, 134, 11], gold2 = [139, 105, 20], dark = [31, 34, 48], muted = [98, 94, 112], light = [255, 249, 235], border = [229, 215, 183];
                 function header() {
-                    pdf.setFillColor.apply(pdf, light); pdf.rect(0, 0, pageW, 86, 'F');
-                    pdf.setDrawColor.apply(pdf, gold); pdf.setLineWidth(2); pdf.line(margin, 84, pageW - margin, 84);
+                    pdf.setFillColor(255, 255, 252); pdf.rect(0, 0, pageW, pageH, 'F');
+                    pdf.setFillColor.apply(pdf, gold2); pdf.rect(0, 0, pageW, 10, 'F');
+                    pdf.setDrawColor.apply(pdf, border); pdf.setLineWidth(1.1); pdf.roundedRect(24, 24, pageW - 48, pageH - 48, 12, 12, 'S');
+                    pdf.setFillColor.apply(pdf, light); pdf.roundedRect(margin, 28, pageW - margin * 2, 92, 14, 14, 'F');
+                    pdf.setDrawColor.apply(pdf, gold); pdf.setLineWidth(1.4); pdf.roundedRect(margin, 28, pageW - margin * 2, 92, 14, 14, 'S');
+                    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(45); pdf.setTextColor(247, 241, 225);
+                    pdf.text('HOTEL', pageW - margin - 8, 107, { align: 'right' });
                     var logo = brand.logo || (document.getElementById('appLogo') && document.getElementById('appLogo').src) || '';
-                    try { if (logo && /^data:image\/(png|jpeg|jpg|webp)/i.test(logo)) pdf.addImage(logo, logo.indexOf('png') !== -1 ? 'PNG' : 'JPEG', margin, 20, 58, 42); else throw new Error('fallback'); }
-                    catch (_) { pdf.setFillColor.apply(pdf, gold); pdf.roundedRect(margin, 20, 52, 42, 7, 7, 'F'); pdf.setTextColor(255,255,255); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(18); pdf.text('PH', margin + 13, 48); }
-                    pdf.setTextColor.apply(pdf, dark); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(16); pdf.text(String(brand.companyName || 'Plan Holidays'), margin + 70, 32);
+                    try { if (logo && /^data:image\/(png|jpeg|jpg|webp)/i.test(logo)) pdf.addImage(logo, getHotelVoucherImageType(logo), margin + 14, 40, 102, 66); else throw new Error('fallback'); }
+                    catch (_) { pdf.setFillColor.apply(pdf, gold); pdf.roundedRect(margin + 14, 40, 96, 64, 10, 10, 'F'); pdf.setTextColor(255,255,255); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(26); pdf.text('PH', margin + 44, 80); }
+                    pdf.setTextColor.apply(pdf, dark); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(19); pdf.text(String(brand.companyName || 'Plan Holidays'), margin + 132, 52);
                     pdf.setTextColor.apply(pdf, muted); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5);
                     var contact = [brand.address || 'London, UK', brand.telephone || '', brand.email || '', brand.website || ''].filter(Boolean).join('  •  ');
-                    pdf.text(pdf.splitTextToSize(contact, pageW - margin * 2 - 180), margin + 70, 47);
-                    pdf.setTextColor.apply(pdf, gold); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(18); pdf.text('HOTEL VOUCHER', pageW - margin, 38, { align: 'right' });
-                    pdf.setTextColor.apply(pdf, muted); pdf.setFontSize(8); pdf.text('Computer generated travel document', pageW - margin, 54, { align: 'right' });
+                    pdf.text(pdf.splitTextToSize(contact, pageW - margin * 2 - 310), margin + 132, 68);
+                    pdf.setTextColor.apply(pdf, gold2); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(23); pdf.text('HOTEL VOUCHER', pageW - margin - 14, 52, { align: 'right' });
+                    pdf.setFillColor(255,255,255); pdf.setDrawColor.apply(pdf, gold); pdf.roundedRect(pageW - margin - 160, 82, 146, 24, 12, 12, 'FD');
+                    pdf.setTextColor.apply(pdf, gold2); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9.5); pdf.text(safePdfText(v.voucherNumber), pageW - margin - 87, 98, { align: 'center' });
                 }
                 function footer() {
-                    pdf.setDrawColor(225, 218, 204); pdf.line(margin, pageH - 52, pageW - margin, pageH - 52);
+                    pdf.setDrawColor.apply(pdf, border); pdf.line(margin, pageH - 56, pageW - margin, pageH - 56);
                     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor.apply(pdf, muted);
                     var support = 'Support: ' + (brand.email || 'info@planholidays.co.uk') + (brand.telephone ? ' | ' + brand.telephone : '');
                     pdf.text(support, margin, pageH - 34);
                     pdf.text('Thank you for choosing ' + (brand.companyName || 'Plan Holidays') + '. This voucher is computer generated and does not require a signature.', margin, pageH - 21);
                 }
-                function newPage() { footer(); pdf.addPage(); header(); return 112; }
+                var hotelVoucherTermsMode = false;
+                function newPage() {
+                    footer();
+                    pdf.addPage();
+                    header();
+                    if (hotelVoucherTermsMode) {
+                        var start = addHotelVoucherSectionTitle(pdf, 'Terms & Conditions (continued)', margin, 140, pageW - margin * 2, { gold: gold, dark: dark, border: border });
+                        pdf.setDrawColor.apply(pdf, border);
+                        pdf.roundedRect(margin, start - 8, pageW - margin * 2, Math.max(34, bottom - start + 12), 10, 10, 'S');
+                        return start + 10;
+                    }
+                    return 140;
+                }
                 function ensure(h) { if (y + h > bottom) y = newPage(); }
-                function sectionTitle(title) { ensure(28); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11); pdf.setTextColor.apply(pdf, gold); pdf.text(title.toUpperCase(), margin, y); y += 14; pdf.setDrawColor(232, 222, 201); pdf.line(margin, y, pageW - margin, y); y += 12; }
+                function sectionTitle(title) { ensure(40); y = addHotelVoucherSectionTitle(pdf, title, margin, y, pageW - margin * 2, { gold: gold, dark: dark, border: border }); }
                 function field(label, value, x, width) {
                     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor.apply(pdf, muted); pdf.text(label, x, y);
                     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10); pdf.setTextColor.apply(pdf, dark);
@@ -8787,9 +8910,10 @@
                     return Math.max(30, 13 + (lines.length * 12));
                 }
                 function twoCol(a, b) {
-                    ensure(46); var w = (pageW - margin * 2 - 24) / 2; var y0 = y;
-                    var h1 = field(a[0], a[1], margin, w); var h2 = field(b[0], b[1], margin + w + 24, w);
-                    y = y0 + Math.max(h1, h2) + 8;
+                    ensure(68); var w = (pageW - margin * 2 - 18) / 2; var h = 56;
+                    drawHotelVoucherBox(pdf, margin, y, w, h, a[0], a[1], { gold: gold, dark: dark, border: border, fill: [255, 253, 247] });
+                    drawHotelVoucherBox(pdf, margin + w + 18, y, w, h, b[0], b[1], { gold: gold, dark: dark, border: border, fill: [255, 253, 247] });
+                    y += h + 12;
                 }
                 header();
                 sectionTitle('Voucher Details');
@@ -8799,12 +8923,20 @@
                 twoCol(['Customer Name', v.customerName], ['Email Address', v.customerEmail]);
                 twoCol(['Contact Number', v.customerPhone], ['Agent', v.createdByName || v.createdBy || '']);
                 sectionTitle('Hotel Details');
-                twoCol(['Hotel Name', v.hotelName], ['Room Type', v.roomType]);
-                twoCol(['Hotel Confirmation Number', v.hotelConfirmationNumber], ['Number of Passengers', v.passengerCount]);
+                var hotelFull = safePdfText(v.hotelName) + (v.hotelAddress ? '\n' + v.hotelAddress : '');
+                ensure(82);
+                var hotelBoxH = drawHotelVoucherFullBox(pdf, margin, y, pageW - margin * 2, 'Hotel Name & Complete Address', hotelFull, { gold: gold, dark: dark, border: border, fill: [255, 253, 247] });
+                y += hotelBoxH + 12;
+                twoCol(['Room Type', v.roomType], ['Hotel Confirmation Number', v.hotelConfirmationNumber]);
                 twoCol(['Check-in Date', formatDateDisplay(v.checkInDate)], ['Check-out Date', formatDateDisplay(v.checkOutDate)]);
+                twoCol(['Number of Passengers', v.passengerCount], ['Voucher Status', v.status || 'Saved']);
                 sectionTitle('Terms & Conditions');
-                pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9.3); pdf.setTextColor(40, 40, 50);
-                y = addHotelVoucherPdfText(pdf, v.terms || '—', margin, y, { maxWidth: pageW - margin * 2, lineHeight: 13.2, bottom: bottom, newPage: newPage });
+                pdf.setDrawColor.apply(pdf, border); pdf.setFillColor(255, 253, 247);
+                pdf.roundedRect(margin, y - 8, pageW - margin * 2, Math.max(34, bottom - y + 12), 10, 10, 'S');
+                pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9.4); pdf.setTextColor(40, 40, 50);
+                hotelVoucherTermsMode = true;
+                y = addHotelVoucherPdfText(pdf, v.terms || '—', margin + 14, y + 10, { maxWidth: pageW - margin * 2 - 28, lineHeight: 13.4, bottom: bottom, newPage: newPage });
+                hotelVoucherTermsMode = false;
                 footer();
                 var total = pdf.internal.getNumberOfPages();
                 for (var i = 1; i <= total; i++) {
@@ -16139,6 +16271,7 @@
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
