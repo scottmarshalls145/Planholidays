@@ -1041,14 +1041,17 @@
             border-radius: 30px;
         }
         .hotel-images-wrap {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 10px;
             margin-top: 10px;
+            max-width: 100%;
         }
         .hotel-images-wrap .img-thumb {
-            width: 120px;
-            height: 120px;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 4 / 3;
+            max-height: 150px;
             border-radius: 10px;
             overflow: hidden;
             border: 2px solid var(--card-border);
@@ -1766,9 +1769,14 @@
             .dash-card h4 {
                 font-size: .8rem;
             }
+            .hotel-images-wrap {
+                gap: 8px;
+            }
             .hotel-images-wrap .img-thumb {
-                width: 80px;
-                height: 80px;
+                width: 100%;
+                height: auto;
+                aspect-ratio: 4 / 3;
+                max-height: 105px;
             }
             .chat-user-list {
                 min-width: 80px;
@@ -1861,8 +1869,10 @@
                 height: auto !important;
             }
             .hotel-images-wrap .img-thumb {
-                width: 120px !important;
-                height: 120px !important;
+                width: 100% !important;
+                height: auto !important;
+                aspect-ratio: 4 / 3;
+                max-height: 120px !important;
             }
         }
         /* DARK MODE OVERRIDES */
@@ -2765,29 +2775,59 @@
                 return Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
             }
 
+            function parseDateLocal(value) {
+                if (!value) return null;
+                if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+                var str = String(value).trim();
+                var m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                if (m) return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+                var dt = new Date(value);
+                return isNaN(dt.getTime()) ? null : dt;
+            }
+
+            function toLocalDateKey(value) {
+                var dt = parseDateLocal(value);
+                if (!dt) return '';
+                return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+            }
+
+            function getLocalDateTimeValue(value) {
+                var dt = parseDateLocal(value) || new Date();
+                return toLocalDateKey(dt) + ' ' + String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0') + ':' + String(dt.getSeconds()).padStart(2, '0');
+            }
+
+            function getLocalTimeValue(value) {
+                var dt = parseDateLocal(value) || new Date();
+                return String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
+            }
+
             function formatDate(d) {
-                if (!d) return '';
-                var dt = new Date(d);
-                return dt.toISOString().split('T')[0];
+                return toLocalDateKey(d);
             }
 
             function formatDateDisplay(d) {
-                if (!d) return '';
-                var dt = new Date(d);
+                var dt = parseDateLocal(d);
+                if (!dt) return '';
                 return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
             }
 
             function formatDateTime(d) {
-                if (!d) return '';
-                var dt = new Date(d);
+                var dt = parseDateLocal(d);
+                if (!dt) return '';
                 return dt.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric',
                     hour: '2-digit', minute: '2-digit' });
             }
 
             function formatTime(d) {
-                if (!d) return '';
-                var dt = new Date(d);
+                var dt = parseDateLocal(d);
+                if (!dt) return '';
                 return dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            }
+
+            function formatAgentShiftTime(shift, field) {
+                if (!shift) return '';
+                var localField = field + 'TimeLocal';
+                return shift[localField] || formatTime(shift[field]);
             }
 
             function formatCurrency(amount, currency) {
@@ -2802,10 +2842,17 @@
                 return parts.join(', ');
             }
             function getPassengerCount(quote) { var p = quote && quote.passengerTypes ? quote.passengerTypes : {}; return (parseInt(p.adults||0)||0)+(parseInt(p.youngAdults||0)||0)+(parseInt(p.children||0)||0)+(parseInt(p.infants||0)||0); }
-            function calculateHotelNights(hotel) { if(!hotel||!hotel.checkIn||!hotel.checkOut)return parseInt(hotel&&hotel.totalNights||0)||0; var d1=new Date(hotel.checkIn), d2=new Date(hotel.checkOut); if(isNaN(d1.getTime())||isNaN(d2.getTime()))return parseInt(hotel.totalNights||0)||0; return Math.max(0,Math.ceil((d2-d1)/(1000*60*60*24))); }
+            function calculateHotelNights(hotel) {
+                if (!hotel || !hotel.checkIn || !hotel.checkOut) return parseInt(hotel && hotel.totalNights || 0) || 0;
+                var d1 = parseDateLocal(hotel.checkIn), d2 = parseDateLocal(hotel.checkOut);
+                if (!d1 || !d2) return parseInt(hotel.totalNights || 0) || 0;
+                var a = Date.UTC(d1.getFullYear(), d1.getMonth(), d1.getDate());
+                var b = Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate());
+                return Math.max(0, Math.round((b - a) / 86400000));
+            }
 
             function getToday() {
-                return new Date().toISOString().split('T')[0];
+                return toLocalDateKey(new Date());
             }
 
             function getNowISO() {
@@ -2815,7 +2862,7 @@
             function getDefaultExpiry() {
                 var d = new Date();
                 d.setDate(d.getDate() + 14);
-                return d.toISOString().split('T')[0];
+                return toLocalDateKey(d);
             }
 
             function generateQuoteNumber() {
@@ -3631,8 +3678,8 @@
                     showToast('You are already checked in.', 'warning');
                     return;
                 }
-                var data = { id: genId(), agentName: user.username, date: today, checkIn: now, checkOut: null,
-                    status: 'on' };
+                var data = { id: genId(), agentName: user.username, date: today, checkIn: now, checkInLocal: getLocalDateTimeValue(), checkInTimeLocal: getLocalTimeValue(), checkOut: null,
+                    checkOutLocal: '', checkOutTimeLocal: '', timeZone: (Intl.DateTimeFormat().resolvedOptions().timeZone || ''), status: 'on' };
                 await saveAgentTime(data);
                 STATE.activeAgentShift = data;
                 updateAgentTimeBadge();
@@ -3653,6 +3700,9 @@
                 }
                 var shift = shifts[0];
                 shift.checkOut = getNowISO();
+                shift.checkOutLocal = getLocalDateTimeValue();
+                shift.checkOutTimeLocal = getLocalTimeValue();
+                shift.timeZone = shift.timeZone || (Intl.DateTimeFormat().resolvedOptions().timeZone || '');
                 shift.status = 'off';
                 await saveAgentTime(shift);
                 STATE.activeAgentShift = null;
@@ -3833,8 +3883,8 @@
             // 11. FLIGHT FUNCTIONS
             // --------------------------------------------------------------
             function getWeekdayName(dateValue) {
-                if (!dateValue) return '';
-                var dt = new Date(String(dateValue).length === 10 ? String(dateValue) + 'T00:00:00' : dateValue);
+                var dt = parseDateLocal(dateValue);
+                if (!dt) return '';
                 if (isNaN(dt.getTime())) return '';
                 return dt.toLocaleDateString('en-GB', { weekday: 'long' });
             }
@@ -5087,7 +5137,7 @@
                 var hotelsHtml = (quote.hotels || []).map(function(h) {
                     var imgs = (h.images || []).map(function(img) {
                         return '<img src="' + img +
-                            '" style="height:180px;width:220px;object-fit:cover;border-radius:8px;border:1px solid #dbe5ec;" />';
+                            '" style="width:31.5%;max-width:31.5%;height:112px;object-fit:cover;border-radius:8px;border:1px solid #dbe5ec;box-sizing:border-box;" />';
                     }).join('');
                     var passengers = [];
                     if (parseInt(h.adults || 0) > 0) passengers.push(h.adults + ' Adult' + (parseInt(h.adults) > 1 ? 's' : ''));
@@ -5216,7 +5266,7 @@
                 var hotelsHtml = (quote.hotels || []).map(function(h) {
                     var imgs = (h.images || []).map(function(img) {
                         return '<img src="' + img +
-                            '" style="height:180px;width:220px;object-fit:cover;border-radius:8px;border:1px solid #dbe5ec;" />';
+                            '" style="width:31.5%;max-width:31.5%;height:112px;object-fit:cover;border-radius:8px;border:1px solid #dbe5ec;box-sizing:border-box;" />';
                     }).join('');
                     var passengers = [];
                     if (parseInt(h.adults || 0) > 0) passengers.push(h.adults + ' Adult' + (parseInt(h.adults) > 1 ? 's' : ''));
@@ -5693,17 +5743,19 @@
                 } catch (_) {}
             }
 
-            function showDashboard() {
+            function showDashboard(skipAutoLoad) {
                 ensureAtolDashboardCard();
                 ensureHotelVoucherDashboardCards();
                 document.getElementById('dashboard').style.display = 'block';
                 document.getElementById('quoteBuilder').classList.remove('visible');
                 document.getElementById('quoteBuilder').style.display = 'none';
-                loadQuotes();
-                loadInvoices();
-                loadAgentTimes();
-                loadInquiries();
-                loadHotelVouchers();
+                if (!skipAutoLoad) {
+                    loadQuotes();
+                    loadInvoices();
+                    loadAgentTimes();
+                    loadInquiries();
+                    loadHotelVouchers();
+                }
                 updateQuoteCount();
                 updateInvoiceCount();
                 updateInquiryCount();
@@ -6954,8 +7006,8 @@
                             allShifts.push({
                                 agentDisplay: (users[name] && users[name].name) || name,
                                 date: t.date || (ci ? ci.toISOString().slice(0,10) : ''),
-                                checkInTime: ci ? ci.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '',
-                                checkOutTime: co ? co.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '',
+                                checkInTime: formatAgentShiftTime(t, 'checkIn'),
+                                checkOutTime: formatAgentShiftTime(t, 'checkOut'),
                                 diffHrs: diffHrs,
                                 status: status
                             });
@@ -7046,14 +7098,14 @@
                             '<div style="font-size:0.75rem;color:var(--text2);margin-top:6px;display:flex;gap:12px;flex-wrap:wrap;">' +
                               '<span><strong>' + totalHrs.toFixed(1) + 'h</strong> total (90d)</span>' +
                               '<span><strong>' + daysWorked + '</strong> days worked</span>' +
-                              '<span>Today: ' + (todayShift ? formatTime(todayShift.checkIn) + (todayShift.checkOut ? ' → ' + formatTime(todayShift.checkOut) : ' (active)') : 'No shift') + '</span>' +
+                              '<span>Today: ' + (todayShift ? formatAgentShiftTime(todayShift, 'checkIn') + (todayShift.checkOut ? ' → ' + formatAgentShiftTime(todayShift, 'checkOut') : ' (active)') : 'No shift') + '</span>' +
                             '</div>' +
                             '<div style="margin-top:4px;">' + chartSvg + '</div>' +
                             '<details style="margin-top:8px;font-size:0.75rem;color:var(--text2);"><summary style="cursor:pointer;">All shifts (' + agentTimes.length + ')</summary>' +
                             '<div style="max-height:180px;overflow-y:auto;margin-top:4px;">' +
                             (agentTimes.map(function(t) {
-                                return '<div>' + t.date + ' ' + formatTime(t.checkIn) + (t
-                                    .checkOut ? ' → ' + formatTime(t.checkOut) : ' (active)') +
+                                return '<div>' + t.date + ' ' + formatAgentShiftTime(t, 'checkIn') + (t
+                                    .checkOut ? ' → ' + formatAgentShiftTime(t, 'checkOut') : ' (active)') +
                                     '</div>';
                             }).join('') || 'No shifts recorded') +
                             '</div></details>' +
@@ -8860,14 +8912,14 @@
                 var pageW = pdf.internal.pageSize.getWidth();
                 var pageH = pdf.internal.pageSize.getHeight();
                 var margin = 38, bottom = pageH - 78, y = 140;
-                var gold = [184, 134, 11], gold2 = [139, 105, 20], dark = [31, 34, 48], muted = [98, 94, 112], light = [255, 249, 235], border = [229, 215, 183];
+                var gold = [42, 123, 196], gold2 = [10, 63, 119], dark = [18, 39, 68], muted = [82, 103, 132], light = [239, 247, 255], border = [181, 211, 238];
                 function header() {
-                    pdf.setFillColor(255, 255, 252); pdf.rect(0, 0, pageW, pageH, 'F');
+                    pdf.setFillColor(250, 253, 255); pdf.rect(0, 0, pageW, pageH, 'F');
                     pdf.setFillColor.apply(pdf, gold2); pdf.rect(0, 0, pageW, 10, 'F');
                     pdf.setDrawColor.apply(pdf, border); pdf.setLineWidth(1.1); pdf.roundedRect(24, 24, pageW - 48, pageH - 48, 12, 12, 'S');
                     pdf.setFillColor.apply(pdf, light); pdf.roundedRect(margin, 28, pageW - margin * 2, 92, 14, 14, 'F');
                     pdf.setDrawColor.apply(pdf, gold); pdf.setLineWidth(1.4); pdf.roundedRect(margin, 28, pageW - margin * 2, 92, 14, 14, 'S');
-                    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(45); pdf.setTextColor(247, 241, 225);
+                    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(45); pdf.setTextColor(224, 239, 255);
                     pdf.text('HOTEL', pageW - margin - 8, 107, { align: 'right' });
                     var logo = brand.logo || (document.getElementById('appLogo') && document.getElementById('appLogo').src) || '';
                     try { if (logo && /^data:image\/(png|jpeg|jpg|webp)/i.test(logo)) pdf.addImage(logo, getHotelVoucherImageType(logo), margin + 14, 40, 102, 66); else throw new Error('fallback'); }
@@ -8911,8 +8963,8 @@
                 }
                 function twoCol(a, b) {
                     ensure(68); var w = (pageW - margin * 2 - 18) / 2; var h = 56;
-                    drawHotelVoucherBox(pdf, margin, y, w, h, a[0], a[1], { gold: gold, dark: dark, border: border, fill: [255, 253, 247] });
-                    drawHotelVoucherBox(pdf, margin + w + 18, y, w, h, b[0], b[1], { gold: gold, dark: dark, border: border, fill: [255, 253, 247] });
+                    drawHotelVoucherBox(pdf, margin, y, w, h, a[0], a[1], { gold: gold, dark: dark, border: border, fill: [247, 251, 255] });
+                    drawHotelVoucherBox(pdf, margin + w + 18, y, w, h, b[0], b[1], { gold: gold, dark: dark, border: border, fill: [247, 251, 255] });
                     y += h + 12;
                 }
                 header();
@@ -8925,15 +8977,15 @@
                 sectionTitle('Hotel Details');
                 var hotelFull = safePdfText(v.hotelName) + (v.hotelAddress ? '\n' + v.hotelAddress : '');
                 ensure(82);
-                var hotelBoxH = drawHotelVoucherFullBox(pdf, margin, y, pageW - margin * 2, 'Hotel Name & Complete Address', hotelFull, { gold: gold, dark: dark, border: border, fill: [255, 253, 247] });
+                var hotelBoxH = drawHotelVoucherFullBox(pdf, margin, y, pageW - margin * 2, 'Hotel Name & Complete Address', hotelFull, { gold: gold, dark: dark, border: border, fill: [247, 251, 255] });
                 y += hotelBoxH + 12;
                 twoCol(['Room Type', v.roomType], ['Hotel Confirmation Number', v.hotelConfirmationNumber]);
                 twoCol(['Check-in Date', formatDateDisplay(v.checkInDate)], ['Check-out Date', formatDateDisplay(v.checkOutDate)]);
                 twoCol(['Number of Passengers', v.passengerCount], ['Voucher Status', v.status || 'Saved']);
                 sectionTitle('Terms & Conditions');
-                pdf.setDrawColor.apply(pdf, border); pdf.setFillColor(255, 253, 247);
+                pdf.setDrawColor.apply(pdf, border); pdf.setFillColor(247, 251, 255);
                 pdf.roundedRect(margin, y - 8, pageW - margin * 2, Math.max(34, bottom - y + 12), 10, 10, 'S');
-                pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9.4); pdf.setTextColor(40, 40, 50);
+                pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9.4); pdf.setTextColor(25, 45, 70);
                 hotelVoucherTermsMode = true;
                 y = addHotelVoucherPdfText(pdf, v.terms || '—', margin + 14, y + 10, { maxWidth: pageW - margin * 2 - 28, lineHeight: 13.4, bottom: bottom, newPage: newPage });
                 hotelVoucherTermsMode = false;
@@ -9025,6 +9077,7 @@
                         // Detach realtime listeners
                         try { if (_userLiveListener) _userLiveListener.off(); } catch (_) {}
                         try { if (_inqLiveListener) _inqLiveListener.off(); } catch (_) {}
+                        markCurrentUserOffline(STATE.currentUser);
                         clearSession();
                         STATE.currentUser = null;
                         document.getElementById('appShell').classList.remove('visible');
@@ -9045,6 +9098,9 @@
                         });
                         if (openShift && firebaseConnected && db) {
                             openShift.checkOut = getNowISO();
+                            openShift.checkOutLocal = getLocalDateTimeValue();
+                            openShift.checkOutTimeLocal = getLocalTimeValue();
+                            openShift.timeZone = openShift.timeZone || (Intl.DateTimeFormat().resolvedOptions().timeZone || '');
                             openShift.status = 'off';
                             openShift.autoClosed = true;
                             // Fire-and-forget (best effort)
@@ -9768,22 +9824,53 @@
             // --------------------------------------------------------------
             // 32. AFTER LOGIN
             // --------------------------------------------------------------
-            // Session helpers — persistent login for 1 hour minimum
-            var SESSION_DURATION_MS = 60 * 60 * 1000; // 1 hour
+            // Session helpers — keep active users logged in, expire after 15 minutes idle
+            var SESSION_IDLE_MS = 15 * 60 * 1000;
+            var SESSION_DURATION_MS = SESSION_IDLE_MS;
             var _sessionTimer = null;
+            var _sessionActivityBound = false;
+            var _lastSessionTouch = 0;
             function saveSession(user) {
                 try {
+                    var now = Date.now();
                     var payload = {
                         user: user,
-                        expiresAt: Date.now() + SESSION_DURATION_MS
+                        lastActivity: now,
+                        expiresAt: now + SESSION_IDLE_MS
                     };
                     localStorage.setItem('ph_session', JSON.stringify(payload));
+                    _lastSessionTouch = now;
                 } catch (_) {}
+                bindSessionActivity();
                 scheduleSessionExpiry();
             }
             function clearSession() {
                 try { localStorage.removeItem('ph_session'); } catch (_) {}
                 if (_sessionTimer) { clearTimeout(_sessionTimer); _sessionTimer = null; }
+            }
+            function bindSessionActivity() {
+                if (_sessionActivityBound) return;
+                _sessionActivityBound = true;
+                ['click','keydown','mousemove','scroll','touchstart','input','change'].forEach(function(evt) {
+                    document.addEventListener(evt, function() { touchSessionActivity(false); }, { passive: true });
+                });
+                document.addEventListener('visibilitychange', function() { if (!document.hidden) touchSessionActivity(true); });
+            }
+            function touchSessionActivity(force) {
+                if (!STATE.currentUser) return;
+                var now = Date.now();
+                if (!force && now - _lastSessionTouch < 30000) return;
+                try {
+                    var raw = localStorage.getItem('ph_session');
+                    if (!raw) return;
+                    var s = JSON.parse(raw) || {};
+                    s.user = STATE.currentUser;
+                    s.lastActivity = now;
+                    s.expiresAt = now + SESSION_IDLE_MS;
+                    localStorage.setItem('ph_session', JSON.stringify(s));
+                    _lastSessionTouch = now;
+                    scheduleSessionExpiry();
+                } catch (_) {}
             }
             function scheduleSessionExpiry() {
                 if (_sessionTimer) { clearTimeout(_sessionTimer); _sessionTimer = null; }
@@ -9796,14 +9883,47 @@
                     _sessionTimer = setTimeout(function() { forceLogout(true); }, remaining);
                 } catch (_) {}
             }
+            function markCurrentUserOffline(user) {
+                try {
+                    user = user || STATE.currentUser;
+                    if (!user || !user.username) return;
+                    var off = { username: user.username, name: user.name || user.username, role: user.role || 'agent', lastSeen: Date.now() - 999999, ts: getNowISO(), offline: true };
+                    writeData('presence/' + user.username, off, null);
+                    localStorage.setItem('ph_presence_' + user.username, JSON.stringify(off));
+                } catch (_) {}
+            }
+            function autoCloseOpenShiftForUser(user) {
+                try {
+                    if (!user || (user.role !== 'agent' && user.role !== 'manager')) return;
+                    var today = getToday();
+                    var shift = (STATE.agentTimes || []).find(function(t) { return t.agentName === user.username && t.date === today && !t.checkOut; });
+                    if (!shift) return;
+                    shift.checkOut = getNowISO();
+                    shift.checkOutLocal = getLocalDateTimeValue();
+                    shift.checkOutTimeLocal = getLocalTimeValue();
+                    shift.timeZone = shift.timeZone || (Intl.DateTimeFormat().resolvedOptions().timeZone || '');
+                    shift.status = 'off';
+                    shift.autoClosed = true;
+                    shift.autoClosedReason = 'idle-session-expired';
+                    writeData('agentTimes/' + shift.id, shift, 'ph_agent_times');
+                    readData('agentTimes', 'ph_agent_times_list', true).then(function(allTimes) {
+                        allTimes = allTimes || {};
+                        allTimes[shift.id] = shift;
+                        return writeData('agentTimes', allTimes, 'ph_agent_times_list');
+                    }).catch(function() {});
+                } catch (_) {}
+            }
             function forceLogout(expired) {
+                var user = STATE.currentUser;
+                if (expired) autoCloseOpenShiftForUser(user);
+                markCurrentUserOffline(user);
                 clearSession();
                 STATE.currentUser = null;
                 var shell = document.getElementById('appShell');
                 if (shell) { shell.classList.remove('visible'); shell.style.display = 'none'; }
                 var lp = document.getElementById('loginPage');
                 if (lp) lp.style.display = 'flex';
-                if (expired) showToast('Session expired. Please log in again.', 'warning');
+                if (expired) showToast('Logged out after 15 minutes of inactivity. Please log in again.', 'warning');
             }
             function restoreSession() {
                 try {
@@ -9837,7 +9957,7 @@
                 }
 
                 // Show dashboard immediately for perceived speed
-                showDashboard();
+                showDashboard(true);
 
                 // Load critical data in parallel; defer non-critical
                 try {
@@ -9893,6 +10013,8 @@
                     loadInvoiceConditions().catch(function() {});
                 }, 0);
 
+                bindSessionActivity();
+                touchSessionActivity(true);
                 scheduleSessionExpiry();
 
                 // Start Google Sheets auto-backup timer
@@ -9997,7 +10119,7 @@
             Object.assign(DEFAULT_ADMIN.permissions,{canViewCalendar:true,canAddCalendarTasks:true,canCreateTasks:true,canEditTasks:true,canViewTaskHistory:true,canDeleteTasks:true});
             function _mrVals(o){if(!o)return[];if(Array.isArray(o))return o;return Object.keys(o).map(function(k){var v=o[k]||{};if(!v._key)v._key=k;return v;});}
             function _mrInit(n){n=String(n||'?').trim();return n.split(/\s+/).slice(0,2).map(function(x){return x[0]?x[0].toUpperCase():''}).join('')||'?';}
-            function _mrToday(){return new Date().toISOString().slice(0,10)}
+            function _mrToday(){return (typeof getToday === 'function') ? getToday() : new Date().toLocaleDateString('en-CA')}
             function _mrCanCreateTask(){return isAdmin()||hasPermission('canCreateTasks')}
             function _mrCanEditTask(t){return isAdmin()||hasPermission('canEditTasks')||(t&&t.assignedTo===STATE.currentUser.username)}
             function _mrCanDeleteTask(){return isAdmin()||hasPermission('canDeleteTasks')}
@@ -12803,6 +12925,19 @@
                     b.textContent = n;
                 }
 
+                async function _refreshOnlineAgents(){
+                    try{
+                        if(firebaseConnected && db){
+                            var snap = await db.ref('presence').once('value');
+                            _onlineAgents = snap.val() || {};
+                        } else {
+                            _attachPresenceListener();
+                        }
+                    }catch(_){}
+                    _updateOnlineBadge();
+                    if(document.getElementById('ccOnlineList')) _renderOnlineAgents();
+                }
+
                 // ---------- CALL LOGS ----------
                 var _callLogListener = null;
                 var _callLogs = {}; // {id: log}
@@ -12933,7 +13068,7 @@
                         };
                     });
                     _renderCCPanel();
-                    // Refresh the online agents list every 5s while the modal is open
+                    // Refresh the online agents list every 2s while the modal is open
                     if(_ccOnlineRefreshTimer) clearInterval(_ccOnlineRefreshTimer);
                     _ccOnlineRefreshTimer = setInterval(function(){
                         var stillOpen = document.getElementById('ccPanel');
@@ -12944,7 +13079,7 @@
                         }
                         _updateOnlineBadge();
                         if(document.getElementById('ccOnlineList')) _renderOnlineAgents();
-                    }, 5000);
+                    }, 2000);
                 };
 
                 function _renderCCPanel(){
@@ -12955,6 +13090,7 @@
                             '<div class="cc-filters">'+
                                 '<input id="ccAgentSearch" placeholder="Search agents..." />'+
                                 '<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="ccShowOffline" /> Show offline agents</label>'+
+                                '<button class="btn btn-sm btn-outline" id="ccRefreshOnline"><i class="fas fa-rotate"></i> Refresh</button>'+
                             '</div>'+
                             '<div id="ccOnlineList" class="cc-agent-grid"></div>';
                         _renderOnlineAgents();
@@ -12967,6 +13103,8 @@
                         };
                         var so = document.getElementById('ccShowOffline');
                         if(so) so.onchange = _renderOnlineAgents;
+                        var rb = document.getElementById('ccRefreshOnline');
+                        if(rb) rb.onclick = function(){ _refreshOnlineAgents(); };
                     } else if(_ccTab === 'logs'){
                         p.innerHTML =
                             '<div class="cc-filters">'+
@@ -13137,14 +13275,14 @@
                 setTimeout(_kickoff, 1500);
                 setInterval(function(){
                     if(STATE.currentUser && !_presenceHeartbeat) _kickoff();
-                    // Refresh presence map (localStorage fallback) and badge every 5s
+                    // Refresh presence map (localStorage fallback) and badge every 2s
                     try{
                         if(!firebaseConnected || !db){ _attachPresenceListener(); }
                     }catch(_){}
                     _updateOnlineBadge();
                     // Live-refresh the Calls Center online list if it's currently visible
                     if(document.getElementById('ccOnlineList')) _renderOnlineAgents();
-                }, 5000);
+                }, 2000);
             })();
 
 
@@ -16301,5 +16439,6 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
