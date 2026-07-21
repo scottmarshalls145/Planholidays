@@ -2585,22 +2585,7 @@
 
             function formatDateDisplay(d) {
                 if (!d) return '';
-                // If the value is a plain YYYY-MM-DD (as returned by <input type="date">),
-                // parse it as a LOCAL date. Otherwise new Date('2026-07-20') is UTC midnight
-                // and toLocaleDateString shifts it back by 1 day in timezones west of UTC,
-                // which caused the wrong date to appear on quote/invoice PDFs.
-                var dt;
-                if (typeof d === 'string') {
-                    var m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-                    if (m) {
-                        dt = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
-                    } else {
-                        dt = new Date(d);
-                    }
-                } else {
-                    dt = new Date(d);
-                }
-                if (isNaN(dt.getTime())) return '';
+                var dt = new Date(d);
                 return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
             }
 
@@ -15286,285 +15271,267 @@
                 setTimeout(function(){ _svPatchPermissionsForms(); _svPatchDashboardHandlers(); _svEnsureDashboardCard(); if (STATE.currentUser) _svAttachIncomingRequests(); }, 1800);
             })();
 
+
+
             // ==============================================================
-            // MuleRun requested addition:
-            //  - Ensure "Hide Names" button visible/usable for agents in chat
-            //  - Agents can delete their OWN messages (removed from both sides)
-            //  - Deleted messages remain viewable ONLY in admin chat panel
-            //  - Admin sidebar filter buttons: Online Agents / Mutual Chats
-            //  - Deleted-message log accessible only to admin
+            // CHAT PRIVACY + ADMIN CHAT FILTERS + DELETE AUDIT HISTORY
+            // Adds agent-visible Hide Names, admin Online/Mutual filters,
+            // agent message delete, and admin-only deleted message history.
             // ==============================================================
             (function(){
-                var MR_MSG_STYLE_ID = 'mr-agent-delete-msg-style';
-                function _mrInjectMsgStyles(){
-                    if (document.getElementById(MR_MSG_STYLE_ID)) return;
-                    var st = document.createElement('style');
-                    st.id = MR_MSG_STYLE_ID;
-                    st.textContent =
-                        '.mr-agent-delete-msg{margin-left:8px;background:transparent;border:0;color:var(--danger,#c0392b);cursor:pointer;font-size:.78rem;padding:2px 7px;border-radius:8px;opacity:.72;transition:opacity .15s,background .15s;}' +
-                        '.mr-agent-delete-msg:hover{opacity:1;background:rgba(192,57,43,.14);}' +
-                        '.bubble-row.mr-msg-deleted{opacity:.72;}' +
-                        '.bubble-row.mr-msg-deleted .bubble{border:1px dashed var(--danger,#c0392b)!important;background:rgba(192,57,43,.08)!important;}' +
-                        '.mr-msg-deleted-tag{display:inline-flex;gap:4px;align-items:center;font-size:.68rem;padding:1px 7px;background:rgba(192,57,43,.18);color:var(--danger,#c0392b);border-radius:999px;margin-left:6px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}' +
-                        '.mr-admin-chat-filters{display:flex;gap:5px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--card-border);background:rgba(184,134,11,.05);}' +
-                        '.mr-admin-chat-filters .btn{flex:1;min-width:96px;font-size:.72rem;padding:6px 8px;}' +
-                        '.mr-admin-chat-filters .btn.active{background:var(--primary)!important;color:#fff!important;border-color:var(--primary)!important;}' +
-                        '.chat-contact.mr-hidden-by-filter,.chat-contact-section.mr-hidden-by-filter{display:none!important;}' +
-                        '#mrToggleChatNamesBtn{display:inline-flex!important;}';
-                    document.head.appendChild(st);
+                var MR_CHAT_PRIVACY_STYLE_ID = 'mr-chat-privacy-admin-style';
+                var _adminMode = 'all'; // all | online | mutual
+                var _chatRefreshRef = null;
+                var _chatRefreshTimer = null;
+
+                function _ce(v){ try { return escapeHTML(v); } catch (_) { return String(v == null ? '' : v).replace(/[&<>"']/g, function(ch){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch]; }); } }
+                function _me(){ return STATE && STATE.currentUser ? STATE.currentUser.username : ''; }
+                function _isAdmin(){ try { return isAdmin(); } catch (_) { return false; } }
+                function _now(){ try { return getNowISO(); } catch (_) { return new Date().toISOString(); } }
+                function _vals(obj){ if (!obj) return []; return Array.isArray(obj) ? obj : Object.keys(obj).map(function(k){ var m=obj[k]||{}; if (!m._key) m._key=k; return m; }); }
+                function _msgId(m){ return (m && (m._key || m.id || m._id || m.key || (m.conversationKey && m.timestamp && (m.conversationKey + '_' + String(m.timestamp).replace(/[^0-9a-z]/gi,''))))) || ''; }
+                function _name(users, username){ var u=(users||{})[username]||{}; return u.name || u.displayName || username || 'Agent'; }
+                function _init(name){ return String(name || '?').split(/\s+/).filter(Boolean).slice(0,2).map(function(x){ return x.charAt(0).toUpperCase(); }).join('') || '?'; }
+                function _avatar(users, username, label){
+                    var u=(users||{})[username]||{}, photo=u.photo || u.avatar || u.profilePhoto || u.profileImage || '';
+                    var click = (username && typeof window._viewAgentProfile === 'function') ? ' onclick="event.stopPropagation();window._viewAgentProfile(\'' + _ce(username) + '\')" title="View profile"' : '';
+                    return '<div class="chat-avatar"' + click + '>' + (photo ? '<img src="' + _ce(photo) + '" alt="' + _ce(label || username) + '" />' : _ce(_init(label || username))) + '</div>';
                 }
-                _mrInjectMsgStyles();
-
-                function _mrMsgId(m){ return m && (m._key || m._id || m.id || ''); }
-                function _mrIsAdmin(){ try { return typeof isAdmin === 'function' && isAdmin(); } catch (_) { return false; } }
-
-                // ---- Override loadChatMessages so admin ALSO sees deleted messages ----
-                if (typeof loadChatMessages === 'function' && !loadChatMessages.__mrAdminDeletedPatched) {
-                    var _mrPrevLoadChatMessages = loadChatMessages;
-                    loadChatMessages = async function(contact){
-                        if (!_mrIsAdmin()) return _mrPrevLoadChatMessages.apply(this, arguments);
-                        var u = STATE.currentUser; if (!u) return;
-                        var all = await readData('chatMessages', 'ph_chat_messages', true) || {};
-                        var c = contact || STATE.activeChatUser || STATE.activeChatGroup || STATE.activeChatPair;
-                        if (!c) return;
-                        var pairKey = '';
-                        if (typeof c === 'string' && c.indexOf('pair:') === 0) pairKey = c.slice(5);
-                        if (STATE.activeChatPair) pairKey = STATE.activeChatPair;
-                        var f = _mrVals(all).filter(function(m){
-                            if (!m) return false;
-                            if (pairKey) {
-                                var p = pairKey.split('__');
-                                return p.length === 2 && _chatPrivateBetween(m, p[0], p[1]);
-                            }
-                            if (m.groupId) return m.groupId === c;
-                            return (m.from === u.username && m.to === c) || (m.from === c && m.to === u.username);
-                        });
-                        f.sort(function(a, b){ return new Date(a.timestamp||0) - new Date(b.timestamp||0); });
-                        STATE.chatMessages = f;
-                        renderChatMessages(f);
-                        try { attachRealtimeChatNotifications(); } catch (_) {}
-                    };
-                    loadChatMessages.__mrAdminDeletedPatched = true;
-                }
-
-                // ---- Override renderChatMessages to add per-agent delete button + deleted visual ----
-                if (typeof renderChatMessages === 'function' && !renderChatMessages.__mrAgentDeletePatched) {
-                    renderChatMessages = function(messages){
-                        var c = document.getElementById('chatMessagesContainer');
-                        if (!c) return;
-                        var context = '';
-                        if (STATE.activeChatPair) context = '<div class="chat-context-label"><i class="fas fa-user-friends"></i> Agent mutual chat</div>';
-                        else if (_mrIsAdmin() && STATE.activeChatUser) context = '<div class="chat-context-label"><i class="fas fa-user-shield"></i> Admin direct chat</div>';
-                        else if (STATE.activeChatGroup) context = '<div class="chat-context-label"><i class="fas fa-users"></i> Group chat</div>';
-                        if (!messages || !messages.length) {
-                            c.innerHTML = context + '<div class="chat-empty"><i class="fas fa-comments" style="font-size:2rem;color:var(--primary);"></i><h4>No messages yet</h4><p>Full chat history will be saved here.</p></div>';
-                            return;
-                        }
-                        var admin = _mrIsAdmin();
-                        var me = STATE.currentUser && STATE.currentUser.username;
-                        c.innerHTML = context + messages.map(function(m){
-                            if (m.deleted && !admin) return '';
-                            var mine = m.from === me;
-                            var sys = m.type === 'system';
-                            var mid = _mrMsgId(m);
-                            var deleted = !!m.deleted;
-                            var content = m.message ? '<div>' + escapeHTML(m.message) + '</div>' : '';
-                            if (m.attachment && m.attachment.data) content += '<img class="chat-image" src="' + m.attachment.data + '" alt="Shared image" />';
-                            var adminCheck = (admin && mid) ? '<label class="chat-delete-select" title="Select message to delete"><input type="checkbox" class="chat-delete-check" value="' + escapeHTML(mid) + '" /></label>' : '';
-                            var agentDelBtn = (!admin && mine && mid && !deleted && !STATE.activeChatPair) ? '<button class="mr-agent-delete-msg" title="Delete this message" onclick="window._mrAgentDeleteOwnMessage(\'' + escapeHTML(mid) + '\')"><i class="fas fa-trash"></i></button>' : '';
-                            var deletedTag = deleted ? '<span class="mr-msg-deleted-tag" title="Deleted ' + (m.deletedAt ? formatTime(m.deletedAt) : '') + ' by ' + escapeHTML(m.deletedBy || '') + '"><i class="fas fa-eye-slash"></i> Deleted</span>' : '';
-                            return '<div class="bubble-row ' + (mine ? 'mine' : 'theirs') + ' ' + (sys ? 'system' : '') + (deleted ? ' mr-msg-deleted' : '') + '">' +
-                                adminCheck +
-                                '<div class="chat-avatar">' + (sys ? '<i class="fas fa-bell"></i>' : _mrInit(mine ? 'You' : m.from)) + '</div>' +
-                                '<div class="bubble"><div class="msg-sender">' + (sys ? 'Group Notice' : (mine ? 'You' : escapeHTML(m.from || 'User'))) + deletedTag + '</div>' +
-                                content +
-                                '<div class="bubble-meta">' + formatTime(m.timestamp || '') + agentDelBtn + '</div>' +
-                                '</div></div>';
-                        }).join('');
-                        setTimeout(function(){ c.scrollTop = Math.max(0, c.scrollHeight - c.clientHeight); }, 40);
-                    };
-                    renderChatMessages.__mrAgentDeletePatched = true;
-                }
-
-                // ---- Agent deletes own message (soft delete; admin keeps record) ----
-                window._mrAgentDeleteOwnMessage = async function(msgId){
-                    if (!msgId) return;
-                    var u = STATE.currentUser; if (!u) return;
-                    if (!confirm('Delete this message from your chat? Admin will still have a record of it.')) return;
-                    var all = await readData('chatMessages', 'ph_chat_messages', true) || {};
-                    var target = null, targetKey = null;
-                    if (Array.isArray(all)) {
-                        for (var i = 0; i < all.length; i++) {
-                            var m = all[i];
-                            if (m && (m._key === msgId || m._id === msgId || m.id === msgId)) { target = m; targetKey = i; break; }
-                        }
-                    } else if (all[msgId]) {
-                        target = all[msgId]; targetKey = msgId;
-                    } else {
-                        Object.keys(all).forEach(function(k){
-                            var m = all[k];
-                            if (m && (m._key === msgId || m._id === msgId || m.id === msgId)) { target = m; targetKey = k; }
-                        });
-                    }
-                    if (!target) { showToast('Message not found.', 'error'); return; }
-                    if (target.from !== u.username && !_mrIsAdmin()) { showToast('You can only delete your own messages.', 'error'); return; }
-                    if (target.deleted) { showToast('Already deleted.', 'info'); return; }
-                    target.deleted = true;
-                    target.deletedAt = getNowISO();
-                    target.deletedBy = u.username;
-                    try {
-                        if (targetKey != null && !Array.isArray(all) && firebaseConnected && db) {
-                            await db.ref('chatMessages/' + targetKey).set(target);
-                        } else if (targetKey != null && !Array.isArray(all)) {
-                            await writeData('chatMessages/' + targetKey, target, null);
-                        } else {
-                            await writeData('chatMessages', all, 'ph_chat_messages');
-                        }
-                    } catch (e) {
-                        await writeData('chatMessages', all, 'ph_chat_messages');
-                    }
-                    try {
-                        var cache = JSON.parse(localStorage.getItem('ph_chat_messages') || '{}');
-                        if (cache && typeof cache === 'object' && !Array.isArray(cache) && targetKey != null && cache[targetKey]) {
-                            cache[targetKey] = target;
-                            localStorage.setItem('ph_chat_messages', JSON.stringify(cache));
-                        }
-                    } catch (_) {}
-                    showToast('Message deleted from your chat. Admin retains a copy.', 'success');
-                    try { loadChatMessages(); } catch (_) {}
-                };
-
-                // ---- Admin sidebar filter bar: All / Online Agents / Mutual Chats / Deleted Log ----
-                function _mrIsPresenceOnlineForFilter(p){
-                    if (!p || p.offline) return false;
-                    var ls = parseInt(p.lastSeen || 0, 10);
-                    return !!ls && (Date.now() - ls) < 65000;
-                }
-                async function _mrReadPresenceForFilter(){
-                    var out = {};
-                    try { var fb = await readData('presence', null, true); if (fb && typeof fb === 'object') out = fb; } catch (_) {}
-                    try {
-                        for (var i = 0; i < localStorage.length; i++) {
-                            var k = localStorage.key(i);
-                            if (k && k.indexOf('ph_presence_') === 0) {
-                                try { var v = JSON.parse(localStorage.getItem(k)); if (v && v.username && !out[v.username]) out[v.username] = v; } catch (_) {}
-                            }
-                        }
-                    } catch (_) {}
+                function _pairKey(a,b){ return [a,b].sort().join('__'); }
+                function _privateBetween(m,a,b){ return !m.groupId && m.to !== 'group' && ((m.from===a && m.to===b) || (m.from===b && m.to===a)); }
+                function _privacyKey(){ return 'ph_chat_names_hidden_' + String(_me() || 'guest').replace(/[^a-z0-9_-]/gi,'_'); }
+                function _privacyHidden(){ try { return localStorage.getItem(_privacyKey()) === '1'; } catch (_) { return false; } }
+                function _setPrivacyHidden(v){ try { localStorage.setItem(_privacyKey(), v ? '1' : '0'); } catch (_) {} }
+                function _presenceOnline(p){ if (!p || p.offline) return false; var last=parseInt(p.lastSeen||0,10); return !!last && (Date.now()-last)<65000; }
+                async function _presence(){
+                    var out={};
+                    try { var fb=await readData('presence', null, true); if (fb && typeof fb==='object') out=fb; } catch (_) {}
+                    try { for (var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(k&&k.indexOf('ph_presence_')===0){ try{ var v=JSON.parse(localStorage.getItem(k)); if(v&&v.username&&!out[v.username]) out[v.username]=v; }catch(_){} } } } catch (_) {}
                     return out;
                 }
-                function _mrCurrentAdminFilter(){
-                    var bar = document.getElementById('mrAdminChatFilters');
-                    if (!bar) return 'all';
-                    var act = bar.querySelector('button.active');
-                    return act ? (act.dataset.filter || 'all') : 'all';
+                async function _users(){ var u={}; try { u=await readData('users','ph_users',true)||{}; } catch (_) {} STATE.users=u; return u; }
+                async function _messages(){ try { return await readData('chatMessages','ph_chat_messages',true)||{}; } catch (_) { return {}; } }
+
+                function _injectStyles(){
+                    if (document.getElementById(MR_CHAT_PRIVACY_STYLE_ID)) return;
+                    var st=document.createElement('style');
+                    st.id=MR_CHAT_PRIVACY_STYLE_ID;
+                    st.textContent = '' +
+                        '.mr-chat-privacy-bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:9px;}' +
+                        '.mr-chat-privacy-bar .btn,.mr-admin-chat-tabs .btn{border-radius:999px;}' +
+                        '.mr-admin-chat-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px solid var(--card-border);}' +
+                        '.mr-admin-chat-tabs .active{background:var(--primary)!important;color:#fff!important;border-color:var(--primary)!important;}' +
+                        '.chat-shell.mr-chat-names-hidden{grid-template-columns:260px minmax(300px,1fr)!important;}' +
+                        '.chat-shell.mr-chat-names-hidden .chat-sidebar{display:flex!important;}' +
+                        '.chat-shell.mr-chat-names-hidden .chat-contact-name,.chat-shell.mr-chat-names-hidden .chat-contact-sub,.chat-shell.mr-chat-names-hidden .mr-chat-online-item .chat-contact-name,.chat-shell.mr-chat-names-hidden .mr-chat-online-item .chat-contact-sub{visibility:hidden!important;position:relative!important;}' +
+                        '.chat-shell.mr-chat-names-hidden .chat-contact-name:after,.chat-shell.mr-chat-names-hidden .mr-chat-online-item .chat-contact-name:after{content:attr(data-private-label);visibility:visible;position:absolute;left:0;top:0;color:var(--text);}' +
+                        '.chat-shell.mr-chat-names-hidden .chat-contact-sub:after,.chat-shell.mr-chat-names-hidden .mr-chat-online-item .chat-contact-sub:after{content:attr(data-private-sub);visibility:visible;position:absolute;left:0;top:0;color:var(--text2);}' +
+                        '.bubble-row>.chat-avatar{width:32px!important;height:32px!important;min-width:32px!important;max-width:32px!important;flex:0 0 32px!important;overflow:hidden!important;border-radius:12px!important;cursor:pointer;}' +
+                        '.messenger-title .chat-avatar,.chat-contact .chat-avatar{width:38px!important;height:38px!important;min-width:38px!important;max-width:38px!important;flex:0 0 38px!important;overflow:hidden!important;border-radius:14px!important;}' +
+                        '.chat-avatar img,.chat-avatar.profile-avatar img{width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;max-width:100%!important;max-height:100%!important;object-fit:cover!important;display:block!important;border-radius:inherit!important;}' +
+                        '.chat-msg-actions{display:inline-flex;gap:4px;align-items:center;margin-left:6px;}' +
+                        '.chat-msg-delete-btn{border:0;background:rgba(192,57,43,.12);color:var(--danger);border-radius:8px;width:25px;height:25px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;}' +
+                        '.bubble-row.mine .chat-msg-delete-btn{background:rgba(255,255,255,.18);color:#fff;}' +
+                        '.chat-deleted-audit-row{padding:10px 12px;border:1px solid var(--card-border);border-radius:14px;background:var(--input-bg);margin:8px 0;}' +
+                        '.chat-deleted-audit-meta{font-size:.75rem;color:var(--text2);margin-bottom:5px;}' +
+                        '.chat-admin-empty{padding:18px;text-align:center;color:var(--text2);}' +
+                        '@media(max-width:780px){.chat-shell.mr-chat-names-hidden{grid-template-columns:1fr!important}.chat-shell.mr-chat-names-hidden .chat-sidebar{display:flex!important;max-height:220px}}';
+                    document.head.appendChild(st);
                 }
-                async function _mrApplyAdminSidebarFilter(mode){
-                    var list = document.getElementById('chatContactsList');
-                    if (!list) return;
-                    var contacts = list.querySelectorAll('.chat-contact');
-                    var sections = list.querySelectorAll('.chat-contact-section');
-                    contacts.forEach(function(c){ c.classList.remove('mr-hidden-by-filter'); });
-                    sections.forEach(function(s){ s.classList.remove('mr-hidden-by-filter'); });
-                    if (mode === 'all' || !mode) return;
-                    if (mode === 'mutual') {
-                        contacts.forEach(function(c){ if (!c.classList.contains('mutual-chat')) c.classList.add('mr-hidden-by-filter'); });
-                        sections.forEach(function(s){ if (!/mutual/i.test(s.textContent || '')) s.classList.add('mr-hidden-by-filter'); });
-                        return;
-                    }
-                    if (mode === 'online') {
-                        var presence = await _mrReadPresenceForFilter();
-                        contacts.forEach(function(c){
-                            var key = c.dataset.key || '';
-                            if (key.indexOf('user_') === 0) {
-                                var uname = key.slice(5);
-                                if (!_mrIsPresenceOnlineForFilter(presence[uname])) c.classList.add('mr-hidden-by-filter');
-                            } else {
-                                c.classList.add('mr-hidden-by-filter');
-                            }
-                        });
-                        sections.forEach(function(s){ if (!/admin chats|people/i.test(s.textContent || '')) s.classList.add('mr-hidden-by-filter'); });
-                        return;
-                    }
-                }
-                function _mrEnsureAdminChatFilters(){
-                    if (!_mrIsAdmin()) return;
-                    var sidebar = document.querySelector('.chat-sidebar');
-                    if (!sidebar) return;
-                    if (document.getElementById('mrAdminChatFilters')) return;
-                    var head = sidebar.querySelector('.chat-sidebar-head');
-                    var bar = document.createElement('div');
-                    bar.id = 'mrAdminChatFilters';
-                    bar.className = 'mr-admin-chat-filters';
-                    bar.innerHTML =
-                        '<button type="button" class="btn btn-sm btn-outline active" data-filter="all"><i class="fas fa-list"></i> All</button>' +
-                        '<button type="button" class="btn btn-sm btn-outline" data-filter="online"><i class="fas fa-signal"></i> Online Agents</button>' +
-                        '<button type="button" class="btn btn-sm btn-outline" data-filter="mutual"><i class="fas fa-user-friends"></i> Mutual Chats</button>' +
-                        '<button type="button" class="btn btn-sm btn-outline" data-filter="deleted"><i class="fas fa-trash"></i> Deleted Log</button>';
-                    if (head && head.nextSibling) sidebar.insertBefore(bar, head.nextSibling); else sidebar.insertBefore(bar, sidebar.firstChild);
-                    bar.querySelectorAll('button').forEach(function(b){
-                        b.addEventListener('click', function(){
-                            var f = b.dataset.filter;
-                            if (f === 'deleted') { _mrShowAdminDeletedLog(); return; }
-                            bar.querySelectorAll('button').forEach(function(x){ x.classList.remove('active'); });
-                            b.classList.add('active');
-                            _mrApplyAdminSidebarFilter(f);
-                        });
+
+                function _applyPrivacyLabels(){
+                    var shell=document.querySelector('.chat-shell'); if(!shell) return;
+                    var hidden=_privacyHidden();
+                    shell.classList.toggle('mr-chat-names-hidden', hidden);
+                    var btns=document.querySelectorAll('#mrSidebarHideNamesBtn,#mrToggleChatNamesBtn');
+                    Array.prototype.forEach.call(btns,function(btn){ if(btn) btn.innerHTML = hidden ? '<i class="fas fa-eye"></i> Show Names' : '<i class="fas fa-eye-slash"></i> Hide Names'; });
+                    Array.prototype.forEach.call(document.querySelectorAll('.chat-contact'), function(el){
+                        var name=el.querySelector('.chat-contact-name'), sub=el.querySelector('.chat-contact-sub');
+                        var key=String(el.dataset.key||'');
+                        var label=key.indexOf('pair_')===0?'Mutual Chat':(key.indexOf('group_')===0?'Group':'Agent');
+                        if(name) name.setAttribute('data-private-label', label);
+                        if(sub) sub.setAttribute('data-private-sub', key.indexOf('pair_')===0?'Agent-to-agent conversation':(key.indexOf('group_')===0?'Group conversation':'Status hidden'));
+                    });
+                    Array.prototype.forEach.call(document.querySelectorAll('.mr-chat-online-item'), function(el){
+                        var name=el.querySelector('.chat-contact-name'), sub=el.querySelector('.chat-contact-sub');
+                        if(name) name.setAttribute('data-private-label','Online Agent');
+                        if(sub) sub.setAttribute('data-private-sub','Status hidden');
                     });
                 }
+                function _togglePrivacy(){ _setPrivacyHidden(!_privacyHidden()); _applyPrivacyLabels(); }
 
-                async function _mrShowAdminDeletedLog(){
-                    if (!_mrIsAdmin()) { showToast('Admin access required.', 'error'); return; }
-                    var all = await readData('chatMessages', 'ph_chat_messages', true) || {};
-                    var users = STATE.users && Object.keys(STATE.users).length ? STATE.users : (await readData('users', 'ph_users', true) || {});
-                    var deleted = _mrVals(all).filter(function(m){ return m && m.deleted; })
-                        .sort(function(a, b){ return new Date(b.deletedAt || b.timestamp || 0) - new Date(a.deletedAt || a.timestamp || 0); });
-                    var rows = deleted.map(function(m){
-                        var fromName = (users[m.from] && users[m.from].name) || m.from || '';
-                        var toName = m.groupId ? ('Group: ' + m.groupId) : ((users[m.to] && users[m.to].name) || m.to || '');
-                        var content = m.message ? escapeHTML(m.message) : (m.attachment && m.attachment.data ? '<em>[Image]</em>' : '<em>[empty]</em>');
-                        var delByName = (users[m.deletedBy] && users[m.deletedBy].name) || m.deletedBy || '';
-                        return '<tr><td>' + escapeHTML(fromName) + '</td><td>' + escapeHTML(toName) + '</td><td>' + content + '</td><td>' + escapeHTML(formatTime(m.timestamp || '')) + '</td><td>' + escapeHTML(m.deletedAt ? formatTime(m.deletedAt) : '') + '</td><td>' + escapeHTML(delByName) + '</td></tr>';
+                function _installSidebarControls(){
+                    _injectStyles();
+                    var head=document.querySelector('.chat-sidebar-head');
+                    if(!head) return;
+                    if(!document.getElementById('mrSidebarHideNamesBtn')){
+                        var bar=document.createElement('div');
+                        bar.className='mr-chat-privacy-bar';
+                        bar.innerHTML='<button type="button" class="btn btn-sm btn-outline" id="mrSidebarHideNamesBtn"><i class="fas fa-eye-slash"></i> Hide Names</button>';
+                        head.appendChild(bar);
+                        document.getElementById('mrSidebarHideNamesBtn').onclick=function(e){ e.preventDefault(); _togglePrivacy(); };
+                    }
+                    if(_isAdmin() && !document.getElementById('mrAdminChatTabs')){
+                        var tabs=document.createElement('div');
+                        tabs.id='mrAdminChatTabs';
+                        tabs.className='mr-admin-chat-tabs';
+                        tabs.innerHTML='<button type="button" class="btn btn-sm btn-outline" data-mode="all"><i class="fas fa-inbox"></i> All</button><button type="button" class="btn btn-sm btn-outline" data-mode="online"><i class="fas fa-signal"></i> Online Agents</button><button type="button" class="btn btn-sm btn-outline" data-mode="mutual"><i class="fas fa-user-friends"></i> Mutual Chats</button><button type="button" class="btn btn-sm btn-outline" id="mrDeletedChatHistoryBtn"><i class="fas fa-trash-clock"></i> Deleted</button>';
+                        head.appendChild(tabs);
+                        Array.prototype.forEach.call(tabs.querySelectorAll('[data-mode]'), function(btn){
+                            btn.onclick=function(){ _adminMode=this.getAttribute('data-mode')||'all'; _syncAdminTabs(); if(typeof loadChatContacts==='function') loadChatContacts(); };
+                        });
+                        var del=document.getElementById('mrDeletedChatHistoryBtn'); if(del) del.onclick=function(){ window._mrShowDeletedChatHistory(); };
+                    }
+                    _syncAdminTabs();
+                    _applyPrivacyLabels();
+                }
+                function _syncAdminTabs(){
+                    Array.prototype.forEach.call(document.querySelectorAll('#mrAdminChatTabs [data-mode]'), function(btn){ btn.classList.toggle('active', (btn.getAttribute('data-mode')||'all')===_adminMode); });
+                }
+
+                async function _renderAdminOnlineContacts(){
+                    var list=document.getElementById('chatContactsList'); if(!list) return;
+                    var users=await _users(), pres=await _presence(), me=_me();
+                    var names=Object.keys(users||{}).filter(function(k){ return k!==me && k!=='Plan' && _presenceOnline(pres[k]); });
+                    names.sort(function(a,b){ return _name(users,a).localeCompare(_name(users,b)); });
+                    list.innerHTML = names.length ? '<div class="chat-contact-section">Online Agents</div>' + names.map(function(k){
+                        var display=_name(users,k), role=(users[k]||{}).role||'agent';
+                        return '<div class="chat-contact admin-chat" data-key="user_'+_ce(k)+'" data-name="'+_ce((display+' '+k+' online').toLowerCase())+'" onclick="window._selectChatContact(decodeURIComponent(\''+encodeURIComponent(k)+'\'),null,decodeURIComponent(\''+encodeURIComponent(display)+'\'),null)">'+_avatar(users,k,display)+'<div class="chat-contact-main"><div class="chat-contact-name">'+_ce(display)+'</div><div class="chat-contact-sub"><span class="mr-chat-contact-dot"></span> @'+_ce(k)+' · '+_ce(role)+' · Online</div></div></div>';
+                    }).join('') : '<div class="chat-admin-empty"><i class="fas fa-user-slash"></i><p>No agents are online right now.</p></div>';
+                    _applyPrivacyLabels();
+                }
+                async function _renderAdminMutualContacts(){
+                    var list=document.getElementById('chatContactsList'); if(!list) return;
+                    var users=await _users(), all=await _messages(), me=_me(), pairs={};
+                    _vals(all).forEach(function(m){
+                        if(!m || m.deleted || m.groupId || !m.from || !m.to || m.to==='group') return;
+                        if(m.from===me || m.to===me || m.from==='Plan' || m.to==='Plan') return;
+                        var pk=_pairKey(m.from,m.to);
+                        pairs[pk]=pairs[pk]||{a:m.from,b:m.to,last:m.timestamp||'',count:0};
+                        pairs[pk].count++;
+                        if(new Date(m.timestamp||0)>new Date(pairs[pk].last||0)) pairs[pk].last=m.timestamp||'';
+                    });
+                    var keys=Object.keys(pairs).sort(function(a,b){ return new Date(pairs[b].last||0)-new Date(pairs[a].last||0); });
+                    list.innerHTML = keys.length ? '<div class="chat-contact-section">Mutual Chats Between Agents</div>' + keys.map(function(pk){
+                        var pr=pairs[pk], label=_name(users,pr.a)+' ↔ '+_name(users,pr.b);
+                        return '<div class="chat-contact mutual-chat" data-key="pair_'+_ce(pk)+'" data-name="'+_ce(label.toLowerCase())+'" onclick="window._selectChatContact(null,null,decodeURIComponent(\''+encodeURIComponent(label)+'\'),decodeURIComponent(\''+encodeURIComponent(pk)+'\'))"><div class="chat-avatar"><i class="fas fa-user-friends"></i></div><div class="chat-contact-main"><div class="chat-contact-name">'+_ce(label)+'</div><div class="chat-contact-sub">'+pr.count+' message(s) · last '+_ce(formatDateTime(pr.last||''))+'</div></div></div>';
+                    }).join('') : '<div class="chat-admin-empty"><i class="fas fa-comments"></i><p>No mutual chats between agents yet.</p></div>';
+                    _applyPrivacyLabels();
+                }
+
+                async function _markMessageDeleted(id){
+                    var all=await _messages(), arr=Array.isArray(all), found=null, foundKey='';
+                    if(arr){
+                        for(var i=0;i<all.length;i++){ var mid=_msgId(all[i]); if(mid===id){ found=all[i]; foundKey=String(i); break; } }
+                    } else {
+                        Object.keys(all||{}).some(function(k){ var m=all[k]||{}; var mid=_msgId(Object.assign({_key:k},m)); if(mid===id || k===id){ found=m; foundKey=k; return true; } return false; });
+                    }
+                    if(!found) { showToast('Message not found.', 'error'); return false; }
+                    var me=_me();
+                    if(!_isAdmin() && found.from!==me){ showToast('You can only delete messages you sent.', 'error'); return false; }
+                    if(found.deleted){ showToast('Message is already deleted.', 'info'); return false; }
+                    var fields={ deleted:true, deletedAt:_now(), deletedBy:me, deletedForAgents:true, deletedOriginalMessage: found.message || '', deletedOriginalType: found.type || 'text', deletedHadAttachment: !!(found.attachment && found.attachment.data) };
+                    if(firebaseConnected && db && !arr && foundKey){ await db.ref('chatMessages/'+foundKey).update(fields); }
+                    else { Object.assign(found, fields); await writeData('chatMessages', all, 'ph_chat_messages'); }
+                    try { delete STATE._cache['chatMessages_ph_chat_messages']; } catch (_) {}
+                    showToast('Message deleted.', 'success');
+                    if(typeof loadChatMessages==='function') loadChatMessages();
+                    return true;
+                }
+                window._mrDeleteChatMessage = async function(id){
+                    if(!id) return;
+                    if(!confirm('Delete this message?')) return;
+                    await _markMessageDeleted(id);
+                };
+                window._mrShowDeletedChatHistory = async function(){
+                    if(!_isAdmin()) return showToast('Admin access required.', 'error');
+                    var users=await _users(), all=await _messages();
+                    var rows=_vals(all).filter(function(m){ return m && m.deleted; }).sort(function(a,b){ return new Date(b.deletedAt||b.timestamp||0)-new Date(a.deletedAt||a.timestamp||0); });
+                    var html=rows.length ? rows.map(function(m){
+                        var text=m.deletedOriginalMessage != null ? m.deletedOriginalMessage : (m.message || '');
+                        var target=m.groupId ? ('Group: '+m.groupId) : (m.to || '');
+                        return '<div class="chat-deleted-audit-row"><div class="chat-deleted-audit-meta"><strong>'+_ce(_name(users,m.from))+'</strong> to <strong>'+_ce(target)+'</strong> · sent '+_ce(formatDateTime(m.timestamp||''))+' · deleted '+_ce(formatDateTime(m.deletedAt||''))+' by '+_ce(m.deletedBy||'')+'</div><div>'+_ce(text || (m.deletedHadAttachment?'[Image attachment]':'(empty message)'))+'</div></div>';
+                    }).join('') : '<p class="text-muted">No deleted messages found.</p>';
+                    showModal('<h3><i class="fas fa-trash-clock"></i> Deleted Message History</h3><p class="text-muted text-sm">Admin-only audit trail. Deleted messages stay hidden from agents.</p><div style="max-height:62vh;overflow:auto;margin-top:12px;">'+html+'</div><div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>');
+                };
+
+                function _renderMessagesWithDelete(messages){
+                    _injectStyles();
+                    var c=document.getElementById('chatMessagesContainer'); if(!c) return;
+                    var users=STATE.users||{}, me=_me();
+                    var context='';
+                    if(STATE.activeChatPair) context='<div class="chat-context-label"><i class="fas fa-user-friends"></i> Agent mutual chat</div>';
+                    else if(_isAdmin()&&STATE.activeChatUser) context='<div class="chat-context-label"><i class="fas fa-user-shield"></i> Admin direct chat</div>';
+                    else if(STATE.activeChatGroup) context='<div class="chat-context-label"><i class="fas fa-users"></i> Group chat</div>';
+                    var visible=_vals(messages).filter(function(m){ return m && !m.deleted; });
+                    if(!visible.length){ c.innerHTML=context+'<div class="chat-empty"><i class="fas fa-comments" style="font-size:2rem;color:var(--primary);"></i><h4>No messages yet</h4><p>Full chat history will be saved here.</p></div>'; return; }
+                    c.innerHTML=context+visible.map(function(m){
+                        var mine=m.from===me, sys=m.type==='system', mid=_msgId(m), sender=sys?'Group Notice':(mine?'You':_name(users,m.from));
+                        var content=m.message?'<div>'+_ce(m.message)+'</div>':'';
+                        if(m.attachment&&m.attachment.data) content+='<img class="chat-image" src="'+m.attachment.data+'" alt="Shared image" />';
+                        var select=(_isAdmin()&&mid)?'<label class="chat-delete-select" title="Select message to delete"><input type="checkbox" class="chat-delete-check" value="'+_ce(mid)+'" /></label>':'';
+                        var edit=(mine&&!sys&&mid&&window._mrEditOwnChatMessage)?'<button type="button" class="chat-msg-edit-btn" data-msg-id="'+_ce(mid)+'" title="Edit message"><i class="fas fa-pen"></i></button>':'';
+                        var del=((mine||_isAdmin())&&!sys&&mid)?'<button type="button" class="chat-msg-delete-btn" data-msg-id="'+_ce(mid)+'" title="Delete message"><i class="fas fa-trash"></i></button>':'';
+                        var edited=m.editedAt?'<span class="chat-edited-note">edited</span>':'';
+                        var adminAudit='';
+                        if(_isAdmin()&&m.editedAt){ adminAudit='<div class="chat-edit-audit"><div class="chat-edit-audit-title">Edit history visible to admin only</div></div>'; }
+                        return '<div class="bubble-row '+(mine?'mine':'theirs')+' '+(sys?'system':'')+'">'+select+_avatar(users,m.from,sender)+'<div class="bubble"><div class="chat-msg-head"><div class="msg-sender">'+_ce(sender)+'</div><div class="chat-msg-actions">'+edit+del+'</div></div>'+content+adminAudit+'<div class="bubble-meta">'+_ce(formatTime(m.timestamp||''))+edited+'</div></div></div>';
                     }).join('');
-                    if (!rows) rows = '<tr><td colspan="6" class="text-center text-muted">No deleted messages yet.</td></tr>';
-                    showModal(
-                        '<h3><i class="fas fa-trash"></i> Deleted Messages (Admin Only)</h3>' +
-                        '<p class="text-muted text-sm">These messages were removed from the agents\' chat windows. Only the admin can view them.</p>' +
-                        '<div class="history-table-wrap" style="max-height:60vh;overflow:auto;"><table><thead><tr><th>From</th><th>To</th><th>Message</th><th>Sent</th><th>Deleted At</th><th>Deleted By</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-                        '<div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>'
-                    );
+                    Array.prototype.forEach.call(c.querySelectorAll('.chat-msg-edit-btn'), function(btn){ btn.onclick=function(e){ e.preventDefault(); e.stopPropagation(); window._mrEditOwnChatMessage(this.getAttribute('data-msg-id')); }; });
+                    Array.prototype.forEach.call(c.querySelectorAll('.chat-msg-delete-btn'), function(btn){ btn.onclick=function(e){ e.preventDefault(); e.stopPropagation(); window._mrDeleteChatMessage(this.getAttribute('data-msg-id')); }; });
+                    setTimeout(function(){ c.scrollTop=Math.max(0,c.scrollHeight-c.clientHeight); _applyPrivacyLabels(); },40);
                 }
-                window._mrShowAdminDeletedLog = _mrShowAdminDeletedLog;
 
-                // Reapply active filter after contacts re-render, and inject filter bar
-                if (typeof loadChatContacts === 'function' && !loadChatContacts.__mrAdminFiltersPatched) {
-                    var _mrPrevLoadChatContacts = loadChatContacts;
-                    loadChatContacts = async function(){
-                        var r = await _mrPrevLoadChatContacts.apply(this, arguments);
-                        setTimeout(function(){
-                            _mrEnsureAdminChatFilters();
-                            if (_mrIsAdmin()) _mrApplyAdminSidebarFilter(_mrCurrentAdminFilter());
-                        }, 50);
-                        return r;
-                    };
-                    loadChatContacts.__mrAdminFiltersPatched = true;
+                function _patchChat(){
+                    _injectStyles();
+                    if(typeof showChatUI==='function' && !showChatUI.__mrPrivacyAdminPatched){
+                        var prevShow=showChatUI;
+                        showChatUI=function(){ var r=prevShow.apply(this,arguments); setTimeout(_installSidebarControls,80); setTimeout(_installSidebarControls,420); _attachChatRefresh(); return r; };
+                        showChatUI.__mrPrivacyAdminPatched=true;
+                    }
+                    if(typeof loadChatContacts==='function' && !loadChatContacts.__mrPrivacyAdminPatched){
+                        var prevLoad=loadChatContacts;
+                        loadChatContacts=async function(){
+                            var r=await prevLoad.apply(this,arguments);
+                            _installSidebarControls();
+                            if(_isAdmin() && _adminMode==='online') await _renderAdminOnlineContacts();
+                            if(_isAdmin() && _adminMode==='mutual') await _renderAdminMutualContacts();
+                            _applyPrivacyLabels();
+                            return r;
+                        };
+                        loadChatContacts.__mrPrivacyAdminPatched=true;
+                    }
+                    if(typeof renderChatMessages==='function' && !renderChatMessages.__mrPrivacyDeletePatched){
+                        renderChatMessages=function(messages){ _renderMessagesWithDelete(messages); };
+                        renderChatMessages.__mrPrivacyDeletePatched=true;
+                    }
                 }
-                if (typeof showChatUI === 'function' && !showChatUI.__mrAdminFiltersPatched) {
-                    var _mrPrevShowChatUiForAdminFilters = showChatUI;
-                    showChatUI = function(){
-                        var r = _mrPrevShowChatUiForAdminFilters.apply(this, arguments);
-                        setTimeout(_mrEnsureAdminChatFilters, 200);
-                        setTimeout(_mrEnsureAdminChatFilters, 600);
-                        return r;
-                    };
-                    showChatUI.__mrAdminFiltersPatched = true;
+
+                function _attachChatRefresh(){
+                    if(!firebaseConnected || !db || _chatRefreshRef) return;
+                    _chatRefreshRef=db.ref('chatMessages');
+                    _chatRefreshRef.on('value', function(){
+                        if(_chatRefreshTimer) clearTimeout(_chatRefreshTimer);
+                        _chatRefreshTimer=setTimeout(function(){
+                            if(document.getElementById('chatMessagesContainer') && (STATE.activeChatUser || STATE.activeChatGroup || STATE.activeChatPair)) {
+                                try { loadChatMessages(); } catch (_) {}
+                            }
+                            if(document.getElementById('chatContactsList')) { try { loadChatContacts(); } catch (_) {} }
+                        }, 250);
+                    });
                 }
+                if(typeof afterLogin==='function' && !afterLogin.__mrChatDeleteRefreshPatched){
+                    var prevAfter=afterLogin;
+                    afterLogin=async function(){ var r=await prevAfter.apply(this,arguments); _patchChat(); _attachChatRefresh(); return r; };
+                    afterLogin.__mrChatDeleteRefreshPatched=true;
+                }
+                _patchChat();
+                document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ _patchChat(); _installSidebarControls(); }, 1100); });
             })();
 
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
