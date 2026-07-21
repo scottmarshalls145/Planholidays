@@ -2134,6 +2134,170 @@
         .voice-panel.call-minimized>:not(.mr-call-window-bar){display:none!important}
         .voice-panel.call-maximized{left:8px!important;top:8px!important;right:auto!important;bottom:auto!important;width:calc(100vw - 16px)!important;height:calc(100vh - 16px)!important}
 
+
+        /* HOTEL VOUCHER MODULE */
+        .voucher-form-shell {
+            width: 100%;
+            max-width: none;
+            margin: 0;
+        }
+        .voucher-hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 18px;
+            align-items: center;
+            padding: 22px;
+            margin-bottom: 18px;
+            border: 1px solid rgba(184, 134, 11, .28);
+            border-radius: 24px;
+            background: linear-gradient(135deg, rgba(184,134,11,.18), rgba(255,255,255,.34));
+            box-shadow: var(--shadow);
+        }
+        .dark .voucher-hero {
+            background: linear-gradient(135deg, rgba(184,134,11,.18), rgba(30,30,50,.6));
+        }
+        .voucher-hero h3 {
+            font-family: var(--font-serif);
+            font-size: clamp(1.45rem, 3vw, 2rem);
+            margin-bottom: 6px;
+        }
+        .voucher-number-pill {
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: var(--primary);
+            color: #fff;
+            font-weight: 800;
+            letter-spacing: .04em;
+            white-space: nowrap;
+        }
+        .voucher-section-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+        .voucher-form-shell .form-card {
+            height: 100%;
+        }
+        .voucher-terms-box {
+            width: 100%;
+            min-height: 520px;
+            display: block;
+            resize: vertical;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            font-family: var(--font);
+            box-sizing: border-box;
+        }
+        .voucher-terms-card {
+            width: 100%;
+        }
+        .voucher-actions-bar {
+            position: sticky;
+            bottom: 0;
+            z-index: 4;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 18px;
+            padding: 14px;
+            border: 1px solid var(--card-border);
+            border-radius: 18px;
+            background: color-mix(in srgb, var(--bg2) 88%, transparent);
+            backdrop-filter: blur(14px);
+            box-shadow: 0 -10px 35px rgba(0,0,0,.08);
+        }
+        .voucher-preview-card {
+            color: #172033;
+            background: #fff;
+            border-radius: 18px;
+            border: 1px solid #e7dcc4;
+            overflow: hidden;
+            box-shadow: 0 18px 55px rgba(18, 18, 26, .12);
+        }
+        .voucher-preview-head {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 16px;
+            align-items: center;
+            padding: 22px;
+            border-bottom: 4px solid #b8860b;
+            background: linear-gradient(135deg, #fffaf0, #ffffff);
+        }
+        .voucher-preview-logo {
+            width: 74px;
+            height: 54px;
+            object-fit: contain;
+            border-radius: 10px;
+            background: #f8f1df;
+        }
+        .voucher-preview-title {
+            text-align: right;
+            font-size: 1.45rem;
+            font-weight: 900;
+            color: #8b6914;
+            letter-spacing: .08em;
+        }
+        .voucher-preview-body {
+            padding: 22px;
+        }
+        .voucher-preview-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin: 14px 0;
+        }
+        .voucher-preview-section {
+            border: 1px solid #efe4cb;
+            border-radius: 14px;
+            padding: 14px;
+            background: #fffdf8;
+        }
+        .voucher-preview-section h4 {
+            color: #8b6914;
+            margin-bottom: 9px;
+            font-size: .9rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+        .voucher-preview-row {
+            display: grid;
+            grid-template-columns: 160px 1fr;
+            gap: 10px;
+            padding: 5px 0;
+            border-bottom: 1px dashed #eadfc8;
+        }
+        .voucher-preview-row:last-child { border-bottom: 0; }
+        .voucher-preview-label { color: #6a6170; font-size: .84rem; }
+        .voucher-preview-value { font-weight: 650; overflow-wrap: anywhere; }
+        .voucher-preview-terms {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            line-height: 1.72;
+            color: #242435;
+        }
+        .voucher-status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 9px;
+            border-radius: 999px;
+            background: rgba(39, 174, 96, .12);
+            color: var(--success);
+            font-weight: 800;
+            font-size: .78rem;
+        }
+        @media (max-width: 760px) {
+            .voucher-hero, .voucher-preview-head, .voucher-preview-grid, .voucher-section-grid {
+                grid-template-columns: 1fr;
+            }
+            .voucher-preview-title { text-align: left; }
+            .voucher-preview-row { grid-template-columns: 1fr; gap: 2px; }
+            .voucher-actions-bar { justify-content: stretch; }
+            .voucher-actions-bar .btn { flex: 1 1 180px; }
+        }
+
     </style>
 </head>
 <body>
@@ -2567,7 +2731,8 @@
                 activeChatUser: null,
                 activeChatGroup: null,
                 chatGroups: {},
-                inquiries: []
+                inquiries: [],
+                hotelVouchers: []
             };
 
             // --------------------------------------------------------------
@@ -3002,6 +3167,11 @@
                     canEditAtol: true,
                     canViewAtolHistory: true,
                     canExportAtolHistory: true,
+                    canCreateHotelVoucher: true,
+                    canEditHotelVoucher: true,
+                    canViewHotelVoucher: true,
+                    canDownloadHotelVoucherPDF: true,
+                    canViewVoucherHistory: true,
                     canViewCalendar: true,
                     canAddCalendarTasks: true,
                     canCreateTasks: true,
@@ -5502,6 +5672,7 @@
 
             function showDashboard() {
                 ensureAtolDashboardCard();
+                ensureHotelVoucherDashboardCards();
                 document.getElementById('dashboard').style.display = 'block';
                 document.getElementById('quoteBuilder').classList.remove('visible');
                 document.getElementById('quoteBuilder').style.display = 'none';
@@ -5509,6 +5680,7 @@
                 loadInvoices();
                 loadAgentTimes();
                 loadInquiries();
+                loadHotelVouchers();
                 updateQuoteCount();
                 updateInvoiceCount();
                 updateInquiryCount();
@@ -5644,6 +5816,12 @@
                         break;
                     case 'atol':
                         showAtolCenter();
+                        break;
+                    case 'hotelVoucher':
+                        showHotelVoucherForm();
+                        break;
+                    case 'voucherHistory':
+                        showVoucherHistory();
                         break;
                     case 'theme':
                         showThemeEditor();
@@ -8000,7 +8178,7 @@
 
             function showAddUser() {
                 showModal(
-                    '<h3>Add User</h3><div class="form-row"><div class="form-group"><label>Username *</label><input type="text" id="newUsername" /></div><div class="form-group"><label>Password *</label><input type="password" id="newPassword" /></div><div class="form-group"><label>Full Name</label><input type="text" id="newName" /></div><div class="form-group"><label>Email</label><input type="email" id="newEmail" /></div><div class="form-group"><label>Role</label><select id="newRole"><option value="agent">Agent</option><option value="manager">Manager</option><option value="accounts">Accounts</option><option value="readonly">Read Only</option></select></div></div><div class="form-group"><label>Permissions</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;"><label><input type="checkbox" class="perm-check" value="canCreateQuotes" checked /> Create Quotes</label><label><input type="checkbox" class="perm-check" value="canEditQuotes" checked /> Edit Quotes</label><label><input type="checkbox" class="perm-check" value="canViewInvoices" checked /> View Invoices</label><label><input type="checkbox" class="perm-check" value="canManageAccounts" /> Manage Accounts</label><label><input type="checkbox" class="perm-check" value="canViewQuoteHistory" checked /> Quote History (Own Quotes)</label><label><input type="checkbox" class="perm-check" value="canDeleteQuotes" /> Delete Quotes</label><label><input type="checkbox" class="perm-check" value="canDeleteInvoices" /> Delete Invoices</label><label><input type="checkbox" class="perm-check" value="canExportData" /> Export Data</label><label><input type="checkbox" class="perm-check" value="canAssignAgents" /> Assign Agents</label><label><input type="checkbox" class="perm-check" value="canEditInvoices" /> Edit Invoices</label><label><input type="checkbox" class="perm-check" value="canViewInquiries" checked /> View Inquiries (Own)</label><label><input type="checkbox" class="perm-check" value="canCreateInquiries" checked /> Create Inquiries</label><label><input type="checkbox" class="perm-check" value="canEditInquiries" /> Edit Inquiries</label><label><input type="checkbox" class="perm-check" value="canDeleteInquiries" /> Delete Inquiries</label><label><input type="checkbox" class="perm-check" value="canMakeInvoice" /> Make Invoice</label><label><input type="checkbox" class="perm-check" value="canEditInvoiceAgent" /> Edit Invoice (Agent)</label><label><input type="checkbox" class="perm-check" value="canAddAccountsFromInvoice" /> Add Accounts from Invoice</label><label><input type="checkbox" class="perm-check" value="canEditAccountsAgent" /> Edit Accounts (Agent)</label><label><input type="checkbox" class="perm-check" value="canCreateAtol" /> Create ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canEditAtol" /> Edit ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canViewAtolHistory" /> Certificate History</label><label><input type="checkbox" class="perm-check" value="canViewCalendar" checked /> View Calendar</label><label><input type="checkbox" class="perm-check" value="canAddCalendarTasks" checked /> Add Daily Task on Calendar</label><label><input type="checkbox" class="perm-check" value="canCreateTasks" checked /> Create Task</label><label><input type="checkbox" class="perm-check" value="canEditTasks" /> Edit Task</label><label><input type="checkbox" class="perm-check" value="canViewTaskHistory" checked /> View Task History</label><label><input type="checkbox" class="perm-check" value="canDeleteTasks" /> Delete Task</label><label><input type="checkbox" class="perm-check" value="canViewAgentMargins" /> View Agent Margins</label><label><input type="checkbox" class="perm-check" value="canAddAgentMargins" /> Add Agent Margins</label><label><input type="checkbox" class="perm-check" value="canEditAgentMargins" /> Edit Agent Margins</label><label><input type="checkbox" class="perm-check" value="canDeleteAgentMargins" /> Delete Agent Margins</label><label><input type="checkbox" class="perm-check" value="canManageAgents" /> Manage Agents</label><label><input type="checkbox" class="perm-check" value="canManageMonths" /> Manage Months</label></div></div><div class="modal-actions"><button class="btn btn-primary" id="btnCreateUser">Create</button><button class="btn btn-close-modal" data-close-modal>Cancel</button></div>'
+                    '<h3>Add User</h3><div class="form-row"><div class="form-group"><label>Username *</label><input type="text" id="newUsername" /></div><div class="form-group"><label>Password *</label><input type="password" id="newPassword" /></div><div class="form-group"><label>Full Name</label><input type="text" id="newName" /></div><div class="form-group"><label>Email</label><input type="email" id="newEmail" /></div><div class="form-group"><label>Role</label><select id="newRole"><option value="agent">Agent</option><option value="manager">Manager</option><option value="accounts">Accounts</option><option value="readonly">Read Only</option></select></div></div><div class="form-group"><label>Permissions</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;"><label><input type="checkbox" class="perm-check" value="canCreateQuotes" checked /> Create Quotes</label><label><input type="checkbox" class="perm-check" value="canEditQuotes" checked /> Edit Quotes</label><label><input type="checkbox" class="perm-check" value="canViewInvoices" checked /> View Invoices</label><label><input type="checkbox" class="perm-check" value="canManageAccounts" /> Manage Accounts</label><label><input type="checkbox" class="perm-check" value="canViewQuoteHistory" checked /> Quote History (Own Quotes)</label><label><input type="checkbox" class="perm-check" value="canDeleteQuotes" /> Delete Quotes</label><label><input type="checkbox" class="perm-check" value="canDeleteInvoices" /> Delete Invoices</label><label><input type="checkbox" class="perm-check" value="canExportData" /> Export Data</label><label><input type="checkbox" class="perm-check" value="canAssignAgents" /> Assign Agents</label><label><input type="checkbox" class="perm-check" value="canEditInvoices" /> Edit Invoices</label><label><input type="checkbox" class="perm-check" value="canViewInquiries" checked /> View Inquiries (Own)</label><label><input type="checkbox" class="perm-check" value="canCreateInquiries" checked /> Create Inquiries</label><label><input type="checkbox" class="perm-check" value="canEditInquiries" /> Edit Inquiries</label><label><input type="checkbox" class="perm-check" value="canDeleteInquiries" /> Delete Inquiries</label><label><input type="checkbox" class="perm-check" value="canMakeInvoice" /> Make Invoice</label><label><input type="checkbox" class="perm-check" value="canEditInvoiceAgent" /> Edit Invoice (Agent)</label><label><input type="checkbox" class="perm-check" value="canAddAccountsFromInvoice" /> Add Accounts from Invoice</label><label><input type="checkbox" class="perm-check" value="canEditAccountsAgent" /> Edit Accounts (Agent)</label><label><input type="checkbox" class="perm-check" value="canCreateAtol" /> Create ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canEditAtol" /> Edit ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canViewAtolHistory" /> Certificate History</label><label><input type="checkbox" class="perm-check" value="canCreateHotelVoucher" /> Create Hotel Voucher</label><label><input type="checkbox" class="perm-check" value="canEditHotelVoucher" /> Edit Hotel Voucher</label><label><input type="checkbox" class="perm-check" value="canViewHotelVoucher" /> View Hotel Voucher</label><label><input type="checkbox" class="perm-check" value="canDownloadHotelVoucherPDF" /> Download Hotel Voucher PDF</label><label><input type="checkbox" class="perm-check" value="canViewVoucherHistory" /> View Voucher History</label><label><input type="checkbox" class="perm-check" value="canViewCalendar" checked /> View Calendar</label><label><input type="checkbox" class="perm-check" value="canAddCalendarTasks" checked /> Add Daily Task on Calendar</label><label><input type="checkbox" class="perm-check" value="canCreateTasks" checked /> Create Task</label><label><input type="checkbox" class="perm-check" value="canEditTasks" /> Edit Task</label><label><input type="checkbox" class="perm-check" value="canViewTaskHistory" checked /> View Task History</label><label><input type="checkbox" class="perm-check" value="canDeleteTasks" /> Delete Task</label><label><input type="checkbox" class="perm-check" value="canViewAgentMargins" /> View Agent Margins</label><label><input type="checkbox" class="perm-check" value="canAddAgentMargins" /> Add Agent Margins</label><label><input type="checkbox" class="perm-check" value="canEditAgentMargins" /> Edit Agent Margins</label><label><input type="checkbox" class="perm-check" value="canDeleteAgentMargins" /> Delete Agent Margins</label><label><input type="checkbox" class="perm-check" value="canManageAgents" /> Manage Agents</label><label><input type="checkbox" class="perm-check" value="canManageMonths" /> Manage Months</label></div></div><div class="modal-actions"><button class="btn btn-primary" id="btnCreateUser">Create</button><button class="btn btn-close-modal" data-close-modal>Cancel</button></div>'
                     );
                 document.getElementById('btnCreateUser').addEventListener('click', async function() {
                     var username = document.getElementById('newUsername').value.trim();
@@ -8121,6 +8299,21 @@
                         '<label><input type="checkbox" class="edit-perm" value="canViewAtolHistory" ' +
                         (perms.canViewAtolHistory ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
                         ' /> Certificate History</label>' +
+                        '<label><input type="checkbox" class="edit-perm" value="canCreateHotelVoucher" ' +
+                        ((perms.canCreateHotelVoucher || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
+                        ' /> Create Hotel Voucher</label>' +
+                        '<label><input type="checkbox" class="edit-perm" value="canEditHotelVoucher" ' +
+                        ((perms.canEditHotelVoucher || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
+                        ' /> Edit Hotel Voucher</label>' +
+                        '<label><input type="checkbox" class="edit-perm" value="canViewHotelVoucher" ' +
+                        ((perms.canViewHotelVoucher || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
+                        ' /> View Hotel Voucher</label>' +
+                        '<label><input type="checkbox" class="edit-perm" value="canDownloadHotelVoucherPDF" ' +
+                        ((perms.canDownloadHotelVoucherPDF || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
+                        ' /> Download Hotel Voucher PDF</label>' +
+                        '<label><input type="checkbox" class="edit-perm" value="canViewVoucherHistory" ' +
+                        ((perms.canViewVoucherHistory || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
+                        ' /> View Voucher History</label>' +
                         '<label><input type="checkbox" class="edit-perm" value="canViewCalendar" ' +
                         (perms.canViewCalendar ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
                         ' /> View Calendar</label>' +
@@ -8207,6 +8400,420 @@
                     if (username !== 'Plan') renderUserManagement();
                 });
             }
+
+
+            // --------------------------------------------------------------
+            // 30H. HOTEL VOUCHERS (permissioned creation, history, PDF)
+            // --------------------------------------------------------------
+            function canCreateHotelVoucher() { return isAdmin() || hasPermission('canCreateHotelVoucher'); }
+            function canEditHotelVoucher(voucher) {
+                if (isAdmin()) return true;
+                if (!hasPermission('canEditHotelVoucher')) return false;
+                return !!voucher && voucher.createdBy === (STATE.currentUser && STATE.currentUser.username);
+            }
+            function canViewHotelVoucher(voucher) {
+                if (isAdmin()) return true;
+                if (!hasPermission('canViewHotelVoucher')) return false;
+                return !!voucher && voucher.createdBy === (STATE.currentUser && STATE.currentUser.username);
+            }
+            function canDownloadHotelVoucher(voucher) {
+                if (isAdmin()) return true;
+                if (!hasPermission('canDownloadHotelVoucherPDF')) return false;
+                return !!voucher && voucher.createdBy === (STATE.currentUser && STATE.currentUser.username);
+            }
+            function canViewVoucherHistory() { return isAdmin() || hasPermission('canViewVoucherHistory'); }
+
+            function ensureHotelVoucherDashboardCards() {
+                try {
+                    var grid = document.querySelector('.dashboard-grid');
+                    if (!grid) return;
+                    function addCard(action, perm, icon, title, desc, badgeId) {
+                        var card = grid.querySelector('.dash-card[data-action="' + action + '"]');
+                        if (!card) {
+                            card = document.createElement('div');
+                            card.className = 'dash-card';
+                            card.dataset.action = action;
+                            card.dataset.perm = perm;
+                            card.dataset.hotelVoucher = 'true';
+                            card.innerHTML = '<i class="' + icon + '"></i><h4>' + title + '</h4><p>' + desc + '</p>' + (badgeId ? '<span class="badge-count" id="' + badgeId + '">0</span>' : '');
+                            var users = grid.querySelector('.dash-card[data-action="users"]');
+                            if (users) grid.insertBefore(card, users); else grid.appendChild(card);
+                        }
+                        if (!card.__hotelVoucherClickBound) {
+                            card.addEventListener('click', function() { handleDashAction(action); });
+                            card.__hotelVoucherClickBound = true;
+                        }
+                    }
+                    addCard('hotelVoucher', 'canCreateHotelVoucher', 'fas fa-hotel', 'Hotel Voucher', 'Create professional hotel vouchers', null);
+                    addCard('voucherHistory', 'canViewVoucherHistory', 'fas fa-folder-open', 'Voucher History', 'View your saved hotel vouchers', 'voucherCountBadge');
+                    updateHotelVoucherCount();
+                } catch (e) { console.warn('Hotel voucher cards failed:', e); }
+            }
+
+            async function loadHotelVouchers(bypassCache) {
+                var all = await readData('hotelVouchers', 'ph_hotel_vouchers', bypassCache !== false) || {};
+                var arr = Object.values(all || {});
+                STATE.hotelVouchers = arr;
+                updateHotelVoucherCount(arr);
+                return arr;
+            }
+
+            function visibleHotelVouchers(list) {
+                list = list || STATE.hotelVouchers || [];
+                if (isAdmin()) return list;
+                var me = STATE.currentUser && STATE.currentUser.username;
+                return list.filter(function(v) { return v && v.createdBy === me; });
+            }
+
+            function updateHotelVoucherCount(list) {
+                var badge = document.getElementById('voucherCountBadge');
+                if (!badge) return;
+                var arr = visibleHotelVouchers(list || STATE.hotelVouchers || []);
+                badge.textContent = arr.length;
+            }
+
+            function generateHotelVoucherNumber() {
+                var d = new Date();
+                var y = String(d.getFullYear()).slice(-2);
+                var m = String(d.getMonth() + 1).padStart(2, '0');
+                var day = String(d.getDate()).padStart(2, '0');
+                var rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+                return 'HV-' + y + m + day + '-' + rand;
+            }
+
+            function emptyHotelVoucher() {
+                return {
+                    id: null,
+                    voucherNumber: generateHotelVoucherNumber(),
+                    invoiceNumber: '',
+                    customerName: '',
+                    customerEmail: '',
+                    customerPhone: '',
+                    hotelName: '',
+                    roomType: '',
+                    hotelConfirmationNumber: '',
+                    checkInDate: '',
+                    checkOutDate: '',
+                    passengerCount: '',
+                    terms: '',
+                    status: 'Saved',
+                    createdAt: getNowISO(),
+                    updatedAt: getNowISO(),
+                    createdBy: STATE.currentUser ? STATE.currentUser.username : '',
+                    createdByName: STATE.currentUser ? (STATE.currentUser.name || STATE.currentUser.username) : ''
+                };
+            }
+
+            function getHotelVoucherFormData(existing) {
+                existing = existing || {};
+                var now = getNowISO();
+                return {
+                    id: existing.id || null,
+                    voucherNumber: (document.getElementById('hvVoucherNumber') && document.getElementById('hvVoucherNumber').value ? document.getElementById('hvVoucherNumber').value.trim() : existing.voucherNumber) || generateHotelVoucherNumber(),
+                    invoiceNumber: (document.getElementById('hvInvoiceNumber').value || '').trim(),
+                    customerName: (document.getElementById('hvCustomerName').value || '').trim(),
+                    customerEmail: (document.getElementById('hvCustomerEmail').value || '').trim(),
+                    customerPhone: (document.getElementById('hvCustomerPhone').value || '').trim(),
+                    hotelName: (document.getElementById('hvHotelName').value || '').trim(),
+                    roomType: (document.getElementById('hvRoomType').value || '').trim(),
+                    hotelConfirmationNumber: (document.getElementById('hvConfirmationNumber').value || '').trim(),
+                    checkInDate: document.getElementById('hvCheckInDate').value || '',
+                    checkOutDate: document.getElementById('hvCheckOutDate').value || '',
+                    passengerCount: (document.getElementById('hvPassengerCount').value || '').trim(),
+                    terms: document.getElementById('hvTerms').value || '',
+                    status: document.getElementById('hvStatus').value || 'Saved',
+                    createdAt: existing.createdAt || now,
+                    updatedAt: now,
+                    createdBy: existing.createdBy || (STATE.currentUser ? STATE.currentUser.username : ''),
+                    createdByName: existing.createdByName || (STATE.currentUser ? (STATE.currentUser.name || STATE.currentUser.username) : '')
+                };
+            }
+
+            async function saveHotelVoucher(voucher) {
+                var all = await readData('hotelVouchers', 'ph_hotel_vouchers', true) || {};
+                if (!voucher.id) voucher.id = genId();
+                all[voucher.id] = voucher;
+                await writeData('hotelVouchers/' + voucher.id, voucher, null);
+                await writeData('hotelVouchers', all, 'ph_hotel_vouchers');
+                STATE.hotelVouchers = Object.values(all);
+                updateHotelVoucherCount();
+                return voucher;
+            }
+
+            async function getHotelVoucherById(id) {
+                var all = await readData('hotelVouchers', 'ph_hotel_vouchers', true) || {};
+                var voucher = all[id] || (STATE.hotelVouchers || []).find(function(v) { return v && v.id === id; });
+                if (voucher && !voucher.id) voucher.id = id;
+                return voucher || null;
+            }
+
+            function hotelVoucherStatusOptions(value) {
+                var opts = ['Saved', 'Issued', 'Amended', 'Cancelled'];
+                return opts.map(function(o) { return '<option value="' + o + '" ' + (value === o ? 'selected' : '') + '>' + o + '</option>'; }).join('');
+            }
+
+            function showHotelVoucherForm(id) {
+                (async function() {
+                    var existing = id ? await getHotelVoucherById(id) : null;
+                    if (id && !existing) { showToast('Voucher not found.', 'error'); return; }
+                    if (id) {
+                        if (!canEditHotelVoucher(existing)) { showToast('You do not have permission to edit this voucher.', 'error'); return; }
+                    } else if (!canCreateHotelVoucher()) {
+                        showToast('You do not have permission to create hotel vouchers.', 'error');
+                        return;
+                    }
+                    var v = existing || emptyHotelVoucher();
+                    var isExisting = !!v.id;
+                    var html =
+                        '<div class="voucher-form-shell">' +
+                        '<div class="voucher-hero"><div><h3><i class="fas fa-hotel" style="color:var(--primary);"></i> Hotel Voucher</h3>' +
+                        '<p class="text-muted">Create a polished hotel voucher with secure storage, permission-controlled actions, and multi-page PDF support.</p></div>' +
+                        '<div class="voucher-number-pill"><label style="display:block;font-size:.68rem;opacity:.85;margin-bottom:2px;">Voucher No.</label><input type="text" id="hvVoucherNumber" value="' + escapeHTML(v.voucherNumber || '') + '" style="width:180px;border:0;border-radius:999px;padding:7px 10px;font-weight:800;letter-spacing:.04em;color:#1e1e2a;background:#fff;" /></div></div>' +
+                        '<div class="voucher-section-grid">' +
+                        '<div class="form-card"><h3><i class="fas fa-user"></i> Customer Information</h3><div class="form-row">' +
+                        '<div class="form-group"><label>Customer Name <span class="required">*</span></label><input type="text" id="hvCustomerName" value="' + escapeHTML(v.customerName) + '" /></div>' +
+                        '<div class="form-group"><label>Customer Email Address</label><input type="email" id="hvCustomerEmail" value="' + escapeHTML(v.customerEmail) + '" /></div>' +
+                        '<div class="form-group"><label>Customer Contact Number</label><input type="text" id="hvCustomerPhone" value="' + escapeHTML(v.customerPhone) + '" /></div>' +
+                        '</div></div>' +
+                        '<div class="form-card"><h3><i class="fas fa-bookmark"></i> Booking Information</h3><div class="form-row">' +
+                        '<div class="form-group"><label>Invoice Number <span class="required">*</span></label><input type="text" id="hvInvoiceNumber" value="' + escapeHTML(v.invoiceNumber) + '" /></div>' +
+                        '<div class="form-group"><label>Hotel Name <span class="required">*</span></label><input type="text" id="hvHotelName" value="' + escapeHTML(v.hotelName) + '" /></div>' +
+                        '<div class="form-group"><label>Room Type</label><input type="text" id="hvRoomType" value="' + escapeHTML(v.roomType) + '" /></div>' +
+                        '<div class="form-group"><label>Hotel Confirmation Number</label><input type="text" id="hvConfirmationNumber" value="' + escapeHTML(v.hotelConfirmationNumber) + '" /></div>' +
+                        '<div class="form-group"><label>Check-in Date</label><input type="date" id="hvCheckInDate" value="' + escapeHTML(v.checkInDate) + '" /></div>' +
+                        '<div class="form-group"><label>Check-out Date</label><input type="date" id="hvCheckOutDate" value="' + escapeHTML(v.checkOutDate) + '" /></div>' +
+                        '<div class="form-group"><label>Total Number of Passengers</label><input type="number" min="0" id="hvPassengerCount" value="' + escapeHTML(v.passengerCount) + '" /></div>' +
+                        '<div class="form-group"><label>Status</label><select id="hvStatus">' + hotelVoucherStatusOptions(v.status || 'Saved') + '</select></div>' +
+                        '</div></div></div>' +
+                        '<div class="form-card voucher-terms-card mt-16"><h3><i class="fas fa-file-lines"></i> Terms & Conditions</h3>' +
+                        '<p class="text-muted text-sm mb-8">Enter hotel terms, important notes, cancellation policy, special instructions, and any additional information. No character limit is applied.</p>' +
+                        '<textarea id="hvTerms" class="voucher-terms-box" rows="16" spellcheck="true" placeholder="Hotel Terms & Conditions\nImportant Notes\nCancellation Policy\nSpecial Instructions\nAdditional Information">' + escapeHTML(v.terms || '') + '</textarea></div>' +
+                        '<div class="voucher-actions-bar">' +
+                        ((canCreateHotelVoucher() || (isExisting && canEditHotelVoucher(v))) ? '<button class="btn btn-primary" id="btnSaveHotelVoucher"><i class="fas fa-save"></i> Save Voucher</button>' : '') +
+                        (hasPermission('canViewHotelVoucher') || isAdmin() ? '<button class="btn btn-success" id="btnViewHotelVoucher"><i class="fas fa-eye"></i> View Voucher</button>' : '') +
+                        (hasPermission('canDownloadHotelVoucherPDF') || isAdmin() ? '<button class="btn btn-success" id="btnDownloadHotelVoucher"><i class="fas fa-file-pdf"></i> Download Voucher (PDF)</button>' : '') +
+                        (isExisting && canEditHotelVoucher(v) ? '<button class="btn btn-outline" id="btnEditHotelVoucher"><i class="fas fa-pen"></i> Edit Voucher</button>' : '') +
+                        '<button class="btn btn-outline" id="btnBackHotelVoucher"><i class="fas fa-arrow-left"></i> Back</button>' +
+                        '</div></div>';
+                    showModal(html);
+
+                    var current = v;
+                    async function saveFromForm(showSuccess) {
+                        var data = getHotelVoucherFormData(current);
+                        if (!data.customerName || !data.invoiceNumber || !data.hotelName) {
+                            showToast('Customer name, invoice number and hotel name are required.', 'error');
+                            return null;
+                        }
+                        if (data.id && !canEditHotelVoucher(current)) { showToast('Permission denied.', 'error'); return null; }
+                        if (!data.id && !canCreateHotelVoucher()) { showToast('Permission denied.', 'error'); return null; }
+                        current = await saveHotelVoucher(data);
+                        if (showSuccess !== false) showToast('Hotel voucher saved.', 'success');
+                        return current;
+                    }
+                    var backBtn = document.getElementById('btnBackHotelVoucher');
+                    if (backBtn) backBtn.addEventListener('click', function() { window.closeModal(); showDashboard(); });
+                    var saveBtn = document.getElementById('btnSaveHotelVoucher');
+                    if (saveBtn) saveBtn.addEventListener('click', async function() {
+                        var saved = await saveFromForm(true);
+                        if (saved) showHotelVoucherForm(saved.id);
+                    });
+                    var viewBtn = document.getElementById('btnViewHotelVoucher');
+                    if (viewBtn) viewBtn.addEventListener('click', async function() {
+                        var data = current.id ? getHotelVoucherFormData(current) : await saveFromForm(true);
+                        if (!data) return;
+                        if (!canViewHotelVoucher(data)) { showToast('You do not have permission to view this voucher.', 'error'); return; }
+                        showHotelVoucherPreview(data);
+                    });
+                    var dlBtn = document.getElementById('btnDownloadHotelVoucher');
+                    if (dlBtn) dlBtn.addEventListener('click', async function() {
+                        var data = current.id ? getHotelVoucherFormData(current) : await saveFromForm(true);
+                        if (!data) return;
+                        if (!canDownloadHotelVoucher(data)) { showToast('You do not have permission to download this voucher.', 'error'); return; }
+                        await downloadHotelVoucherPDF(data);
+                    });
+                    var editBtn = document.getElementById('btnEditHotelVoucher');
+                    if (editBtn) editBtn.addEventListener('click', function() { showToast('Voucher is open for editing.', 'info'); });
+                })();
+            }
+
+            function hotelVoucherPreviewHTML(v) {
+                var brand = STATE.branding || {};
+                var logo = brand.logo || document.getElementById('appLogo').src || '';
+                function row(label, value) { return '<div class="voucher-preview-row"><div class="voucher-preview-label">' + label + '</div><div class="voucher-preview-value">' + escapeHTML(value || '—') + '</div></div>'; }
+                return '<div class="voucher-preview-card">' +
+                    '<div class="voucher-preview-head"><img class="voucher-preview-logo" src="' + escapeHTML(logo) + '" alt="Company Logo" />' +
+                    '<div><h3 style="margin:0;color:#172033;">' + escapeHTML(brand.companyName || 'Plan Holidays') + '</h3>' +
+                    '<div style="color:#61576a;font-size:.88rem;line-height:1.55;">' + escapeHTML(brand.address || 'London, UK') + '<br>' + escapeHTML(brand.telephone || '') + ' · ' + escapeHTML(brand.email || '') + (brand.website ? '<br>' + escapeHTML(brand.website) : '') + '</div></div>' +
+                    '<div class="voucher-preview-title">HOTEL VOUCHER</div></div>' +
+                    '<div class="voucher-preview-body">' +
+                    '<div class="voucher-preview-grid">' +
+                    '<div class="voucher-preview-section"><h4>Voucher Details</h4>' + row('Voucher Number', v.voucherNumber) + row('Invoice Number', v.invoiceNumber) + row('Issue Date', formatDateDisplay(v.createdAt || getToday())) + row('Status', v.status || 'Saved') + '</div>' +
+                    '<div class="voucher-preview-section"><h4>Customer Details</h4>' + row('Customer Name', v.customerName) + row('Email Address', v.customerEmail) + row('Contact Number', v.customerPhone) + '</div>' +
+                    '<div class="voucher-preview-section" style="grid-column:1/-1;"><h4>Hotel Details</h4>' + row('Hotel Name', v.hotelName) + row('Room Type', v.roomType) + row('Hotel Confirmation No.', v.hotelConfirmationNumber) + row('Check-in Date', formatDateDisplay(v.checkInDate)) + row('Check-out Date', formatDateDisplay(v.checkOutDate)) + row('Number of Passengers', v.passengerCount) + '</div>' +
+                    '</div><div class="voucher-preview-section"><h4>Terms & Conditions</h4><div class="voucher-preview-terms">' + escapeHTML(v.terms || '—') + '</div></div>' +
+                    '<div style="margin-top:16px;color:#61576a;font-size:.86rem;text-align:center;">Thank you for choosing ' + escapeHTML(brand.companyName || 'Plan Holidays') + '. This voucher is computer generated and does not require a signature.</div>' +
+                    '</div></div>';
+            }
+
+            function showHotelVoucherPreview(voucher) {
+                var v = voucher;
+                if (!canViewHotelVoucher(v)) { showToast('Permission denied.', 'error'); return; }
+                showModal('<h3><i class="fas fa-eye"></i> Hotel Voucher Preview</h3><div style="max-height:68vh;overflow:auto;padding:8px;background:var(--bg);border-radius:16px;">' + hotelVoucherPreviewHTML(v) + '</div><div class="modal-actions">' +
+                    (canDownloadHotelVoucher(v) ? '<button class="btn btn-success" onclick="window._downloadHotelVoucherFromPreview(\'' + v.id + '\')"><i class="fas fa-file-pdf"></i> Download PDF</button>' : '') +
+                    (canEditHotelVoucher(v) ? '<button class="btn btn-primary" onclick="window._editHotelVoucherFromPreview(\'' + v.id + '\')"><i class="fas fa-pen"></i> Edit</button>' : '') +
+                    '<button class="btn btn-close-modal" data-close-modal>Close</button></div>');
+                window._downloadHotelVoucherFromPreview = async function(id2) {
+                    var found = await getHotelVoucherById(id2);
+                    if (found) await downloadHotelVoucherPDF(found);
+                };
+                window._editHotelVoucherFromPreview = function(id2) { window.closeModal(); showHotelVoucherForm(id2); };
+            }
+
+            async function showVoucherHistory() {
+                if (!canViewVoucherHistory()) { showToast('You do not have permission to view voucher history.', 'error'); return; }
+                var list = visibleHotelVouchers(await loadHotelVouchers(true));
+                list.sort(function(a, b) { return new Date(b.createdAt || 0) - new Date(a.createdAt || 0); });
+                var showAgent = isAdmin();
+                var rows = list.map(function(v) {
+                    var actions = '<div class="actions-cell">';
+                    if (canViewHotelVoucher(v)) actions += '<button class="btn btn-sm btn-primary" title="View" onclick="window._viewHotelVoucher(\'' + v.id + '\')"><i class="fas fa-eye"></i></button>';
+                    if (canEditHotelVoucher(v)) actions += '<button class="btn btn-sm btn-outline" title="Edit" onclick="window._editHotelVoucher(\'' + v.id + '\')"><i class="fas fa-pen"></i></button>';
+                    if (canDownloadHotelVoucher(v)) actions += '<button class="btn btn-sm btn-success" title="Download PDF" onclick="window._downloadHotelVoucher(\'' + v.id + '\')"><i class="fas fa-file-pdf"></i></button>';
+                    if (isAdmin()) actions += '<button class="btn btn-sm btn-danger" title="Delete" onclick="window._deleteHotelVoucher(\'' + v.id + '\')"><i class="fas fa-trash"></i></button>';
+                    actions += '</div>';
+                    return '<tr>' +
+                        '<td>' + escapeHTML(v.voucherNumber || '') + '</td>' +
+                        '<td>' + escapeHTML(v.invoiceNumber || '') + '</td>' +
+                        '<td>' + escapeHTML(v.customerName || '') + '</td>' +
+                        '<td>' + escapeHTML(v.hotelName || '') + '</td>' +
+                        '<td>' + escapeHTML(formatDateDisplay(v.checkInDate)) + '</td>' +
+                        '<td>' + escapeHTML(formatDateDisplay(v.checkOutDate)) + '</td>' +
+                        '<td>' + escapeHTML(formatDateDisplay(v.createdAt)) + '</td>' +
+                        (showAgent ? '<td>' + escapeHTML(v.createdByName || v.createdBy || '') + '</td>' : '') +
+                        '<td><span class="voucher-status-chip"><i class="fas fa-circle-check"></i>' + escapeHTML(v.status || 'Saved') + '</span></td>' +
+                        '<td>' + actions + '</td></tr>';
+                }).join('') || '<tr><td colspan="' + (showAgent ? 10 : 9) + '" class="text-center text-muted">No hotel vouchers found.</td></tr>';
+                var html = '<h3><i class="fas fa-folder-open"></i> Voucher History' + (isAdmin() ? ' (All Agents)' : ' (Yours)') + '</h3>' +
+                    '<p class="text-muted text-sm">Agents can only see vouchers they personally created.</p>' +
+                    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">' +
+                    (canCreateHotelVoucher() ? '<button class="btn btn-primary" onclick="window._newHotelVoucher()"><i class="fas fa-plus"></i> New Hotel Voucher</button>' : '') +
+                    '<button class="btn btn-outline" onclick="window._refreshVoucherHistory()"><i class="fas fa-rotate"></i> Refresh</button></div>' +
+                    '<div class="history-table-wrap"><table><thead><tr><th>Voucher Number</th><th>Invoice Number</th><th>Customer Name</th><th>Hotel Name</th><th>Check-in Date</th><th>Check-out Date</th><th>Date Created</th>' + (showAgent ? '<th>Agent</th>' : '') + '<th>Status</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+                    '<div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
+                showModal(html);
+                window._newHotelVoucher = function() { window.closeModal(); showHotelVoucherForm(); };
+                window._refreshVoucherHistory = function() { window.closeModal(); showVoucherHistory(); };
+                window._viewHotelVoucher = async function(id2) { var v = await getHotelVoucherById(id2); if (v) showHotelVoucherPreview(v); };
+                window._editHotelVoucher = function(id2) { window.closeModal(); showHotelVoucherForm(id2); };
+                window._downloadHotelVoucher = async function(id2) { var v = await getHotelVoucherById(id2); if (v) await downloadHotelVoucherPDF(v); };
+                window._deleteHotelVoucher = async function(id2) {
+                    if (!isAdmin()) return showToast('Admin access required.', 'error');
+                    if (!confirm('Delete this hotel voucher?')) return;
+                    var all = await readData('hotelVouchers', 'ph_hotel_vouchers', true) || {};
+                    delete all[id2];
+                    await removeData('hotelVouchers/' + id2, null);
+                    await writeData('hotelVouchers', all, 'ph_hotel_vouchers');
+                    STATE.hotelVouchers = Object.values(all);
+                    showToast('Voucher deleted.', 'success');
+                    window.closeModal(); showVoucherHistory();
+                };
+            }
+
+            function addHotelVoucherPdfText(pdf, text, x, y, options) {
+                options = options || {};
+                var maxWidth = options.maxWidth || 510;
+                var lineHeight = options.lineHeight || 13;
+                var bottom = options.bottom || 760;
+                var newPage = options.newPage;
+                var parts = String(text == null ? '' : text).split('\n');
+                parts.forEach(function(part, idx) {
+                    var lines = part === '' ? [''] : pdf.splitTextToSize(part, maxWidth);
+                    lines.forEach(function(line) {
+                        if (y + lineHeight > bottom) { y = newPage(); }
+                        pdf.text(line || ' ', x, y);
+                        y += lineHeight;
+                    });
+                    if (idx < parts.length - 1 && part !== '') {
+                        if (y + lineHeight > bottom) { y = newPage(); }
+                    }
+                });
+                return y;
+            }
+
+            async function downloadHotelVoucherPDF(v) {
+                if (!canDownloadHotelVoucher(v)) { showToast('You do not have permission to download this voucher.', 'error'); return; }
+                await loadBranding();
+                var brand = STATE.branding || {};
+                var jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+                if (!jsPDFCtor) {
+                    var el = document.createElement('div');
+                    el.innerHTML = hotelVoucherPreviewHTML(v);
+                    await html2pdf().set({ margin: [10, 10, 14, 10], filename: 'Hotel_Voucher_' + (v.voucherNumber || 'voucher') + '.pdf', html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['css', 'legacy'], avoid: ['.voucher-preview-row'] } }).from(el).save();
+                    return;
+                }
+                var pdf = new jsPDFCtor({ unit: 'pt', format: 'a4', orientation: 'portrait' });
+                var pageW = pdf.internal.pageSize.getWidth();
+                var pageH = pdf.internal.pageSize.getHeight();
+                var margin = 42, bottom = pageH - 72, y = 112;
+                var gold = [184, 134, 11], dark = [31, 34, 48], muted = [98, 94, 112], light = [248, 244, 235];
+                function header() {
+                    pdf.setFillColor.apply(pdf, light); pdf.rect(0, 0, pageW, 86, 'F');
+                    pdf.setDrawColor.apply(pdf, gold); pdf.setLineWidth(2); pdf.line(margin, 84, pageW - margin, 84);
+                    var logo = brand.logo || (document.getElementById('appLogo') && document.getElementById('appLogo').src) || '';
+                    try { if (logo && /^data:image\/(png|jpeg|jpg|webp)/i.test(logo)) pdf.addImage(logo, logo.indexOf('png') !== -1 ? 'PNG' : 'JPEG', margin, 20, 58, 42); else throw new Error('fallback'); }
+                    catch (_) { pdf.setFillColor.apply(pdf, gold); pdf.roundedRect(margin, 20, 52, 42, 7, 7, 'F'); pdf.setTextColor(255,255,255); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(18); pdf.text('PH', margin + 13, 48); }
+                    pdf.setTextColor.apply(pdf, dark); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(16); pdf.text(String(brand.companyName || 'Plan Holidays'), margin + 70, 32);
+                    pdf.setTextColor.apply(pdf, muted); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5);
+                    var contact = [brand.address || 'London, UK', brand.telephone || '', brand.email || '', brand.website || ''].filter(Boolean).join('  •  ');
+                    pdf.text(pdf.splitTextToSize(contact, pageW - margin * 2 - 180), margin + 70, 47);
+                    pdf.setTextColor.apply(pdf, gold); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(18); pdf.text('HOTEL VOUCHER', pageW - margin, 38, { align: 'right' });
+                    pdf.setTextColor.apply(pdf, muted); pdf.setFontSize(8); pdf.text('Computer generated travel document', pageW - margin, 54, { align: 'right' });
+                }
+                function footer() {
+                    pdf.setDrawColor(225, 218, 204); pdf.line(margin, pageH - 52, pageW - margin, pageH - 52);
+                    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor.apply(pdf, muted);
+                    var support = 'Support: ' + (brand.email || 'info@planholidays.co.uk') + (brand.telephone ? ' | ' + brand.telephone : '');
+                    pdf.text(support, margin, pageH - 34);
+                    pdf.text('Thank you for choosing ' + (brand.companyName || 'Plan Holidays') + '. This voucher is computer generated and does not require a signature.', margin, pageH - 21);
+                }
+                function newPage() { footer(); pdf.addPage(); header(); return 112; }
+                function ensure(h) { if (y + h > bottom) y = newPage(); }
+                function sectionTitle(title) { ensure(28); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11); pdf.setTextColor.apply(pdf, gold); pdf.text(title.toUpperCase(), margin, y); y += 14; pdf.setDrawColor(232, 222, 201); pdf.line(margin, y, pageW - margin, y); y += 12; }
+                function field(label, value, x, width) {
+                    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor.apply(pdf, muted); pdf.text(label, x, y);
+                    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10); pdf.setTextColor.apply(pdf, dark);
+                    var lines = pdf.splitTextToSize(String(value || '—'), width);
+                    pdf.text(lines, x, y + 13);
+                    return Math.max(30, 13 + (lines.length * 12));
+                }
+                function twoCol(a, b) {
+                    ensure(46); var w = (pageW - margin * 2 - 24) / 2; var y0 = y;
+                    var h1 = field(a[0], a[1], margin, w); var h2 = field(b[0], b[1], margin + w + 24, w);
+                    y = y0 + Math.max(h1, h2) + 8;
+                }
+                header();
+                sectionTitle('Voucher Details');
+                twoCol(['Voucher Number', v.voucherNumber], ['Invoice Number', v.invoiceNumber]);
+                twoCol(['Issue Date', formatDateDisplay(v.createdAt || getToday())], ['Status', v.status || 'Saved']);
+                sectionTitle('Customer Details');
+                twoCol(['Customer Name', v.customerName], ['Email Address', v.customerEmail]);
+                twoCol(['Contact Number', v.customerPhone], ['Agent', v.createdByName || v.createdBy || '']);
+                sectionTitle('Hotel Details');
+                twoCol(['Hotel Name', v.hotelName], ['Room Type', v.roomType]);
+                twoCol(['Hotel Confirmation Number', v.hotelConfirmationNumber], ['Number of Passengers', v.passengerCount]);
+                twoCol(['Check-in Date', formatDateDisplay(v.checkInDate)], ['Check-out Date', formatDateDisplay(v.checkOutDate)]);
+                sectionTitle('Terms & Conditions');
+                pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9.3); pdf.setTextColor(40, 40, 50);
+                y = addHotelVoucherPdfText(pdf, v.terms || '—', margin, y, { maxWidth: pageW - margin * 2, lineHeight: 13.2, bottom: bottom, newPage: newPage });
+                footer();
+                var total = pdf.internal.getNumberOfPages();
+                for (var i = 1; i <= total; i++) {
+                    pdf.setPage(i); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor.apply(pdf, muted);
+                    pdf.text('Page ' + i + ' of ' + total, pageW - margin, pageH - 21, { align: 'right' });
+                }
+                pdf.save('Hotel_Voucher_' + (v.voucherNumber || 'voucher') + '.pdf');
+            }
+
 
             // --------------------------------------------------------------
             // 31. EVENT BINDING
@@ -15532,6 +16139,7 @@
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
