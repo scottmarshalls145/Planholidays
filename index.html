@@ -17118,6 +17118,312 @@
                 document.addEventListener('visibilitychange', function(){ if (!document.hidden) _attachLive(); });
                 document.addEventListener('DOMContentLoaded', function(){ setTimeout(_attachLive, 1200); });
             })();
+
+            // Final targeted realtime chat repair: keep open conversations live and
+            // show only same-day message notifications to non-admin agents.
+            (function _mrFinalRealtimeMessengerRepair(){
+                var _ref = null;
+                var _poll = null;
+                var _user = '';
+                var _latest = {};
+                var _renderTimer = null;
+                var _contactsTimer = null;
+                var _lastToastTs = Date.now();
+
+                function _me(){ return STATE.currentUser && STATE.currentUser.username; }
+                function _isAdminUser(){ try { return typeof isAdmin === 'function' && isAdmin(); } catch (_) { return false; } }
+                function _vals(obj){
+                    if (!obj) return [];
+                    if (Array.isArray(obj)) return obj.map(function(m, i){
+                        if (!m) return null;
+                        var x = Object.assign({}, m);
+                        if (!x._key) x._key = x._id || x.id || String(i);
+                        return x;
+                    }).filter(Boolean);
+                    return Object.keys(obj).map(function(k){
+                        var m = obj[k];
+                        if (!m) return null;
+                        var x = Object.assign({}, m);
+                        if (!x._key) x._key = k;
+                        return x;
+                    }).filter(Boolean);
+                }
+                function _dayKey(value){
+                    try { return toLocalDateKey(value); } catch (_) {
+                        var d = new Date(value || 0);
+                        if (isNaN(d.getTime())) return '';
+                        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                    }
+                }
+                function _todayOnly(m){
+                    if (_isAdminUser()) return true;
+                    var today = (typeof getToday === 'function') ? getToday() : _dayKey(new Date());
+                    return _dayKey(m && m.timestamp) === today;
+                }
+                function _chatContext(){
+                    if (STATE.activeChatPair) return { kind:'pair', value:STATE.activeChatPair };
+                    if (STATE.activeChatGroup) return { kind:'group', value:STATE.activeChatGroup };
+                    if (STATE.activeChatUser) return { kind:'user', value:STATE.activeChatUser };
+                    return null;
+                }
+                function _privateBetween(m, a, b){
+                    return m && !m.groupId && m.to !== 'group' && ((m.from === a && m.to === b) || (m.from === b && m.to === a));
+                }
+                function _groupMembers(groupId, m){
+                    var fromMessage = Array.isArray(m && m.members) ? m.members : [];
+                    var fromState = ((STATE.chatGroups || {})[groupId] || {}).members || [];
+                    return fromMessage.length ? fromMessage : fromState;
+                }
+                function _visibleInOpenChat(m, ctx, me){
+                    if (!m || m.deleted || !ctx || !me) return false;
+                    if (ctx.kind === 'pair') {
+                        if (!_isAdminUser()) return false;
+                        var p = String(ctx.value || '').split('__');
+                        return p.length === 2 && _privateBetween(m, p[0], p[1]);
+                    }
+                    if (ctx.kind === 'group') {
+                        if (m.groupId !== ctx.value) return false;
+                        var members = _groupMembers(ctx.value, m);
+                        return _isAdminUser() || m.from === me || members.indexOf(me) !== -1;
+                    }
+                    return !m.groupId && ((m.from === me && m.to === ctx.value) || (m.from === ctx.value && m.to === me));
+                }
+                function _incomingForMe(m){
+                    var me = _me();
+                    if (!me || !m || m.deleted || m.from === me || !_todayOnly(m)) return false;
+                    if (m.groupId) {
+                        var members = _groupMembers(m.groupId, m);
+                        if (!_isAdminUser() && members.indexOf(me) === -1) return false;
+                        return !(m.readBy && m.readBy[me]);
+                    }
+                    return m.to === me && !m.read;
+                }
+                function _setBadge(n){
+                    try { if (typeof ensureNotificationUI === 'function') ensureNotificationUI(); } catch (_) {}
+                    ['chatNotifyBadge','chatCardNotifyBadge'].forEach(function(id){
+                        var e = document.getElementById(id);
+                        if (e) { e.style.display = n ? 'inline-flex' : 'none'; e.textContent = n; }
+                    });
+                }
+                function _cache(raw){
+                    _latest = raw || {};
+                    try { STATE._cache = STATE._cache || {}; STATE._cache['chatMessages_ph_chat_messages'] = _latest; } catch (_) {}
+                    try { localStorage.setItem('ph_chat_messages', JSON.stringify(_latest)); } catch (_) {}
+                }
+                async function _fetch(){
+                    try {
+                        if (firebaseConnected && db) {
+                            var snap = await db.ref('chatMessages').once('value');
+                            return snap.val() || {};
+                        }
+                    } catch (_) {}
+                    try { return await readData('chatMessages', 'ph_chat_messages', true) || {}; } catch (_) { return {}; }
+                }
+                function _markRead(list){
+                    var me = _me();
+                    if (!me || !list || !list.length) return;
+                    try {
+                        if (firebaseConnected && db) {
+                            list.forEach(function(m){
+                                if (!m || !m._key || m.from === me) return;
+                                if (m.groupId) db.ref('chatMessages/' + m._key + '/readBy/' + me).set(true);
+                                else if (m.to === me && !m.read) db.ref('chatMessages/' + m._key + '/read').set(true);
+                            });
+                        } else {
+                            var changed = false;
+                            var all = _latest || {};
+                            _vals(all).forEach(function(m){
+                                if (!m || m.from === me) return;
+                                if (m.groupId && _incomingForMe(m)) { m.readBy = m.readBy || {}; m.readBy[me] = true; changed = true; }
+                                else if (m.to === me && !m.read) { m.read = true; changed = true; }
+                            });
+                            if (changed) localStorage.setItem('ph_chat_messages', JSON.stringify(all));
+                        }
+                    } catch (_) {}
+                }
+                function _renderOpenChat(){
+                    var container = document.getElementById('chatMessagesContainer');
+                    if (!container) return;
+                    var me = _me(), ctx = _chatContext();
+                    if (!me || !ctx) return;
+                    var nearBottom = (container.scrollHeight - container.scrollTop - container.clientHeight) < 120;
+                    var list = _vals(_latest).filter(function(m){ return _visibleInOpenChat(m, ctx, me); });
+                    list.sort(function(a, b){ return new Date(a.timestamp || 0) - new Date(b.timestamp || 0); });
+                    STATE.chatMessages = list;
+                    try { renderChatMessages(list); } catch (_) {}
+                    if (nearBottom) setTimeout(function(){ container.scrollTop = Math.max(0, container.scrollHeight - container.clientHeight); }, 30);
+                    _markRead(list);
+                }
+                function _refreshContacts(){
+                    if (!document.getElementById('chatContactsList') || typeof loadChatContacts !== 'function') return;
+                    if (_contactsTimer) clearTimeout(_contactsTimer);
+                    _contactsTimer = setTimeout(function(){ try { loadChatContacts(); } catch (_) {} }, 250);
+                }
+                function _handle(raw){
+                    _cache(raw || {});
+                    var incoming = _vals(_latest).filter(_incomingForMe);
+                    _setBadge(incoming.length);
+                    incoming.sort(function(a, b){ return new Date(b.timestamp || 0) - new Date(a.timestamp || 0); });
+                    var newest = incoming[0], ts = newest ? new Date(newest.timestamp || 0).getTime() : 0;
+                    if (newest && ts > _lastToastTs) {
+                        _lastToastTs = ts;
+                        try { showToast('New message from ' + (newest.from || 'user'), 'info', 5000); } catch (_) {}
+                        try {
+                            if ('Notification' in window) {
+                                if (Notification.permission === 'default') Notification.requestPermission();
+                                if (Notification.permission === 'granted') new Notification('New portal message', { body:(newest.from || 'User') + ': ' + (newest.message || '[Image]') });
+                            }
+                        } catch (_) {}
+                    }
+                    if (_renderTimer) clearTimeout(_renderTimer);
+                    _renderTimer = setTimeout(_renderOpenChat, 25);
+                    _refreshContacts();
+                }
+                async function _pollOnce(){ if (_me()) _handle(await _fetch()); }
+                function _detach(){
+                    if (_ref && _ref.off) { try { _ref.off(); } catch (_) {} }
+                    _ref = null;
+                    if (_poll) { clearInterval(_poll); _poll = null; }
+                    _user = '';
+                }
+                function _attach(){
+                    var me = _me();
+                    if (!me) { _detach(); return; }
+                    if (_user && _user !== me) _detach();
+                    _user = me;
+                    if (!_ref && firebaseConnected && db) {
+                        try {
+                            _ref = db.ref('chatMessages');
+                            _ref.on('value', function(snap){ _handle(snap.val() || {}); }, function(){ _pollOnce(); });
+                        } catch (_) { _ref = null; }
+                    }
+                    if (!_poll) _poll = setInterval(_pollOnce, firebaseConnected && db ? 4000 : 1000);
+                    _pollOnce();
+                }
+                function _patchSelection(){
+                    if (!window._selectChatContact || window._selectChatContact.__mrFinalRealtimeRepair) return;
+                    var prev = window._selectChatContact;
+                    window._selectChatContact = function(){
+                        var result = prev.apply(this, arguments);
+                        _attach();
+                        setTimeout(_renderOpenChat, 60);
+                        return result;
+                    };
+                    window._selectChatContact.__mrFinalRealtimeRepair = true;
+                }
+                if (typeof _mrIncoming === 'function') {
+                    _mrIncoming = function(all){ return _vals(all).filter(_incomingForMe); };
+                }
+                if (typeof attachRealtimeChatNotifications === 'function' && !attachRealtimeChatNotifications.__mrFinalRealtimeRepair) {
+                    var prevAttach = attachRealtimeChatNotifications;
+                    attachRealtimeChatNotifications = function(){
+                        var result;
+                        try { result = prevAttach.apply(this, arguments); } catch (_) {}
+                        _attach();
+                        return result;
+                    };
+                    attachRealtimeChatNotifications.__mrFinalRealtimeRepair = true;
+                }
+                if (typeof showChatUI === 'function' && !showChatUI.__mrFinalRealtimeRepair) {
+                    var prevShow = showChatUI;
+                    showChatUI = function(){
+                        var result = prevShow.apply(this, arguments);
+                        setTimeout(function(){ _attach(); _patchSelection(); _renderOpenChat(); }, 80);
+                        setTimeout(function(){ _patchSelection(); _renderOpenChat(); }, 450);
+                        return result;
+                    };
+                    showChatUI.__mrFinalRealtimeRepair = true;
+                }
+                if (typeof loadChatContacts === 'function' && !loadChatContacts.__mrFinalRealtimeRepair) {
+                    var prevContacts = loadChatContacts;
+                    loadChatContacts = async function(){
+                        var result = await prevContacts.apply(this, arguments);
+                        _patchSelection();
+                        return result;
+                    };
+                    loadChatContacts.__mrFinalRealtimeRepair = true;
+                }
+                if (typeof sendChatMessage === 'function' && !sendChatMessage.__mrFinalRealtimeRepair) {
+                    var prevSend = sendChatMessage;
+                    sendChatMessage = async function(){
+                        var result = await prevSend.apply(this, arguments);
+                        await _pollOnce();
+                        _renderOpenChat();
+                        return result;
+                    };
+                    sendChatMessage.__mrFinalRealtimeRepair = true;
+                }
+                window.addEventListener('storage', function(e){ if (e && e.key === 'ph_chat_messages') { try { _handle(JSON.parse(e.newValue || '{}')); } catch (_) {} } });
+                document.addEventListener('visibilitychange', function(){ if (!document.hidden) _attach(); });
+                document.addEventListener('DOMContentLoaded', function(){ setTimeout(_attach, 1500); });
+            })();
+
+            // Final targeted notification repair: agent notification panel is limited to today only.
+            (function _mrAgentSameDayNotificationPanel(){
+                function _isAdminUser(){ try { return typeof isAdmin === 'function' && isAdmin(); } catch (_) { return false; } }
+                function _me(){ return STATE.currentUser && STATE.currentUser.username; }
+                function _esc(v){ return (typeof escapeHTML === 'function') ? escapeHTML(v) : String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+                function _vals(o){ if(!o) return []; if(Array.isArray(o)) return o; return Object.keys(o).map(function(k){ var v=o[k]||{}; if(!v._key) v._key=k; return v; }); }
+                function _day(v){ try { return toLocalDateKey(v); } catch (_) { var d=new Date(v||0); return isNaN(d.getTime())?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); } }
+                function _today(v){ return _day(v) === ((typeof getToday === 'function') ? getToday() : _day(new Date())); }
+                function _name(u){ var users=STATE.users||{}, x=users[u]||{}; return x.name || x.displayName || u || 'User'; }
+                function _forMe(m){ var me=_me(); if(!me || !m || m.deleted || m.from===me || !_today(m.timestamp)) return false; if(m.groupId){ var g=(STATE.chatGroups||{})[m.groupId]||{}, members=m.members||g.members||[]; return members.indexOf(me)!==-1; } return m.to===me; }
+                function _unread(m){ var me=_me(); if(!_forMe(m)) return false; return m.groupId ? !(m.readBy&&m.readBy[me]) : !m.read; }
+                function _setBadge(n){ ['chatNotifyBadge','chatCardNotifyBadge'].forEach(function(id){ var e=document.getElementById(id); if(e){ e.style.display=n?'inline-flex':'none'; e.textContent=n; } }); }
+                async function _readCalls(){
+                    var out={};
+                    try { var fb=await readData('callLogs', null, true); if(fb&&typeof fb==='object') out=fb; } catch(_){}
+                    try { for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(k&&k.indexOf('ph_call_logs_')===0){ try{ var v=JSON.parse(localStorage.getItem(k)); if(v&&v.id) out[v.id]=v; }catch(_){} } } } catch(_){}
+                    return out;
+                }
+                async function _markRead(messages){
+                    var me=_me(), unread=(messages||[]).filter(_unread);
+                    if(!me || !unread.length) return;
+                    try{
+                        if(firebaseConnected&&db){
+                            unread.forEach(function(m){ if(!m._key) return; if(m.groupId) db.ref('chatMessages/'+m._key+'/readBy/'+me).set(true); else if(m.to===me) db.ref('chatMessages/'+m._key+'/read').set(true); });
+                        } else {
+                            var all=await readData('chatMessages','ph_chat_messages',true)||{};
+                            if(Array.isArray(all)) all.forEach(function(m){ if(_unread(m)){ if(m.groupId){ m.readBy=m.readBy||{}; m.readBy[me]=true; } else m.read=true; } });
+                            else Object.keys(all).forEach(function(k){ var m=all[k]; if(_unread(m)){ if(m.groupId){ m.readBy=m.readBy||{}; m.readBy[me]=true; } else m.read=true; } });
+                            await writeData('chatMessages', all, 'ph_chat_messages');
+                        }
+                    }catch(_){}
+                }
+                function _messageRow(m){
+                    var label=m.groupId?(((STATE.chatGroups||{})[m.groupId]||{}).name||m.groupId):_name(m.from);
+                    var body=m.message || (m.attachment?'[Image]':'Message');
+                    var when=m.timestamp?formatDateTime(m.timestamp):'';
+                    var fresh=_unread(m)?'<span class="mini-badge">New</span>':'';
+                    var target=m.groupId?m.groupId:m.from, type=m.groupId?'group':'user';
+                    return '<div class="notify-row"><div class="notify-icon"><i class="fas fa-message"></i></div><div class="notify-main"><strong>'+_esc(label)+' '+fresh+'</strong><p>'+_esc(body)+'</p><span>'+_esc(when)+'</span></div><button class="btn btn-sm btn-primary" onclick="window._openNotificationChat(\''+type+'\',\''+_esc(target)+'\')">Open</button></div>';
+                }
+                function _callForMe(c){ var me=_me(); if(!me || !c || c.status!=='missed' || !_today(c.endedAt||c.startedAt)) return false; return c.from===me || (c.members||[]).indexOf(me)!==-1 || String(c.to||'')===me; }
+                function _callRow(c){
+                    var when=(c.endedAt||c.startedAt)?formatDateTime(c.endedAt||c.startedAt):'';
+                    return '<div class="notify-row"><div class="notify-icon missed"><i class="fas fa-phone-slash"></i></div><div class="notify-main"><strong>Missed call from '+_esc(_name(c.from))+'</strong><p>Status: missed call</p><span>'+_esc(when)+'</span></div><button class="btn btn-sm btn-outline" onclick="window._openNotificationCalls()">Call Logs</button></div>';
+                }
+                if(typeof window.showNotificationCenter === 'function' && !window.showNotificationCenter.__mrAgentSameDayOnly){
+                    var previous = window.showNotificationCenter;
+                    window.showNotificationCenter = async function(){
+                        if(_isAdminUser()) return previous.apply(this, arguments);
+                        if(!STATE.currentUser) return showToast('Please login first.','warning');
+                        var msgs={}, calls={};
+                        try { msgs=await readData('chatMessages','ph_chat_messages',true)||{}; } catch(_){}
+                        try { calls=await _readCalls(); } catch(_){}
+                        var messages=_vals(msgs).filter(_forMe).sort(function(a,b){ return new Date(b.timestamp||0)-new Date(a.timestamp||0); }).slice(0,30);
+                        var callRows=_vals(calls).filter(_callForMe).sort(function(a,b){ return new Date(b.endedAt||b.startedAt||0)-new Date(a.endedAt||a.startedAt||0); }).slice(0,20);
+                        var html='<h3><i class="fas fa-bell"></i> Notifications</h3><p class="text-muted text-sm">Agent notifications show today only.</p><div class="notify-center">';
+                        html+='<h4>Messages</h4>'+(messages.length?messages.map(_messageRow).join(''):'<p class="text-muted text-sm">No message notifications for today.</p>');
+                        html+='<h4 class="mt-16">Missed Calls</h4>'+(callRows.length?callRows.map(_callRow).join(''):'<p class="text-muted text-sm">No missed call notifications for today.</p>');
+                        html+='</div><div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
+                        showModal(html);
+                        await _markRead(messages);
+                        _setBadge(0);
+                    };
+                    window.showNotificationCenter.__mrAgentSameDayOnly = true;
+                }
+            })();
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
@@ -17158,5 +17464,6 @@
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 </body>
 </html>
