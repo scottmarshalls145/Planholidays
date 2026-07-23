@@ -16930,6 +16930,194 @@
                 document.addEventListener('visibilitychange', function(){ if (document.hidden) _setTyping(false); });
                 document.addEventListener('DOMContentLoaded', function(){ setTimeout(_afterChatOpen, 1800); });
             })();
+
+
+            // MuleRun definitive fix: keep the currently-open chat synced from Firebase/localStorage without reopening.
+            (function _mrDefinitiveRealtimeOpenChatFix(){
+                var _liveRef = null;
+                var _livePoll = null;
+                var _liveUser = '';
+                var _latestMessages = null;
+                var _renderTimer = null;
+                var _contactTimer = null;
+                var _selectPatchTimer = null;
+
+                function _me(){ return STATE.currentUser && STATE.currentUser.username; }
+                function _hasChatDom(){ return !!document.getElementById('chatMessagesContainer'); }
+                function _hasSelectedChat(){ return !!(STATE.activeChatUser || STATE.activeChatGroup || STATE.activeChatPair); }
+                function _values(obj){
+                    if (!obj) return [];
+                    if (Array.isArray(obj)) return obj.map(function(m, i){
+                        if (!m) return null;
+                        var x = Object.assign({}, m);
+                        if (!x._key) x._key = x._id || x.id || String(i);
+                        return x;
+                    }).filter(Boolean);
+                    return Object.keys(obj).map(function(k){
+                        var m = obj[k];
+                        if (!m) return null;
+                        var x = Object.assign({}, m);
+                        if (!x._key) x._key = k;
+                        return x;
+                    }).filter(Boolean);
+                }
+                function _pairKey(a,b){ return [String(a || ''), String(b || '')].sort().join('__'); }
+                function _privateBetween(m,a,b){ return m && !m.groupId && ((m.from === a && m.to === b) || (m.from === b && m.to === a)); }
+                function _activeContext(){
+                    if (STATE.activeChatPair) return { kind:'pair', value:STATE.activeChatPair };
+                    if (STATE.activeChatGroup) return { kind:'group', value:STATE.activeChatGroup };
+                    if (STATE.activeChatUser) return { kind:'user', value:STATE.activeChatUser };
+                    return null;
+                }
+                function _messageVisible(m, ctx, me){
+                    if (!m || m.deleted || !ctx || !me) return false;
+                    if (ctx.kind === 'pair') {
+                        if (!isAdmin()) return false;
+                        var p = String(ctx.value || '').split('__');
+                        return p.length === 2 && _privateBetween(m, p[0], p[1]);
+                    }
+                    if (ctx.kind === 'group') {
+                        if (!m.groupId || m.groupId !== ctx.value) return false;
+                        var members = Array.isArray(m.members) ? m.members : [];
+                        return isAdmin() || m.from === me || members.indexOf(me) !== -1;
+                    }
+                    return !m.groupId && ((m.from === me && m.to === ctx.value) || (m.from === ctx.value && m.to === me));
+                }
+                function _cacheMessages(raw){
+                    _latestMessages = raw || {};
+                    try { STATE._cache = STATE._cache || {}; STATE._cache['chatMessages_ph_chat_messages'] = _latestMessages; } catch (_) {}
+                    try { localStorage.setItem('ph_chat_messages', JSON.stringify(_latestMessages)); } catch (_) {}
+                }
+                async function _fetchLatestMessages(){
+                    if (db && db.ref) {
+                        try {
+                            var snap = await db.ref('chatMessages').once('value');
+                            return snap.val() || {};
+                        } catch (_) {}
+                    }
+                    try { return await readData('chatMessages', 'ph_chat_messages', true) || {}; } catch (_) { return {}; }
+                }
+                function _markVisibleRead(list){
+                    var me = _me();
+                    if (!me || !db || !db.ref) return;
+                    (list || []).forEach(function(m){
+                        if (!m || !m._key || m.from === me) return;
+                        try {
+                            if (m.groupId) db.ref('chatMessages/' + m._key + '/readBy/' + me).set(true);
+                            else if (m.to === me && !m.read) db.ref('chatMessages/' + m._key + '/read').set(true);
+                        } catch (_) {}
+                    });
+                }
+                function _renderFromLatest(){
+                    if (!_hasChatDom() || !_hasSelectedChat()) return;
+                    var me = _me(), ctx = _activeContext();
+                    if (!me || !ctx || !_latestMessages) return;
+                    var list = _values(_latestMessages).filter(function(m){ return _messageVisible(m, ctx, me); });
+                    list.sort(function(a,b){ return new Date(a.timestamp || 0) - new Date(b.timestamp || 0); });
+                    STATE.chatMessages = list;
+                    try { renderChatMessages(list); } catch (_) {}
+                    _markVisibleRead(list);
+                }
+                function _scheduleRender(){
+                    if (_renderTimer) clearTimeout(_renderTimer);
+                    _renderTimer = setTimeout(_renderFromLatest, 40);
+                }
+                function _scheduleContactsRefresh(){
+                    if (!document.getElementById('chatContactsList') || typeof loadChatContacts !== 'function') return;
+                    if (_contactTimer) clearTimeout(_contactTimer);
+                    _contactTimer = setTimeout(function(){ try { loadChatContacts(); } catch (_) {} }, 350);
+                }
+                function _handleSnapshot(raw){
+                    _cacheMessages(raw || {});
+                    _scheduleRender();
+                    _scheduleContactsRefresh();
+                }
+                async function _pollOnce(){
+                    if (!_me()) return;
+                    var raw = await _fetchLatestMessages();
+                    _handleSnapshot(raw || {});
+                }
+                function _detachLive(){
+                    if (_liveRef && _liveRef.off) { try { _liveRef.off(); } catch (_) {} }
+                    _liveRef = null;
+                    if (_livePoll) { clearInterval(_livePoll); _livePoll = null; }
+                    _liveUser = '';
+                }
+                function _attachLive(){
+                    var me = _me();
+                    if (!me) { _detachLive(); return; }
+                    if (_liveUser && _liveUser !== me) _detachLive();
+                    _liveUser = me;
+                    if (!_liveRef && db && db.ref) {
+                        try {
+                            _liveRef = db.ref('chatMessages');
+                            _liveRef.on('value', function(snap){ _handleSnapshot(snap.val() || {}); }, function(){ _pollOnce(); });
+                        } catch (_) { _liveRef = null; }
+                    }
+                    if (!_livePoll) _livePoll = setInterval(_pollOnce, 1500);
+                    _pollOnce();
+                }
+                function _patchSelectContact(){
+                    if (!window._selectChatContact || window._selectChatContact.__mrDefinitiveRealtimePatched) return;
+                    var prev = window._selectChatContact;
+                    window._selectChatContact = function(){
+                        var result = prev.apply(this, arguments);
+                        _attachLive();
+                        if (_latestMessages) _scheduleRender();
+                        else _pollOnce();
+                        return result;
+                    };
+                    window._selectChatContact.__mrDefinitiveRealtimePatched = true;
+                }
+                function _afterChatUi(){
+                    _attachLive();
+                    _patchSelectContact();
+                    if (_selectPatchTimer) clearTimeout(_selectPatchTimer);
+                    _selectPatchTimer = setTimeout(_patchSelectContact, 250);
+                    if (_latestMessages) _scheduleRender();
+                }
+                if (typeof showChatUI === 'function' && !showChatUI.__mrDefinitiveRealtimePatched) {
+                    var _prevShowChatUI = showChatUI;
+                    showChatUI = function(){
+                        var result = _prevShowChatUI.apply(this, arguments);
+                        setTimeout(_afterChatUi, 80);
+                        setTimeout(_afterChatUi, 500);
+                        return result;
+                    };
+                    showChatUI.__mrDefinitiveRealtimePatched = true;
+                }
+                if (typeof loadChatContacts === 'function' && !loadChatContacts.__mrDefinitiveRealtimePatched) {
+                    var _prevLoadContacts = loadChatContacts;
+                    loadChatContacts = async function(){
+                        var result = await _prevLoadContacts.apply(this, arguments);
+                        _patchSelectContact();
+                        return result;
+                    };
+                    loadChatContacts.__mrDefinitiveRealtimePatched = true;
+                }
+                if (typeof loadChatMessages === 'function' && !loadChatMessages.__mrDefinitiveRealtimePatched) {
+                    var _prevLoadMessages = loadChatMessages;
+                    loadChatMessages = async function(){
+                        _attachLive();
+                        var result = await _prevLoadMessages.apply(this, arguments);
+                        if (_latestMessages) _scheduleRender();
+                        return result;
+                    };
+                    loadChatMessages.__mrDefinitiveRealtimePatched = true;
+                }
+                if (typeof sendChatMessage === 'function' && !sendChatMessage.__mrDefinitiveRealtimePatched) {
+                    var _prevSendMessage = sendChatMessage;
+                    sendChatMessage = async function(){
+                        var result = await _prevSendMessage.apply(this, arguments);
+                        await _pollOnce();
+                        return result;
+                    };
+                    sendChatMessage.__mrDefinitiveRealtimePatched = true;
+                }
+                window.addEventListener('storage', function(e){ if (e && e.key === 'ph_chat_messages') { try { _handleSnapshot(JSON.parse(e.newValue || '{}')); } catch (_) {} } });
+                document.addEventListener('visibilitychange', function(){ if (!document.hidden) _attachLive(); });
+                document.addEventListener('DOMContentLoaded', function(){ setTimeout(_attachLive, 1200); });
+            })();
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
@@ -16963,6 +17151,7 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
