@@ -16406,6 +16406,284 @@
                 document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ _patchChat(); _installSidebarControls(); }, 1100); });
             })();
 
+
+
+            // Targeted chat fix: admin edit audit, readable chat theme, and notification center.
+            (function _mrChatAuditReadabilityNotificationsFix(){
+                var _notifyTimer = null, _lastNotifySnapshot = 0;
+                function _esc(v){ return (typeof escapeHTML === 'function') ? escapeHTML(v) : String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+                function _vals(o){ if(!o) return []; if(Array.isArray(o)) return o; return Object.keys(o).map(function(k){ var v=o[k]||{}; if(!v._key)v._key=k; return v; }); }
+                function _me(){ return STATE.currentUser && STATE.currentUser.username; }
+                function _isAdminUser(){ return typeof isAdmin === 'function' && isAdmin(); }
+                function _userName(u){ var users=STATE.users||{}, x=users[u]||{}; return x.name || x.displayName || u || 'User'; }
+                function _msgId(m){ return (typeof _chatMessageId === 'function' && _chatMessageId(m)) || (m && (m._key || m._id || m.id)) || ''; }
+                function _initials(name){ return String(name||'?').trim().split(/\s+/).slice(0,2).map(function(x){ return x.charAt(0).toUpperCase(); }).join('') || '?'; }
+                function _avatar(from, sender){ var u=(STATE.users||{})[from]||{}, img=u.profilePhoto||u.photo||''; return '<div class="chat-avatar">'+(img?'<img src="'+_esc(img)+'" alt="'+_esc(sender)+'" />':_esc(_initials(sender)))+'</div>'; }
+                function _chatTargetLabel(m){ if(m.groupId){ var g=(STATE.chatGroups||{})[m.groupId]||{}; return g.name || m.groupId; } return _userName(m.from); }
+                function _incomingMessages(all){ var me=_me(); if(!me) return []; return _vals(all).filter(function(m){ if(!m || m.deleted || m.from===me) return false; if(m.groupId) return (m.members||[]).indexOf(me)!==-1 && !(m.readBy&&m.readBy[me]); return m.to===me && !m.read; }); }
+                function _isCallForMe(c){ var me=_me(); if(!me || !c) return false; if(_isAdminUser()) return true; return c.from===me || (c.members||[]).indexOf(me)!==-1 || (c.to||[]).indexOf(me)!==-1 || (c.acceptedBy||[]).indexOf(me)!==-1; }
+                async function _readCallLogs(){
+                    var out={};
+                    try { var fb=await readData('callLogs', null, true); if(fb && typeof fb==='object') out=fb; } catch(_){ }
+                    try { for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(k&&k.indexOf('ph_call_logs_')===0){ try{ var v=JSON.parse(localStorage.getItem(k)); if(v&&v.id) out[v.id]=v; }catch(_){} } } } catch(_){ }
+                    return out;
+                }
+                function _seenKey(){ return 'ph_notifications_seen_at_' + (_me() || 'guest'); }
+                function _seenAt(){ try { return parseInt(localStorage.getItem(_seenKey()) || '0', 10) || 0; } catch(_) { return 0; } }
+                function _setSeenNow(){ try { localStorage.setItem(_seenKey(), String(Date.now())); } catch(_){} }
+                async function _notificationData(){
+                    var msgs={}, calls={};
+                    try { msgs=await readData('chatMessages','ph_chat_messages',true)||{}; } catch(_){ msgs={}; }
+                    try { calls=await _readCallLogs(); } catch(_){ calls={}; }
+                    var seen=_seenAt();
+                    var unread=_incomingMessages(msgs).sort(function(a,b){ return new Date(b.timestamp||0)-new Date(a.timestamp||0); });
+                    var missed=_vals(calls).filter(function(c){
+                        if(!c || c.status!=='missed' || !_isCallForMe(c)) return false;
+                        var t=new Date(c.endedAt||c.startedAt||0).getTime()||0;
+                        return !seen || t>seen;
+                    }).sort(function(a,b){ return new Date(b.endedAt||b.startedAt||0)-new Date(a.endedAt||a.startedAt||0); });
+                    return { unread:unread, missed:missed, total:unread.length+missed.length };
+                }
+                function _setNotificationBadge(n){
+                    try { if(typeof ensureNotificationUI==='function') ensureNotificationUI(); } catch(_){}
+                    ['chatNotifyBadge','chatCardNotifyBadge'].forEach(function(id){ var e=document.getElementById(id); if(e){ e.style.display=n?'inline-flex':'none'; e.textContent=n; } });
+                }
+                function _patchNotificationButton(){
+                    try{
+                        var b=document.getElementById('chatTopNotifyBtn');
+                        if(b){ b.title='Notifications'; b.setAttribute('aria-label','Notifications'); b.onclick=function(e){ if(e){e.preventDefault();e.stopPropagation();} window.showNotificationCenter(); }; }
+                    }catch(_){}
+                }
+                async function _refreshNotificationBadge(showPopup){
+                    if(!STATE.currentUser) return;
+                    var data=await _notificationData();
+                    _setNotificationBadge(data.total);
+                    _patchNotificationButton();
+                    if(showPopup && data.total>_lastNotifySnapshot){
+                        var msg=[]; if(data.unread.length) msg.push(data.unread.length+' unread message'+(data.unread.length===1?'':'s')); if(data.missed.length) msg.push(data.missed.length+' missed call'+(data.missed.length===1?'':'s'));
+                        if(msg.length && typeof showToast==='function') showToast('Notifications: '+msg.join(', '), 'info', 6000);
+                    }
+                    _lastNotifySnapshot=data.total;
+                }
+                function _editAuditHtml(m){
+                    if(!_isAdminUser() || !m || !m.editedAt) return '';
+                    var edits=Array.isArray(m.editHistory)?m.editHistory.slice():[];
+                    if(!edits.length){ edits=[{ from:(m.originalMessage!=null?m.originalMessage:''), to:(m.message||''), at:m.editedAt||'', by:m.editedBy||'' }]; }
+                    return '<div class="chat-edit-audit"><div class="chat-edit-audit-title"><i class="fas fa-clock-rotate-left"></i> Full edit history (admin only)</div>'+edits.map(function(e,idx){
+                        return '<div class="chat-edit-audit-item"><div class="chat-edit-audit-meta"><strong>Edit #'+(idx+1)+'</strong> '+_esc(e.at?formatDateTime(e.at):'')+(e.by?' by '+_esc(e.by):'')+'</div><div><strong>Before:</strong> '+_esc(e.from||'')+'</div><div><strong>After:</strong> '+_esc(e.to||'')+'</div></div>';
+                    }).join('')+'</div>';
+                }
+                function _renderFixedChatMessages(messages){
+                    var c=document.getElementById('chatMessagesContainer'); if(!c) return;
+                    var me=_me(), context='';
+                    if(STATE.activeChatPair) context='<div class="chat-context-label"><i class="fas fa-user-friends"></i> Agent mutual chat</div>';
+                    else if(_isAdminUser()&&STATE.activeChatUser) context='<div class="chat-context-label"><i class="fas fa-user-shield"></i> Admin direct chat</div>';
+                    else if(STATE.activeChatGroup) context='<div class="chat-context-label"><i class="fas fa-users"></i> Group chat</div>';
+                    var visible=_vals(messages).filter(function(m){ return m && !m.deleted; });
+                    if(!visible.length){ c.innerHTML=context+'<div class="chat-empty"><i class="fas fa-comments" style="font-size:2rem;color:var(--primary);"></i><h4>No messages yet</h4><p>Full chat history will be saved here.</p></div>'; return; }
+                    c.innerHTML=context+visible.map(function(m){
+                        var mine=m.from===me, sys=m.type==='system', mid=_msgId(m), sender=sys?'Group Notice':(mine?'You':_userName(m.from));
+                        var content=m.message?'<div>'+_esc(m.message)+'</div>':'';
+                        if(m.attachment&&m.attachment.data) content+='<img class="chat-image" src="'+m.attachment.data+'" alt="Shared image" />';
+                        var select=(_isAdminUser()&&mid)?'<label class="chat-delete-select" title="Select message to delete"><input type="checkbox" class="chat-delete-check" value="'+_esc(mid)+'" /></label>':'';
+                        var edit=(mine&&!sys&&mid&&window._mrEditOwnChatMessage)?'<button type="button" class="chat-msg-edit-btn" data-msg-id="'+_esc(mid)+'" title="Edit message"><i class="fas fa-pen"></i></button>':'';
+                        var del=((mine||_isAdminUser())&&!sys&&mid&&window._mrDeleteChatMessage)?'<button type="button" class="chat-msg-delete-btn" data-msg-id="'+_esc(mid)+'" title="Delete message"><i class="fas fa-trash"></i></button>':'';
+                        var edited=m.editedAt?'<span class="chat-edited-note">edited</span>':'';
+                        var audit=_editAuditHtml(m);
+                        return '<div class="bubble-row '+(mine?'mine':'theirs')+' '+(sys?'system':'')+'">'+select+_avatar(m.from,sender)+'<div class="bubble"><div class="chat-msg-head"><div class="msg-sender">'+_esc(sender)+'</div><div class="chat-msg-actions">'+edit+del+'</div></div>'+content+audit+'<div class="bubble-meta">'+_esc(formatTime(m.timestamp||''))+edited+'</div></div></div>';
+                    }).join('');
+                    Array.prototype.forEach.call(c.querySelectorAll('.chat-msg-edit-btn'), function(btn){ btn.onclick=function(e){ e.preventDefault(); e.stopPropagation(); window._mrEditOwnChatMessage(this.getAttribute('data-msg-id')); }; });
+                    Array.prototype.forEach.call(c.querySelectorAll('.chat-msg-delete-btn'), function(btn){ btn.onclick=function(e){ e.preventDefault(); e.stopPropagation(); window._mrDeleteChatMessage(this.getAttribute('data-msg-id')); }; });
+                    setTimeout(function(){ c.scrollTop=Math.max(0,c.scrollHeight-c.clientHeight); },40);
+                }
+                function _installRenderPatch(){
+                    if(typeof renderChatMessages==='function'){
+                        renderChatMessages=function(messages){ _renderFixedChatMessages(messages); };
+                        renderChatMessages.__mrFullAuditReadabilityPatched=true;
+                    }
+                }
+                window.showNotificationCenter=async function(){
+                    if(!STATE.currentUser) return showToast('Please login first.','warning');
+                    var data=await _notificationData();
+                    function msgRow(m){ var label=_chatTargetLabel(m), when=m.timestamp?formatDateTime(m.timestamp):''; var body=m.message || (m.attachment?'[Image]':'New message'); var target=m.groupId?m.groupId:m.from; var type=m.groupId?'group':'user'; return '<div class="notify-row"><div class="notify-icon"><i class="fas fa-message"></i></div><div class="notify-main"><strong>Missed message from '+_esc(label)+'</strong><p>'+_esc(body)+'</p><span>'+_esc(when)+'</span></div><button class="btn btn-sm btn-primary" onclick="window._openNotificationChat(\''+type+'\',\''+_esc(target)+'\')">Open</button></div>'; }
+                    function callRow(c){ var from=_userName(c.from), when=(c.endedAt||c.startedAt)?formatDateTime(c.endedAt||c.startedAt):''; return '<div class="notify-row"><div class="notify-icon missed"><i class="fas fa-phone-slash"></i></div><div class="notify-main"><strong>Missed call '+(_isAdminUser()?'from ':'')+_esc(from)+'</strong><p>Status: missed call</p><span>'+_esc(when)+'</span></div><button class="btn btn-sm btn-outline" onclick="window._openNotificationCalls()">Call Logs</button></div>'; }
+                    var html='<h3><i class="fas fa-bell"></i> Notifications</h3><p class="text-muted text-sm">Unread messages and missed calls appear here. Opening a chat only happens when you click Open.</p>';
+                    html+='<div class="notify-center">';
+                    html+='<h4>Missed Messages</h4>'+(data.unread.length?data.unread.map(msgRow).join(''):'<p class="text-muted text-sm">No unread messages.</p>');
+                    html+='<h4 class="mt-16">Missed Calls</h4>'+(data.missed.length?data.missed.map(callRow).join(''):'<p class="text-muted text-sm">No new missed calls.</p>');
+                    html+='</div><div class="modal-actions"><button class="btn btn-outline" onclick="window._markNotificationsSeen()"><i class="fas fa-check"></i> Mark calls seen</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
+                    showModal(html); _patchNotificationButton(); _setNotificationBadge(data.total);
+                };
+                window._openNotificationChat=function(type,target){
+                    showChatUI();
+                    setTimeout(function(){
+                        try{
+                            if(type==='group') window._selectChatContact(null,target,((STATE.chatGroups||{})[target]||{}).name||target,null);
+                            else window._selectChatContact(target,null,_userName(target),null);
+                        }catch(_){}
+                    },650);
+                };
+                window._openNotificationCalls=function(){ if(typeof showCallsCenter==='function') showCallsCenter('logs'); else showToast('Call logs are not available.','warning'); };
+                window._markNotificationsSeen=function(){ _setSeenNow(); _refreshNotificationBadge(false); showToast('Missed call notifications marked seen.','success'); try{ window.closeModal(); }catch(_){} };
+                function _injectReadabilityStyles(){
+                    if(document.getElementById('mr-chat-readability-fix-style')) return;
+                    var st=document.createElement('style'); st.id='mr-chat-readability-fix-style';
+                    st.textContent='body:not(.dark):not(.theme-custom) .messenger{background:linear-gradient(180deg,#fffaf0,#f7f1e6)!important;color:#1e1e2a!important}body:not(.dark):not(.theme-custom) .messenger-messages{background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(250,246,238,.96))!important;color:#1e1e2a!important}body:not(.dark):not(.theme-custom) .bubble{background:#fff!important;color:#1e1e2a!important;border-color:rgba(30,30,42,.16)!important;text-shadow:none!important}body:not(.dark):not(.theme-custom) .bubble .msg-sender,body:not(.dark):not(.theme-custom) .bubble .chat-msg-head,body:not(.dark):not(.theme-custom) .bubble .bubble-meta{color:#344054!important;text-shadow:none!important}body:not(.dark):not(.theme-custom) .bubble-row.mine .bubble{background:linear-gradient(135deg,var(--primary),var(--primary2))!important;color:#fff!important;border-color:transparent!important}body:not(.dark):not(.theme-custom) .bubble-row.mine .bubble .msg-sender,body:not(.dark):not(.theme-custom) .bubble-row.mine .bubble .bubble-meta{color:rgba(255,255,255,.88)!important}.chat-msg-actions button,.chat-admin-actions button{color:var(--text)!important;background:var(--input-bg)!important}.bubble-row.mine .chat-msg-actions button{color:#fff!important;background:rgba(255,255,255,.18)!important;border-color:rgba(255,255,255,.32)!important}.chat-edit-audit{margin-top:9px;padding:9px 11px;border-radius:12px;background:rgba(41,128,185,.12);border:1px solid rgba(41,128,185,.24);font-size:.76rem;line-height:1.4;color:inherit}.chat-edit-audit-title{font-weight:800;margin-bottom:5px}.chat-edit-audit-item{padding-top:7px;margin-top:7px;border-top:1px solid rgba(41,128,185,.18)}.chat-edit-audit-meta{font-size:.72rem;opacity:.85;margin-bottom:4px}.notify-center{display:flex;flex-direction:column;gap:8px;margin-top:12px}.notify-center h4{margin:10px 0 4px}.notify-row{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--card-border);border-radius:14px;background:var(--input-bg)}.notify-icon{width:38px;height:38px;border-radius:13px;background:rgba(41,128,185,.16);color:var(--info);display:flex;align-items:center;justify-content:center}.notify-icon.missed{background:rgba(192,57,43,.14);color:var(--danger)}.notify-main{flex:1;min-width:0}.notify-main p{margin:3px 0;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.notify-main span{font-size:.75rem;color:var(--text2)}';
+                    document.head.appendChild(st);
+                }
+                if(typeof ensureNotificationUI==='function' && !ensureNotificationUI.__mrNotificationCenterPatched){
+                    var prevEnsure=ensureNotificationUI;
+                    ensureNotificationUI=function(){ var r=prevEnsure.apply(this,arguments); _patchNotificationButton(); return r; };
+                    ensureNotificationUI.__mrNotificationCenterPatched=true;
+                }
+                if(typeof afterLogin==='function' && !afterLogin.__mrNotificationCenterPatched){
+                    var prevAfter=afterLogin;
+                    afterLogin=async function(){ var r=await prevAfter.apply(this,arguments); _injectReadabilityStyles(); _installRenderPatch(); _patchNotificationButton(); _refreshNotificationBadge(false); if(!_notifyTimer) _notifyTimer=setInterval(function(){ _refreshNotificationBadge(true); }, 5000); return r; };
+                    afterLogin.__mrNotificationCenterPatched=true;
+                }
+                _injectReadabilityStyles();
+                _installRenderPatch();
+                setTimeout(function(){ _patchNotificationButton(); _refreshNotificationBadge(false); },1200);
+                document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ _injectReadabilityStyles(); _installRenderPatch(); _patchNotificationButton(); _refreshNotificationBadge(false); },1600); });
+            })();
+
+
+            // Targeted chat fix: admin-only collapsed full edit-history dropdown for every chat type.
+            (function _mrCollapsedEditHistoryForAdmin(){
+                function _esc(v){ return (typeof escapeHTML === 'function') ? escapeHTML(v) : String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+                function _vals(o){ if(!o) return []; if(Array.isArray(o)) return o; return Object.keys(o).map(function(k){ var v=o[k]||{}; if(!v._key)v._key=k; return v; }); }
+                function _me(){ return STATE.currentUser && STATE.currentUser.username; }
+                function _isAdminUser(){ return typeof isAdmin === 'function' && isAdmin(); }
+                function _msgId(m){ return (typeof _chatMessageId === 'function' && _chatMessageId(m)) || (m && (m._key || m._id || m.id)) || ''; }
+                function _name(u){ var users=STATE.users||{}, x=users[u]||{}; return x.name || x.displayName || u || 'User'; }
+                function _init(n){ return String(n||'?').trim().split(/\s+/).slice(0,2).map(function(x){return x.charAt(0).toUpperCase();}).join('') || '?'; }
+                function _avatar(from, sender){ var u=(STATE.users||{})[from]||{}, img=u.profilePhoto||u.photo||''; return '<div class="chat-avatar">'+(img?'<img src="'+_esc(img)+'" alt="'+_esc(sender)+'" />':_esc(_init(sender)))+'</div>'; }
+                function _editHistory(m){
+                    if(!_isAdminUser() || !m || !m.editedAt) return '';
+                    var edits=Array.isArray(m.editHistory)?m.editHistory.slice():[];
+                    if(!edits.length) edits=[{from:(m.originalMessage!=null?m.originalMessage:''),to:(m.message||''),at:m.editedAt||'',by:m.editedBy||''}];
+                    return '<details class="chat-edit-audit chat-edit-audit-collapsed"><summary><i class="fas fa-clock-rotate-left"></i> Click to view edited history ('+edits.length+' edit'+(edits.length===1?'':'s')+')</summary><div class="chat-edit-audit-body">'+edits.map(function(e,i){
+                        return '<div class="chat-edit-audit-item"><div class="chat-edit-audit-meta"><strong>Edit #'+(i+1)+'</strong> '+_esc(e.at?formatDateTime(e.at):'')+(e.by?' by '+_esc(e.by):'')+'</div><div><strong>Before:</strong> '+_esc((e.from||'')||'(empty)')+'</div><div><strong>After:</strong> '+_esc((e.to||'')||'(empty)')+'</div></div>';
+                    }).join('')+'</div></details>';
+                }
+                function _context(){
+                    if(STATE.activeChatPair) return '<div class="chat-context-label"><i class="fas fa-user-friends"></i> Agent mutual chat</div>';
+                    if(_isAdminUser()&&STATE.activeChatUser) return '<div class="chat-context-label"><i class="fas fa-user-shield"></i> Admin direct chat</div>';
+                    if(STATE.activeChatGroup) return '<div class="chat-context-label"><i class="fas fa-users"></i> Group chat</div>';
+                    return '';
+                }
+                function _render(messages){
+                    var c=document.getElementById('chatMessagesContainer'); if(!c) return;
+                    var me=_me(), visible=_vals(messages).filter(function(m){return m&&!m.deleted;});
+                    var context=_context();
+                    if(!visible.length){ c.innerHTML=context+'<div class="chat-empty"><i class="fas fa-comments" style="font-size:2rem;color:var(--primary);"></i><h4>No messages yet</h4><p>Full chat history will be saved here.</p></div>'; return; }
+                    c.innerHTML=context+visible.map(function(m){
+                        var mine=m.from===me, sys=m.type==='system', mid=_msgId(m), sender=sys?'Group Notice':(mine?'You':_name(m.from));
+                        var content=m.message?'<div>'+_esc(m.message)+'</div>':'';
+                        if(m.attachment&&m.attachment.data) content+='<img class="chat-image" src="'+m.attachment.data+'" alt="Shared image" />';
+                        var select=(_isAdminUser()&&mid)?'<label class="chat-delete-select" title="Select message to delete"><input type="checkbox" class="chat-delete-check" value="'+_esc(mid)+'" /></label>':'';
+                        var edit=(mine&&!sys&&mid&&window._mrEditOwnChatMessage)?'<button type="button" class="chat-msg-edit-btn" data-msg-id="'+_esc(mid)+'" title="Edit message"><i class="fas fa-pen"></i></button>':'';
+                        var del=((mine||_isAdminUser())&&!sys&&mid&&window._mrDeleteChatMessage)?'<button type="button" class="chat-msg-delete-btn" data-msg-id="'+_esc(mid)+'" title="Delete message"><i class="fas fa-trash"></i></button>':'';
+                        var edited=m.editedAt?'<span class="chat-edited-note">edited</span>':'';
+                        return '<div class="bubble-row '+(mine?'mine':'theirs')+' '+(sys?'system':'')+'">'+select+_avatar(m.from,sender)+'<div class="bubble"><div class="chat-msg-head"><div class="msg-sender">'+_esc(sender)+'</div><div class="chat-msg-actions">'+edit+del+'</div></div>'+content+_editHistory(m)+'<div class="bubble-meta">'+_esc(formatTime(m.timestamp||''))+edited+'</div></div></div>';
+                    }).join('');
+                    Array.prototype.forEach.call(c.querySelectorAll('.chat-msg-edit-btn'),function(btn){btn.onclick=function(e){e.preventDefault();e.stopPropagation();window._mrEditOwnChatMessage(this.getAttribute('data-msg-id'));};});
+                    Array.prototype.forEach.call(c.querySelectorAll('.chat-msg-delete-btn'),function(btn){btn.onclick=function(e){e.preventDefault();e.stopPropagation();window._mrDeleteChatMessage(this.getAttribute('data-msg-id'));};});
+                    setTimeout(function(){ c.scrollTop=Math.max(0,c.scrollHeight-c.clientHeight); },40);
+                }
+                function _styles(){
+                    if(document.getElementById('mr-collapsed-edit-history-style')) return;
+                    var st=document.createElement('style'); st.id='mr-collapsed-edit-history-style';
+                    st.textContent='.chat-edit-audit-collapsed{margin-top:9px;padding:0!important;overflow:hidden}.chat-edit-audit-collapsed summary{cursor:pointer;list-style:none;padding:9px 11px;font-weight:800;border-radius:12px;background:rgba(41,128,185,.14);border:1px solid rgba(41,128,185,.26)}.chat-edit-audit-collapsed summary::-webkit-details-marker{display:none}.chat-edit-audit-collapsed summary:after{content:"▾";float:right;transition:transform .18s ease}.chat-edit-audit-collapsed[open] summary:after{transform:rotate(180deg)}.chat-edit-audit-body{padding:8px 11px 10px}.chat-edit-audit-item{padding-top:8px;margin-top:8px;border-top:1px solid rgba(41,128,185,.18)}.chat-edit-audit-item:first-child{border-top:0;margin-top:0}.chat-edit-audit-meta{font-size:.72rem;opacity:.86;margin-bottom:4px}';
+                    document.head.appendChild(st);
+                }
+                function _install(){ _styles(); if(typeof renderChatMessages==='function'){ renderChatMessages=function(messages){ _render(messages); }; renderChatMessages.__mrCollapsedEditHistoryPatched=true; } }
+                if(typeof afterLogin==='function'&&!afterLogin.__mrCollapsedEditHistoryPatched){ var prev=afterLogin; afterLogin=async function(){ var r=await prev.apply(this,arguments); _install(); return r; }; afterLogin.__mrCollapsedEditHistoryPatched=true; }
+                _install();
+                document.addEventListener('DOMContentLoaded',function(){ setTimeout(_install,1800); });
+            })();
+
+
+            // Targeted notification fix: opening notifications shows recent history and marks badge/read state checked.
+            (function _mrNotificationAutoReadOnOpen(){
+                function _esc(v){ return (typeof escapeHTML === 'function') ? escapeHTML(v) : String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+                function _vals(o){ if(!o) return []; if(Array.isArray(o)) return o; return Object.keys(o).map(function(k){ var v=o[k]||{}; if(!v._key)v._key=k; return v; }); }
+                function _me(){ return STATE.currentUser && STATE.currentUser.username; }
+                function _isAdminUser(){ return typeof isAdmin === 'function' && isAdmin(); }
+                function _name(u){ var users=STATE.users||{}, x=users[u]||{}; return x.name || x.displayName || u || 'User'; }
+                function _seenKey(){ return 'ph_notifications_seen_at_' + (_me() || 'guest'); }
+                function _seenAt(){ try { return parseInt(localStorage.getItem(_seenKey()) || '0', 10) || 0; } catch(_) { return 0; } }
+                function _setSeenNow(){ try { localStorage.setItem(_seenKey(), String(Date.now())); } catch(_){} }
+                function _setBadge(n){ ['chatNotifyBadge','chatCardNotifyBadge'].forEach(function(id){ var e=document.getElementById(id); if(e){ e.style.display=n?'inline-flex':'none'; e.textContent=n; } }); }
+                function _forMeMessage(m){ var me=_me(); if(!me || !m || m.deleted || m.from===me) return false; if(m.groupId) return (m.members||[]).indexOf(me)!==-1; return m.to===me; }
+                function _unreadMessage(m){ var me=_me(); if(!_forMeMessage(m)) return false; if(m.groupId) return !(m.readBy&&m.readBy[me]); return !m.read; }
+                function _callForMe(c){ var me=_me(); if(!me || !c) return false; if(_isAdminUser()) return true; return c.from===me || (c.members||[]).indexOf(me)!==-1 || (c.to||[]).indexOf(me)!==-1 || (c.acceptedBy||[]).indexOf(me)!==-1; }
+                async function _readCalls(){
+                    var out={};
+                    try{ var fb=await readData('callLogs',null,true); if(fb&&typeof fb==='object') out=fb; }catch(_){}
+                    try{ for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(k&&k.indexOf('ph_call_logs_')===0){ try{ var v=JSON.parse(localStorage.getItem(k)); if(v&&v.id) out[v.id]=v; }catch(_){} } } }catch(_){}
+                    return out;
+                }
+                async function _notificationLists(){
+                    var msgs={}, calls={};
+                    try{ msgs=await readData('chatMessages','ph_chat_messages',true)||{}; }catch(_){}
+                    try{ calls=await _readCalls(); }catch(_){}
+                    var seen=_seenAt();
+                    var recentMessages=_vals(msgs).filter(_forMeMessage).sort(function(a,b){ return new Date(b.timestamp||0)-new Date(a.timestamp||0); }).slice(0,30);
+                    var unread=recentMessages.filter(_unreadMessage);
+                    var recentCalls=_vals(calls).filter(function(c){ return c && c.status==='missed' && _callForMe(c); }).sort(function(a,b){ return new Date(b.endedAt||b.startedAt||0)-new Date(a.endedAt||a.startedAt||0); }).slice(0,20);
+                    var newMissed=recentCalls.filter(function(c){ var t=new Date(c.endedAt||c.startedAt||0).getTime()||0; return !seen || t>seen; });
+                    return { messages:recentMessages, unread:unread, calls:recentCalls, newMissed:newMissed, total:unread.length+newMissed.length };
+                }
+                async function _markMessagesRead(messages){
+                    var me=_me(); if(!me) return;
+                    var unread=(messages||[]).filter(_unreadMessage);
+                    if(!unread.length) return;
+                    try{
+                        if(firebaseConnected&&db){
+                            unread.forEach(function(m){ if(!m._key) return; if(m.groupId) db.ref('chatMessages/'+m._key+'/readBy/'+me).set(true); else if(m.to===me) db.ref('chatMessages/'+m._key+'/read').set(true); });
+                        } else {
+                            var all=await readData('chatMessages','ph_chat_messages',true)||{};
+                            if(Array.isArray(all)){
+                                all.forEach(function(m){ if(_unreadMessage(m)){ if(m.groupId){ m.readBy=m.readBy||{}; m.readBy[me]=true; } else m.read=true; } });
+                            } else {
+                                Object.keys(all).forEach(function(k){ var m=all[k]; if(_unreadMessage(m)){ if(m.groupId){ m.readBy=m.readBy||{}; m.readBy[me]=true; } else m.read=true; } });
+                            }
+                            await writeData('chatMessages',all,'ph_chat_messages');
+                        }
+                        try{ delete STATE._cache['chatMessages_ph_chat_messages']; }catch(_){}
+                    }catch(_){}
+                }
+                function _messageRow(m){
+                    var label=m.groupId?(((STATE.chatGroups||{})[m.groupId]||{}).name||m.groupId):_name(m.from);
+                    var body=m.message || (m.attachment?'[Image]':'Message');
+                    var when=m.timestamp?formatDateTime(m.timestamp):'';
+                    var fresh=_unreadMessage(m)?'<span class="mini-badge">New</span>':'';
+                    var target=m.groupId?m.groupId:m.from, type=m.groupId?'group':'user';
+                    return '<div class="notify-row"><div class="notify-icon"><i class="fas fa-message"></i></div><div class="notify-main"><strong>'+_esc(label)+' '+fresh+'</strong><p>'+_esc(body)+'</p><span>'+_esc(when)+'</span></div><button class="btn btn-sm btn-primary" onclick="window._openNotificationChat(\''+type+'\',\''+_esc(target)+'\')">Open</button></div>';
+                }
+                function _callRow(c){
+                    var when=(c.endedAt||c.startedAt)?formatDateTime(c.endedAt||c.startedAt):'';
+                    return '<div class="notify-row"><div class="notify-icon missed"><i class="fas fa-phone-slash"></i></div><div class="notify-main"><strong>Missed call from '+_esc(_name(c.from))+'</strong><p>Status: missed call</p><span>'+_esc(when)+'</span></div><button class="btn btn-sm btn-outline" onclick="window._openNotificationCalls()">Call Logs</button></div>';
+                }
+                window.showNotificationCenter=async function(){
+                    if(!STATE.currentUser) return showToast('Please login first.','warning');
+                    var data=await _notificationLists();
+                    var html='<h3><i class="fas fa-bell"></i> Notifications</h3><p class="text-muted text-sm">Recent notifications are shown here. Opening this panel marks the notification badge as checked.</p><div class="notify-center">';
+                    html+='<h4>Messages</h4>'+(data.messages.length?data.messages.map(_messageRow).join(''):'<p class="text-muted text-sm">No recent messages.</p>');
+                    html+='<h4 class="mt-16">Missed Calls</h4>'+(data.calls.length?data.calls.map(_callRow).join(''):'<p class="text-muted text-sm">No recent missed calls.</p>');
+                    html+='</div><div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
+                    showModal(html);
+                    await _markMessagesRead(data.messages);
+                    _setSeenNow();
+                    _setBadge(0);
+                };
+                function _patchButton(){ try{ var b=document.getElementById('chatTopNotifyBtn'); if(b){ b.title='Notifications'; b.onclick=function(e){ if(e){e.preventDefault();e.stopPropagation();} window.showNotificationCenter(); }; } }catch(_){} }
+                if(typeof ensureNotificationUI==='function'&&!ensureNotificationUI.__mrAutoReadNotifyPatched){ var prev=ensureNotificationUI; ensureNotificationUI=function(){ var r=prev.apply(this,arguments); _patchButton(); return r; }; ensureNotificationUI.__mrAutoReadNotifyPatched=true; }
+                if(typeof afterLogin==='function'&&!afterLogin.__mrAutoReadNotifyPatched){ var prevAfter=afterLogin; afterLogin=async function(){ var r=await prevAfter.apply(this,arguments); _patchButton(); return r; }; afterLogin.__mrAutoReadNotifyPatched=true; }
+                _patchButton();
+                document.addEventListener('DOMContentLoaded',function(){ setTimeout(_patchButton,1600); });
+            })();
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
@@ -16439,6 +16717,7 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
