@@ -16700,6 +16700,236 @@
                 _patchButton();
                 document.addEventListener('DOMContentLoaded',function(){ setTimeout(_patchButton,1600); });
             })();
+
+            // Targeted live chat fix: realtime open conversations + typing indicators.
+            (function _mrLiveOpenChatAndTypingFix(){
+                var _msgRef = null;
+                var _msgPoll = null;
+                var _msgTimer = null;
+                var _typingRef = null;
+                var _typingPoll = null;
+                var _typingTimer = null;
+                var _typingKey = '';
+                var _lastTypingWrite = 0;
+
+                function _me(){ return STATE.currentUser && STATE.currentUser.username; }
+                function _nowMs(){ return Date.now ? Date.now() : new Date().getTime(); }
+                function _esc(v){ return (typeof escapeHTML === 'function') ? escapeHTML(v) : String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+                function _safeKey(v){ return String(v || '').replace(/[.#$/\[\]]/g, '_'); }
+                function _chatKey(){
+                    var me = _me();
+                    if (!me) return '';
+                    if (STATE.activeChatPair) return 'pair_' + _safeKey(STATE.activeChatPair);
+                    if (STATE.activeChatGroup) return 'group_' + _safeKey(STATE.activeChatGroup);
+                    if (STATE.activeChatUser) return [me, STATE.activeChatUser].sort().map(_safeKey).join('__');
+                    return '';
+                }
+                function _selectedContact(){
+                    return STATE.activeChatPair || STATE.activeChatGroup || STATE.activeChatUser || '';
+                }
+                function _isChatOpen(){
+                    return !!(document.getElementById('chatMessagesContainer') && document.getElementById('chatInput'));
+                }
+                function _injectStyles(){
+                    if (document.getElementById('mr-live-chat-typing-style')) return;
+                    var st = document.createElement('style');
+                    st.id = 'mr-live-chat-typing-style';
+                    st.textContent =
+                        '#chatTypingIndicator{min-height:22px;padding:0 18px 8px;color:var(--text2);font-size:.78rem;font-weight:700;display:flex;align-items:center;gap:7px}' +
+                        '#chatTypingIndicator:empty{display:none}' +
+                        '.mr-typing-dots{display:inline-flex;gap:3px;align-items:center}' +
+                        '.mr-typing-dots span{width:5px;height:5px;border-radius:50%;background:var(--primary);animation:mrTypingBounce 1s infinite ease-in-out}' +
+                        '.mr-typing-dots span:nth-child(2){animation-delay:.14s}.mr-typing-dots span:nth-child(3){animation-delay:.28s}' +
+                        '@keyframes mrTypingBounce{0%,80%,100%{opacity:.35;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}';
+                    document.head.appendChild(st);
+                }
+                function _ensureTypingIndicator(){
+                    _injectStyles();
+                    var inputBar = document.querySelector('.messenger-input');
+                    var messages = document.getElementById('chatMessagesContainer');
+                    if (!inputBar || !messages || document.getElementById('chatTypingIndicator')) return;
+                    var el = document.createElement('div');
+                    el.id = 'chatTypingIndicator';
+                    inputBar.parentNode.insertBefore(el, inputBar);
+                }
+                function _clearTypingUi(){
+                    var el = document.getElementById('chatTypingIndicator');
+                    if (el) el.innerHTML = '';
+                }
+                function _typingName(username, rec){
+                    var users = STATE.users || {};
+                    var u = users[username] || {};
+                    return (rec && rec.name) || u.name || u.displayName || username || 'Someone';
+                }
+                function _renderTyping(snapshot){
+                    var el = document.getElementById('chatTypingIndicator');
+                    if (!el) return;
+                    var me = _me(), now = _nowMs(), names = [];
+                    Object.keys(snapshot || {}).forEach(function(k){
+                        var rec = snapshot[k] || {};
+                        var user = rec.user || k;
+                        if (!rec.typing || user === me) return;
+                        if (rec.expiresAt && Number(rec.expiresAt) < now) return;
+                        names.push(_typingName(user, rec));
+                    });
+                    if (!names.length) { el.innerHTML = ''; return; }
+                    var label = names.length === 1 ? names[0] + ' is typing' : names.slice(0, 2).join(', ') + (names.length > 2 ? ' +' + (names.length - 2) : '') + ' are typing';
+                    el.innerHTML = '<span>' + _esc(label) + '</span><span class="mr-typing-dots"><span></span><span></span><span></span></span>';
+                }
+                function _detachTyping(){
+                    if (_typingRef && _typingRef.off) { try { _typingRef.off(); } catch (_) {} }
+                    _typingRef = null;
+                    if (_typingPoll) { clearInterval(_typingPoll); _typingPoll = null; }
+                    _typingKey = '';
+                    _clearTypingUi();
+                }
+                function _attachTyping(){
+                    _ensureTypingIndicator();
+                    var key = _chatKey();
+                    if (!key || key === _typingKey) return;
+                    _setTyping(false);
+                    _detachTyping();
+                    _typingKey = key;
+                    if (firebaseConnected && db) {
+                        _typingRef = db.ref('chatTyping/' + key);
+                        _typingRef.on('value', function(snap){ _renderTyping(snap.val() || {}); });
+                    } else {
+                        _typingPoll = setInterval(function(){
+                            try { _renderTyping(JSON.parse(localStorage.getItem('ph_chat_typing_' + key) || '{}')); } catch (_) { _renderTyping({}); }
+                        }, 900);
+                    }
+                }
+                function _setTyping(active){
+                    var me = _me(), key = _chatKey();
+                    if (!me || !key || STATE.activeChatPair) return;
+                    var now = _nowMs();
+                    if (active && now - _lastTypingWrite < 650) return;
+                    _lastTypingWrite = now;
+                    var users = STATE.users || {}, u = users[me] || STATE.currentUser || {};
+                    var rec = { user:me, name:u.name || u.displayName || me, typing:!!active, updatedAt:now, expiresAt:active ? now + 3500 : now };
+                    if (firebaseConnected && db) {
+                        var ref = db.ref('chatTyping/' + key + '/' + _safeKey(me));
+                        if (active) {
+                            ref.set(rec);
+                            try { ref.onDisconnect().remove(); } catch (_) {}
+                        } else {
+                            ref.remove();
+                        }
+                    } else {
+                        try {
+                            var storeKey = 'ph_chat_typing_' + key;
+                            var data = JSON.parse(localStorage.getItem(storeKey) || '{}');
+                            if (active) data[me] = rec; else delete data[me];
+                            localStorage.setItem(storeKey, JSON.stringify(data));
+                        } catch (_) {}
+                    }
+                }
+                function _bindTypingInput(){
+                    var input = document.getElementById('chatInput');
+                    if (!input || input.__mrLiveTypingBound) return;
+                    input.__mrLiveTypingBound = true;
+                    input.addEventListener('input', function(){
+                        if (!_selectedContact() || STATE.activeChatPair) return;
+                        if ((input.value || '').trim()) {
+                            _setTyping(true);
+                            if (_typingTimer) clearTimeout(_typingTimer);
+                            _typingTimer = setTimeout(function(){ _setTyping(false); }, 1800);
+                        } else {
+                            _setTyping(false);
+                        }
+                    });
+                    input.addEventListener('blur', function(){ _setTyping(false); });
+                    input.addEventListener('keydown', function(e){ if (e.key === 'Enter') _setTyping(false); });
+                    var send = document.getElementById('chatSendBtn');
+                    if (send && !send.__mrLiveTypingBound) {
+                        send.__mrLiveTypingBound = true;
+                        send.addEventListener('click', function(){ _setTyping(false); });
+                    }
+                }
+                function _refreshActiveConversation(){
+                    if (!_isChatOpen() || !_selectedContact()) return;
+                    if (_msgTimer) clearTimeout(_msgTimer);
+                    _msgTimer = setTimeout(function(){
+                        try { loadChatMessages(); } catch (_) {}
+                    }, 80);
+                }
+                function _attachMessageLive(){
+                    if (!_isChatOpen()) return;
+                    if (_msgRef || _msgPoll) return;
+                    if (firebaseConnected && db) {
+                        _msgRef = db.ref('chatMessages');
+                        _msgRef.on('child_added', _refreshActiveConversation);
+                        _msgRef.on('child_changed', _refreshActiveConversation);
+                        _msgRef.on('child_removed', _refreshActiveConversation);
+                    } else {
+                        _msgPoll = setInterval(_refreshActiveConversation, 1200);
+                    }
+                }
+                function _wrapSelectContact(){
+                    if (!window._selectChatContact || window._selectChatContact.__mrLivePatched) return;
+                    var prev = window._selectChatContact;
+                    window._selectChatContact = function(){
+                        _setTyping(false);
+                        var result = prev.apply(this, arguments);
+                        setTimeout(function(){
+                            _ensureTypingIndicator();
+                            _bindTypingInput();
+                            _attachTyping();
+                            _attachMessageLive();
+                        }, 120);
+                        return result;
+                    };
+                    window._selectChatContact.__mrLivePatched = true;
+                }
+                function _afterChatOpen(){
+                    _injectStyles();
+                    _ensureTypingIndicator();
+                    _bindTypingInput();
+                    _wrapSelectContact();
+                    _attachMessageLive();
+                    if (_selectedContact()) _attachTyping();
+                }
+                if (typeof showChatUI === 'function' && !showChatUI.__mrLiveOpenPatched) {
+                    var prevShow = showChatUI;
+                    showChatUI = function(){
+                        var result = prevShow.apply(this, arguments);
+                        setTimeout(_afterChatOpen, 120);
+                        setTimeout(_afterChatOpen, 600);
+                        return result;
+                    };
+                    showChatUI.__mrLiveOpenPatched = true;
+                }
+                if (typeof loadChatContacts === 'function' && !loadChatContacts.__mrLiveOpenPatched) {
+                    var prevContacts = loadChatContacts;
+                    loadChatContacts = async function(){
+                        var result = await prevContacts.apply(this, arguments);
+                        _wrapSelectContact();
+                        return result;
+                    };
+                    loadChatContacts.__mrLiveOpenPatched = true;
+                }
+                if (typeof sendChatMessage === 'function' && !sendChatMessage.__mrLiveOpenPatched) {
+                    var prevSend = sendChatMessage;
+                    sendChatMessage = async function(){
+                        _setTyping(false);
+                        var result = await prevSend.apply(this, arguments);
+                        _refreshActiveConversation();
+                        return result;
+                    };
+                    sendChatMessage.__mrLiveOpenPatched = true;
+                }
+                var prevClose = window.closeModal;
+                if (typeof prevClose === 'function' && !prevClose.__mrLiveOpenPatched) {
+                    window.closeModal = function(){
+                        if (document.getElementById('chatMessagesContainer')) _setTyping(false);
+                        return prevClose.apply(this, arguments);
+                    };
+                    window.closeModal.__mrLiveOpenPatched = true;
+                }
+                window.addEventListener('beforeunload', function(){ _setTyping(false); });
+                document.addEventListener('visibilitychange', function(){ if (document.hidden) _setTyping(false); });
+                document.addEventListener('DOMContentLoaded', function(){ setTimeout(_afterChatOpen, 1800); });
+            })();
             document.addEventListener('DOMContentLoaded', init);
         })();
     </script>
@@ -16733,6 +16963,7 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
