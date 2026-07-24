@@ -1298,6 +1298,66 @@
             border-radius: 12px;
             opacity: .8;
         }
+
+        .permission-groups {
+            display: grid;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .permission-group {
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            background: var(--input-bg);
+            overflow: hidden;
+        }
+        .permission-group summary {
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 12px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .permission-group summary::-webkit-details-marker {
+            display: none;
+        }
+        .permission-group summary::after {
+            content: "\f078";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            font-size: .75rem;
+            color: var(--text2);
+            transition: transform var(--transition);
+        }
+        .permission-group[open] summary::after {
+            transform: rotate(180deg);
+        }
+        .permission-group-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .permission-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 8px;
+            padding: 0 12px 12px;
+        }
+        .permission-items label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 9px;
+            border-radius: 10px;
+            background: rgba(255,255,255,.28);
+            font-size: .85rem;
+        }
+        .dark .permission-items label {
+            background: rgba(255,255,255,.05);
+        }
         /* BRANDING */
         .branding-preview {
             margin-top: 12px;
@@ -3253,7 +3313,12 @@
                     canEditAgentMargins: true,
                     canDeleteAgentMargins: true,
                     canManageAgents: true,
-                    canManageMonths: true
+                    canManageMonths: true,
+                    canBookings: true,
+                    canViewBookings: true,
+                    canEditBookings: true,
+                    canEditBookingInvoiceNumber: true,
+                    canEditBookingMargin: true
                 }
             };
 
@@ -5729,6 +5794,19 @@
             // --------------------------------------------------------------
             // 19. UI NAVIGATION
             // --------------------------------------------------------------
+
+            function sortDashboardCardsAlphabetically() {
+                try {
+                    var grid = document.getElementById('dashGrid') || document.querySelector('.dashboard-grid');
+                    if (!grid) return;
+                    Array.prototype.slice.call(grid.querySelectorAll('.dash-card')).sort(function(a, b) {
+                        var at = ((a.querySelector('h4') || {}).textContent || '').trim();
+                        var bt = ((b.querySelector('h4') || {}).textContent || '').trim();
+                        return at.localeCompare(bt, undefined, { sensitivity: 'base' });
+                    }).forEach(function(card) { grid.appendChild(card); });
+                } catch (_) {}
+            }
+
             function ensureAtolDashboardCard() {
                 try {
                     if (document.querySelector('.dash-card[data-action="atol"]')) return;
@@ -5748,6 +5826,7 @@
             function showDashboard(skipAutoLoad) {
                 ensureAtolDashboardCard();
                 ensureHotelVoucherDashboardCards();
+                sortDashboardCardsAlphabetically();
                 document.getElementById('dashboard').style.display = 'block';
                 document.getElementById('quoteBuilder').classList.remove('visible');
                 document.getElementById('quoteBuilder').style.display = 'none';
@@ -8024,10 +8103,11 @@
                 var userCards = entries.map(function(entry) {
                     var key = entry[0],
                         u = entry[1];
-                    var permTags = Object.entries(u.permissions || {}).filter(function(p) { return p[1]; }).map(
-                        function(p) {
-                            return '<span>' + p[0].replace('can', '') + '</span>';
-                        }).join('');
+                    var permTags = Object.entries(u.permissions || {}).filter(function(p) { return p[1]; }).sort(function(a, b) {
+                        return a[0].localeCompare(b[0], undefined, { sensitivity: 'base' });
+                    }).map(function(p) {
+                        return '<span>' + p[0].replace('can', '') + '</span>';
+                    }).join('');
                     var roleClass = u.role === 'agent' ? 'agent' : u.role === 'manager' ? 'manager' : '';
                     var pendingCount = (u.pendingIps || []).length;
                     var approvedCount = (u.approvedIps || []).length;
@@ -8253,10 +8333,145 @@
                 })();
             }
 
+
+            var USER_PERMISSION_GROUPS = [
+                { group: 'Accounts', items: [
+                    { key: 'canAddAccountsFromInvoice', label: 'Add Accounts from Invoice' },
+                    { key: 'canEditAccountsAgent', label: 'Edit Accounts (Agent)' },
+                    { key: 'canManageAccounts', label: 'Manage Accounts' }
+                ] },
+                { group: 'Agent Margins', items: [
+                    { key: 'canAddAgentMargins', label: 'Add Agent Margins' },
+                    { key: 'canDeleteAgentMargins', label: 'Delete Agent Margins' },
+                    { key: 'canEditAgentMargins', label: 'Edit Agent Margins' },
+                    { key: 'canManageAgents', label: 'Manage Agents' },
+                    { key: 'canManageMonths', label: 'Manage Months' },
+                    { key: 'canViewAgentMargins', label: 'View Agent Margins' }
+                ] },
+                { group: 'ATOL Certificates', items: [
+                    { key: 'canViewAtolHistory', label: 'Certificate History' },
+                    { key: 'canCreateAtol', label: 'Create ATOL Certificate' },
+                    { key: 'canEditAtol', label: 'Edit ATOL Certificate' }
+                ] },
+                { group: 'Bookings', items: [
+                    { key: 'canBookings', label: 'Bookings' },
+                    { key: 'canEditBookings', label: 'Edit Bookings' },
+                    { key: 'canEditBookingInvoiceNumber', label: 'Edit Invoice Number' },
+                    { key: 'canEditBookingMargin', label: 'Edit Margin' },
+                    { key: 'canViewBookings', label: 'View Own Bookings' }
+                ] },
+                { group: 'Calendar & Tasks', items: [
+                    { key: 'canAddCalendarTasks', label: 'Add Daily Task on Calendar' },
+                    { key: 'canCreateTasks', label: 'Create Task' },
+                    { key: 'canDeleteTasks', label: 'Delete Task' },
+                    { key: 'canEditTasks', label: 'Edit Task' },
+                    { key: 'canViewCalendar', label: 'View Calendar' },
+                    { key: 'canViewTaskHistory', label: 'View Task History' }
+                ] },
+                { group: 'Data', items: [
+                    { key: 'canAssignAgents', label: 'Assign Agents' },
+                    { key: 'canExportData', label: 'Export Data' }
+                ] },
+                { group: 'Hotel Vouchers', items: [
+                    { key: 'canCreateHotelVoucher', label: 'Create Hotel Voucher' },
+                    { key: 'canDownloadHotelVoucherPDF', label: 'Download Hotel Voucher PDF' },
+                    { key: 'canEditHotelVoucher', label: 'Edit Hotel Voucher' },
+                    { key: 'canViewHotelVoucher', label: 'View Hotel Voucher' },
+                    { key: 'canViewVoucherHistory', label: 'View Voucher History' }
+                ] },
+                { group: 'Inquiries', items: [
+                    { key: 'canCreateInquiries', label: 'Create Inquiries' },
+                    { key: 'canDeleteInquiries', label: 'Delete Inquiries' },
+                    { key: 'canEditInquiries', label: 'Edit Inquiries' },
+                    { key: 'canViewInquiries', label: 'View Inquiries (Own)' }
+                ] },
+                { group: 'Invoices', items: [
+                    { key: 'canDeleteInvoices', label: 'Delete Invoices' },
+                    { key: 'canEditInvoiceAgent', label: 'Edit Invoice (Agent)' },
+                    { key: 'canEditInvoices', label: 'Edit Invoices' },
+                    { key: 'canMakeInvoice', label: 'Make Invoice' },
+                    { key: 'canViewInvoices', label: 'View Invoices' }
+                ] },
+                { group: 'Quotes', items: [
+                    { key: 'canCreateQuotes', label: 'Create Quotes' },
+                    { key: 'canDeleteQuotes', label: 'Delete Quotes' },
+                    { key: 'canEditQuotes', label: 'Edit Quotes' },
+                    { key: 'canViewQuoteHistory', label: 'Quote History (Own Quotes)' }
+                ] }
+            ];
+
+            var DEFAULT_NEW_USER_PERMISSIONS = {
+                canAddCalendarTasks: true,
+                canCreateInquiries: true,
+                canCreateQuotes: true,
+                canCreateTasks: true,
+                canEditQuotes: true,
+                canViewCalendar: true,
+                canViewInquiries: true,
+                canViewInvoices: true,
+                canViewQuoteHistory: true,
+                canViewTaskHistory: true
+            };
+
+            function buildPermissionGroupsHTML(inputClass, permissions, isAdminUser) {
+                permissions = permissions || {};
+                var disabled = isAdminUser ? ' disabled' : '';
+                var groups = USER_PERMISSION_GROUPS.slice().sort(function(a, b) {
+                    return a.group.localeCompare(b.group, undefined, { sensitivity: 'base' });
+                });
+                var html = '<div class="form-group"><label>Permissions ' + (isAdminUser ? '(Admin: Full Access)' : '') + '</label><div class="permission-groups">';
+                groups.forEach(function(group) {
+                    var items = group.items.slice().sort(function(a, b) {
+                        return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
+                    });
+                    var allChecked = items.every(function(item) { return isAdminUser || !!permissions[item.key]; });
+                    html += '<details class="permission-group" open><summary><span class="permission-group-title"><input type="checkbox" class="perm-group-master" onclick="event.stopPropagation()" onchange="window._togglePermissionGroup(this)" ' + (allChecked ? 'checked' : '') + disabled + ' /> ' + group.group + '</span></summary><div class="permission-items">';
+                    items.forEach(function(item) {
+                        var checked = (isAdminUser || !!permissions[item.key]) ? ' checked' : '';
+                        html += '<label><input type="checkbox" class="' + inputClass + '" value="' + item.key + '"' + checked + disabled + ' onchange="window._syncPermissionGroup(this)" /> ' + item.label + '</label>';
+                    });
+                    html += '</div></details>';
+                });
+                html += '</div>' + (isAdminUser ? '<div class="input-hint">Admin has all permissions by default.</div>' : '') + '</div>';
+                return html;
+            }
+
+            function syncPermissionGroupMasters(root) {
+                try {
+                    var scope = root || document;
+                    var groups = scope.classList && scope.classList.contains('permission-group') ? [scope] : Array.prototype.slice.call(scope.querySelectorAll('.permission-group'));
+                    groups.forEach(function(group) {
+                        var master = group.querySelector('.perm-group-master');
+                        var boxes = Array.prototype.slice.call(group.querySelectorAll('input[type="checkbox"]')).filter(function(cb) { return !cb.classList.contains('perm-group-master'); });
+                        if (!master || !boxes.length) return;
+                        var checked = boxes.filter(function(cb) { return cb.checked; }).length;
+                        master.checked = checked === boxes.length;
+                        master.indeterminate = checked > 0 && checked < boxes.length;
+                    });
+                } catch (_) {}
+            }
+
+            window._togglePermissionGroup = function(master) {
+                var group = master && master.closest ? master.closest('.permission-group') : null;
+                if (!group) return;
+                group.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+                    if (!cb.classList.contains('perm-group-master') && !cb.disabled) cb.checked = master.checked;
+                });
+                master.indeterminate = false;
+            };
+
+            window._syncPermissionGroup = function(input) {
+                if (input && input.closest) syncPermissionGroupMasters(input.closest('.permission-group'));
+            };
+
+
             function showAddUser() {
                 showModal(
-                    '<h3>Add User</h3><div class="form-row"><div class="form-group"><label>Username *</label><input type="text" id="newUsername" /></div><div class="form-group"><label>Password *</label><input type="password" id="newPassword" /></div><div class="form-group"><label>Full Name</label><input type="text" id="newName" /></div><div class="form-group"><label>Email</label><input type="email" id="newEmail" /></div><div class="form-group"><label>Role</label><select id="newRole"><option value="agent">Agent</option><option value="manager">Manager</option><option value="accounts">Accounts</option><option value="readonly">Read Only</option></select></div></div><div class="form-group"><label>Permissions</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;"><label><input type="checkbox" class="perm-check" value="canCreateQuotes" checked /> Create Quotes</label><label><input type="checkbox" class="perm-check" value="canEditQuotes" checked /> Edit Quotes</label><label><input type="checkbox" class="perm-check" value="canViewInvoices" checked /> View Invoices</label><label><input type="checkbox" class="perm-check" value="canManageAccounts" /> Manage Accounts</label><label><input type="checkbox" class="perm-check" value="canViewQuoteHistory" checked /> Quote History (Own Quotes)</label><label><input type="checkbox" class="perm-check" value="canDeleteQuotes" /> Delete Quotes</label><label><input type="checkbox" class="perm-check" value="canDeleteInvoices" /> Delete Invoices</label><label><input type="checkbox" class="perm-check" value="canExportData" /> Export Data</label><label><input type="checkbox" class="perm-check" value="canAssignAgents" /> Assign Agents</label><label><input type="checkbox" class="perm-check" value="canEditInvoices" /> Edit Invoices</label><label><input type="checkbox" class="perm-check" value="canViewInquiries" checked /> View Inquiries (Own)</label><label><input type="checkbox" class="perm-check" value="canCreateInquiries" checked /> Create Inquiries</label><label><input type="checkbox" class="perm-check" value="canEditInquiries" /> Edit Inquiries</label><label><input type="checkbox" class="perm-check" value="canDeleteInquiries" /> Delete Inquiries</label><label><input type="checkbox" class="perm-check" value="canMakeInvoice" /> Make Invoice</label><label><input type="checkbox" class="perm-check" value="canEditInvoiceAgent" /> Edit Invoice (Agent)</label><label><input type="checkbox" class="perm-check" value="canAddAccountsFromInvoice" /> Add Accounts from Invoice</label><label><input type="checkbox" class="perm-check" value="canEditAccountsAgent" /> Edit Accounts (Agent)</label><label><input type="checkbox" class="perm-check" value="canCreateAtol" /> Create ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canEditAtol" /> Edit ATOL Certificate</label><label><input type="checkbox" class="perm-check" value="canViewAtolHistory" /> Certificate History</label><label><input type="checkbox" class="perm-check" value="canCreateHotelVoucher" /> Create Hotel Voucher</label><label><input type="checkbox" class="perm-check" value="canEditHotelVoucher" /> Edit Hotel Voucher</label><label><input type="checkbox" class="perm-check" value="canViewHotelVoucher" /> View Hotel Voucher</label><label><input type="checkbox" class="perm-check" value="canDownloadHotelVoucherPDF" /> Download Hotel Voucher PDF</label><label><input type="checkbox" class="perm-check" value="canViewVoucherHistory" /> View Voucher History</label><label><input type="checkbox" class="perm-check" value="canViewCalendar" checked /> View Calendar</label><label><input type="checkbox" class="perm-check" value="canAddCalendarTasks" checked /> Add Daily Task on Calendar</label><label><input type="checkbox" class="perm-check" value="canCreateTasks" checked /> Create Task</label><label><input type="checkbox" class="perm-check" value="canEditTasks" /> Edit Task</label><label><input type="checkbox" class="perm-check" value="canViewTaskHistory" checked /> View Task History</label><label><input type="checkbox" class="perm-check" value="canDeleteTasks" /> Delete Task</label><label><input type="checkbox" class="perm-check" value="canViewAgentMargins" /> View Agent Margins</label><label><input type="checkbox" class="perm-check" value="canAddAgentMargins" /> Add Agent Margins</label><label><input type="checkbox" class="perm-check" value="canEditAgentMargins" /> Edit Agent Margins</label><label><input type="checkbox" class="perm-check" value="canDeleteAgentMargins" /> Delete Agent Margins</label><label><input type="checkbox" class="perm-check" value="canManageAgents" /> Manage Agents</label><label><input type="checkbox" class="perm-check" value="canManageMonths" /> Manage Months</label></div></div><div class="modal-actions"><button class="btn btn-primary" id="btnCreateUser">Create</button><button class="btn btn-close-modal" data-close-modal>Cancel</button></div>'
+                    '<h3>Add User</h3><div class="form-row"><div class="form-group"><label>Username *</label><input type="text" id="newUsername" /></div><div class="form-group"><label>Password *</label><input type="password" id="newPassword" /></div><div class="form-group"><label>Full Name</label><input type="text" id="newName" /></div><div class="form-group"><label>Email</label><input type="email" id="newEmail" /></div><div class="form-group"><label>Role</label><select id="newRole"><option value="agent">Agent</option><option value="manager">Manager</option><option value="accounts">Accounts</option><option value="readonly">Read Only</option></select></div></div>' +
+                    buildPermissionGroupsHTML('perm-check', DEFAULT_NEW_USER_PERMISSIONS, false) +
+                    '<div class="modal-actions"><button class="btn btn-primary" id="btnCreateUser">Create</button><button class="btn btn-close-modal" data-close-modal>Cancel</button></div>'
                     );
+                syncPermissionGroupMasters();
                 document.getElementById('btnCreateUser').addEventListener('click', async function() {
                     var username = document.getElementById('newUsername').value.trim();
                     var password = document.getElementById('newPassword').value;
@@ -8276,6 +8491,8 @@
                     renderUserManagement();
                 });
             }
+
+
 
             function showEditUser(username) {
                 (async function() {
@@ -8310,130 +8527,13 @@
                             'selected' : '') +
                         '>Locked</option></select>' + (isAdminUser ?
                             '<div class="input-hint">Admin cannot be locked.</div>' : '') +
-                        '</div></div><div class="form-group"><label>Permissions ' + (isAdminUser ?
-                            '(Admin: Full Access)' : '') +
-                        '</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">' +
-                        '<label><input type="checkbox" class="edit-perm" value="canCreateQuotes" ' +
-                        (perms.canCreateQuotes ? 'checked' : '') + (isAdminUser ? 'disabled' :
-                            '') + ' /> Create Quotes</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canEditQuotes" ' +
-                        (perms.canEditQuotes ? 'checked' : '') + (isAdminUser ? 'disabled' :
-                            '') + ' /> Edit Quotes</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canViewInvoices" ' +
-                        (perms.canViewInvoices ? 'checked' : '') + (isAdminUser ? 'disabled' :
-                            '') + ' /> View Invoices</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canManageAccounts" ' +
-                        (perms.canManageAccounts ? 'checked' : '') + (isAdminUser ? 'disabled' :
-                            '') + ' /> Manage Accounts</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canViewQuoteHistory" ' +
-                        ((perms.canViewQuoteHistory || perms.canViewAllQuotes) ? 'checked' : '') + (isAdminUser ? 'disabled' :
-                            '') + ' /> Quote History (Own Quotes)</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canDeleteQuotes" ' +
-                        (perms.canDeleteQuotes ? 'checked' : '') + (isAdminUser ? 'disabled' :
-                            '') + ' /> Delete Quotes</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canDeleteInvoices" ' +
-                        (perms.canDeleteInvoices ? 'checked' : '') + (isAdminUser ? 'disabled' :
-                            '') + ' /> Delete Invoices</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canExportData" ' +
-                        (perms.canExportData ? 'checked' : '') + (isAdminUser ? 'disabled' :
-                            '') + ' /> Export Data</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canAssignAgents" ' +
-                        (perms.canAssignAgents ? 'checked' : '') + (isAdminUser ? 'disabled' :
-                            '') + ' /> Assign Agents</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canEditInvoices" ' +
-                        (perms.canEditInvoices ? 'checked' : '') + (isAdminUser ? 'disabled' :
-                            '') + ' /> Edit Invoices</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canViewInquiries" ' +
-                        (perms.canViewInquiries ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> View Inquiries (Own)</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canCreateInquiries" ' +
-                        (perms.canCreateInquiries ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Create Inquiries</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canEditInquiries" ' +
-                        (perms.canEditInquiries ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Edit Inquiries</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canDeleteInquiries" ' +
-                        (perms.canDeleteInquiries ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Delete Inquiries</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canMakeInvoice" ' +
-                        (perms.canMakeInvoice ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Make Invoice</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canEditInvoiceAgent" ' +
-                        (perms.canEditInvoiceAgent ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Edit Invoice (Agent)</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canAddAccountsFromInvoice" ' +
-                        (perms.canAddAccountsFromInvoice ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Add Accounts from Invoice</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canEditAccountsAgent" ' +
-                        (perms.canEditAccountsAgent ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Edit Accounts (Agent)</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canCreateAtol" ' +
-                        (perms.canCreateAtol ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Create ATOL Certificate</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canEditAtol" ' +
-                        (perms.canEditAtol ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Edit ATOL Certificate</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canViewAtolHistory" ' +
-                        (perms.canViewAtolHistory ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Certificate History</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canCreateHotelVoucher" ' +
-                        ((perms.canCreateHotelVoucher || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Create Hotel Voucher</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canEditHotelVoucher" ' +
-                        ((perms.canEditHotelVoucher || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Edit Hotel Voucher</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canViewHotelVoucher" ' +
-                        ((perms.canViewHotelVoucher || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> View Hotel Voucher</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canDownloadHotelVoucherPDF" ' +
-                        ((perms.canDownloadHotelVoucherPDF || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Download Hotel Voucher PDF</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canViewVoucherHistory" ' +
-                        ((perms.canViewVoucherHistory || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> View Voucher History</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canViewCalendar" ' +
-                        (perms.canViewCalendar ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> View Calendar</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canAddCalendarTasks" ' +
-                        (perms.canAddCalendarTasks ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Add Daily Task on Calendar</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canCreateTasks" ' +
-                        (perms.canCreateTasks ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Create Task</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canEditTasks" ' +
-                        (perms.canEditTasks ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Edit Task</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canViewTaskHistory" ' +
-                        (perms.canViewTaskHistory ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> View Task History</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canDeleteTasks" ' +
-                        (perms.canDeleteTasks ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Delete Task</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canViewAgentMargins" ' +
-                        ((perms.canViewAgentMargins || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> View Agent Margins</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canAddAgentMargins" ' +
-                        ((perms.canAddAgentMargins || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Add Agent Margins</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canEditAgentMargins" ' +
-                        ((perms.canEditAgentMargins || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Edit Agent Margins</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canDeleteAgentMargins" ' +
-                        ((perms.canDeleteAgentMargins || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Delete Agent Margins</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canManageAgents" ' +
-                        ((perms.canManageAgents || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Manage Agents</label>' +
-                        '<label><input type="checkbox" class="edit-perm" value="canManageMonths" ' +
-                        ((perms.canManageMonths || isAdminUser) ? 'checked' : '') + (isAdminUser ? 'disabled' : '') +
-                        ' /> Manage Months</label>' +
-                        '</div>' + (isAdminUser ?
-                            '<div class="input-hint">Admin has all permissions by default.</div>' :
-                            '') +
-                        '</div><div class="modal-actions"><button class="btn btn-primary" id="btnSaveUser">Save</button><button class="btn btn-outline" onclick="window._resetUserPwdFromEdit(\'' +
+                        '</div></div>' +
+                        buildPermissionGroupsHTML('edit-perm', perms, isAdminUser) +
+                        '<div class="modal-actions"><button class="btn btn-primary" id="btnSaveUser">Save</button><button class="btn btn-outline" onclick="window._resetUserPwdFromEdit(\'' +
                         username +
                         '\')">Change Password</button><button class="btn btn-close-modal" data-close-modal>Cancel</button></div>'
                         );
+                    syncPermissionGroupMasters();
                     document.getElementById('btnSaveUser').addEventListener('click', async function() {
                         var name = document.getElementById('editName').value.trim();
                         var email = document.getElementById('editEmail').value.trim();
@@ -8462,6 +8562,7 @@
                         showResetPassword(uname); };
                 })();
             }
+
 
             function showResetPassword(username) {
                 showModal(
@@ -8523,6 +8624,7 @@
                     }
                     addCard('hotelVoucher', 'canCreateHotelVoucher', 'fas fa-hotel', 'Hotel Voucher', 'Create professional hotel vouchers', null);
                     addCard('voucherHistory', 'canViewVoucherHistory', 'fas fa-folder-open', 'Voucher History', 'View your saved hotel vouchers', 'voucherCountBadge');
+                    if (typeof sortDashboardCardsAlphabetically === 'function') sortDashboardCardsAlphabetically();
                     updateHotelVoucherCount();
                 } catch (e) { console.warn('Hotel voucher cards failed:', e); }
             }
@@ -10124,7 +10226,7 @@
                 function add(action,perm,icon,title,desc,handler){if(grid.querySelector('.dash-card[data-action="'+action+'"]'))return;var c=document.createElement('div');c.className='dash-card';c.dataset.action=action;if(perm)c.dataset.perm=perm;c.innerHTML='<i class="'+icon+'"></i><h4>'+title+'</h4><p>'+desc+'</p>';c.addEventListener('click',handler);var theme=grid.querySelector('.dash-card[data-action="theme"]');if(theme)grid.insertBefore(c,theme);else grid.appendChild(c)}
                 add('calendar','canViewCalendar','fas fa-calendar-days','Calendar','Edit daily tasks and view portal logs',function(){if(!isAdmin()&&!hasPermission('canViewCalendar'))return showToast('Permission denied.','error');showCalendar()});
                 add('tasks','canViewTaskHistory','fas fa-list-check','Task Manager','Create, schedule and track agent tasks',function(){if(!isAdmin()&&!hasPermission('canViewTaskHistory')&&!hasPermission('canCreateTasks'))return showToast('Permission denied.','error');showTaskManager()});
-                if(STATE.currentUser&&!isAdmin()){var cal=grid.querySelector('.dash-card[data-action="calendar"]'),tsk=grid.querySelector('.dash-card[data-action="tasks"]');if(cal)cal.style.display=hasPermission('canViewCalendar')?'block':'none';if(tsk)tsk.style.display=(hasPermission('canViewTaskHistory')||hasPermission('canCreateTasks'))?'block':'none';}}
+                if(STATE.currentUser&&!isAdmin()){var cal=grid.querySelector('.dash-card[data-action="calendar"]'),tsk=grid.querySelector('.dash-card[data-action="tasks"]');if(cal)cal.style.display=hasPermission('canViewCalendar')?'block':'none';if(tsk)tsk.style.display=(hasPermission('canViewTaskHistory')||hasPermission('canCreateTasks'))?'block':'none';}if(typeof sortDashboardCardsAlphabetically==='function')sortDashboardCardsAlphabetically();}
                 catch(_){}}
             function ensureNotificationUI(){ensureMuleDashboardCards();try{var a=document.querySelector('.topbar-actions');if(a&&!document.getElementById('chatTopNotifyBtn')){var b=document.createElement('button');b.id='chatTopNotifyBtn';b.title='Chat notifications';b.innerHTML='<i class="fas fa-bell"></i><span class="notify-badge" id="chatNotifyBadge">0</span>';b.onclick=function(){showChatUI()};var t=document.getElementById('themeToggle');if(t)a.insertBefore(b,t);else a.appendChild(b)}}catch(_){}}
             function _mrSetBadge(n){ensureNotificationUI();['chatNotifyBadge','chatCardNotifyBadge'].forEach(function(id){var e=document.getElementById(id);if(e){e.style.display=n?'inline-flex':'none';e.textContent=n}})}
@@ -12850,8 +12952,27 @@
                 // ---------- PRESENCE TRACKING ----------
                 var _presenceRef = null, _presenceListener = null, _presenceHeartbeat = null;
                 var _onlineAgents = {}; // { username: {lastSeen, name} }
+                var _onlineAgentsSignature = '';
 
                 function _presenceKey(u){ return 'presence/'+u; }
+                function _presenceUISignature(map){
+                    var rows = [];
+                    Object.keys(map || {}).sort().forEach(function(k){
+                        var p = map[k] || {};
+                        rows.push([k, _isOnline(k) ? '1' : '0', p.name || '', p.role || ''].join('|'));
+                    });
+                    return rows.join(';;');
+                }
+                function _applyPresenceSnapshot(map, forceRender){
+                    _onlineAgents = map || {};
+                    _updateOnlineBadge();
+                    var nextSig = _presenceUISignature(_onlineAgents);
+                    var changed = !!forceRender || nextSig !== _onlineAgentsSignature;
+                    if(changed) _onlineAgentsSignature = nextSig;
+                    if(changed && document.getElementById('ccOnlineList')) _renderOnlineAgents();
+                    return changed;
+                }
+
 
                 function _startPresence(){
                     try{
@@ -12889,18 +13010,15 @@
                                     try{ var v = JSON.parse(localStorage.getItem(k)); if(v && v.username) _onlineAgents[v.username]=v; }catch(_){}
                                 }
                             }
+                            _applyPresenceSnapshot(_onlineAgents);
                             if(cb) cb(_onlineAgents);
                             return;
                         }
                         if(_presenceListener) try{ _presenceListener.off(); }catch(_){}
                         _presenceListener = db.ref('presence');
                         _presenceListener.on('value', function(snap){
-                            _onlineAgents = snap.val() || {};
-                            _updateOnlineBadge();
+                            _applyPresenceSnapshot(snap.val() || {});
                             if(cb) cb(_onlineAgents);
-                            // Refresh calls center if open
-                            var ccOnline = document.getElementById('ccOnlineList');
-                            if(ccOnline) _renderOnlineAgents();
                         });
                     }catch(_){}
                 }
@@ -12925,13 +13043,11 @@
                     try{
                         if(firebaseConnected && db){
                             var snap = await db.ref('presence').once('value');
-                            _onlineAgents = snap.val() || {};
+                            _applyPresenceSnapshot(snap.val() || {});
                         } else {
                             _attachPresenceListener();
                         }
-                    }catch(_){}
-                    _updateOnlineBadge();
-                    if(document.getElementById('ccOnlineList')) _renderOnlineAgents();
+                    }catch(_){ _updateOnlineBadge(); }
                 }
 
                 // ---------- CALL LOGS ----------
@@ -13064,18 +13180,9 @@
                         };
                     });
                     _renderCCPanel();
-                    // Refresh the online agents list every 2s while the modal is open
-                    if(_ccOnlineRefreshTimer) clearInterval(_ccOnlineRefreshTimer);
-                    _ccOnlineRefreshTimer = setInterval(function(){
-                        var stillOpen = document.getElementById('ccPanel');
-                        if(!stillOpen){
-                            clearInterval(_ccOnlineRefreshTimer);
-                            _ccOnlineRefreshTimer = null;
-                            return;
-                        }
-                        _updateOnlineBadge();
-                        if(document.getElementById('ccOnlineList')) _renderOnlineAgents();
-                    }, 2000);
+                    // The shared 2s backend presence poll keeps this list current without refreshing unchanged UI.
+                    if(_ccOnlineRefreshTimer){ clearInterval(_ccOnlineRefreshTimer); _ccOnlineRefreshTimer = null; }
+                    _refreshOnlineAgents();
                 };
 
                 function _renderCCPanel(){
@@ -13271,13 +13378,7 @@
                 setTimeout(_kickoff, 1500);
                 setInterval(function(){
                     if(STATE.currentUser && !_presenceHeartbeat) _kickoff();
-                    // Refresh presence map (localStorage fallback) and badge every 2s
-                    try{
-                        if(!firebaseConnected || !db){ _attachPresenceListener(); }
-                    }catch(_){}
-                    _updateOnlineBadge();
-                    // Live-refresh the Calls Center online list if it's currently visible
-                    if(document.getElementById('ccOnlineList')) _renderOnlineAgents();
+                    if(STATE.currentUser) _refreshOnlineAgents();
                 }, 2000);
             })();
 
@@ -16436,8 +16537,11 @@
                 function _initials(name){ return String(name||'?').trim().split(/\s+/).slice(0,2).map(function(x){ return x.charAt(0).toUpperCase(); }).join('') || '?'; }
                 function _avatar(from, sender){ var u=(STATE.users||{})[from]||{}, img=u.profilePhoto||u.photo||''; return '<div class="chat-avatar">'+(img?'<img src="'+_esc(img)+'" alt="'+_esc(sender)+'" />':_esc(_initials(sender)))+'</div>'; }
                 function _chatTargetLabel(m){ if(m.groupId){ var g=(STATE.chatGroups||{})[m.groupId]||{}; return g.name || m.groupId; } return _userName(m.from); }
-                function _incomingMessages(all){ var me=_me(); if(!me) return []; return _vals(all).filter(function(m){ if(!m || m.deleted || m.from===me) return false; if(m.groupId) return (m.members||[]).indexOf(me)!==-1 && !(m.readBy&&m.readBy[me]); return m.to===me && !m.read; }); }
-                function _isCallForMe(c){ var me=_me(); if(!me || !c) return false; if(_isAdminUser()) return true; return c.from===me || (c.members||[]).indexOf(me)!==-1 || (c.to||[]).indexOf(me)!==-1 || (c.acceptedBy||[]).indexOf(me)!==-1; }
+                function _dayKey(v){ try { return toLocalDateKey(v); } catch (_) { var d=new Date(v||0); return isNaN(d.getTime())?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); } }
+                function _isToday(v){ return _dayKey(v) === ((typeof getToday === 'function') ? getToday() : _dayKey(new Date())); }
+                function _agentNoticeAllowed(v){ if(_isAdminUser()) return true; var t=new Date(v||0).getTime()||0; return _isToday(v) && (!_seenAt() || t>_seenAt()); }
+                function _incomingMessages(all){ var me=_me(); if(!me) return []; return _vals(all).filter(function(m){ if(!m || m.deleted || m.from===me || !_agentNoticeAllowed(m.timestamp)) return false; if(m.groupId) return (m.members||[]).indexOf(me)!==-1 && !(m.readBy&&m.readBy[me]); return m.to===me && !m.read; }); }
+                function _isCallForMe(c){ var me=_me(); if(!me || !c) return false; if(!_agentNoticeAllowed(c.endedAt||c.startedAt)) return false; if(_isAdminUser()) return true; return c.from===me || (c.members||[]).indexOf(me)!==-1 || (c.to||[]).indexOf(me)!==-1 || (c.acceptedBy||[]).indexOf(me)!==-1; }
                 async function _readCallLogs(){
                     var out={};
                     try { var fb=await readData('callLogs', null, true); if(fb && typeof fb==='object') out=fb; } catch(_){ }
@@ -17367,7 +17471,11 @@
                 function _day(v){ try { return toLocalDateKey(v); } catch (_) { var d=new Date(v||0); return isNaN(d.getTime())?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); } }
                 function _today(v){ return _day(v) === ((typeof getToday === 'function') ? getToday() : _day(new Date())); }
                 function _name(u){ var users=STATE.users||{}, x=users[u]||{}; return x.name || x.displayName || u || 'User'; }
-                function _forMe(m){ var me=_me(); if(!me || !m || m.deleted || m.from===me || !_today(m.timestamp)) return false; if(m.groupId){ var g=(STATE.chatGroups||{})[m.groupId]||{}, members=m.members||g.members||[]; return members.indexOf(me)!==-1; } return m.to===me; }
+                function _seenKey(){ return 'ph_notifications_seen_at_' + (_me() || 'guest'); }
+                function _seenAt(){ try { return parseInt(localStorage.getItem(_seenKey()) || '0', 10) || 0; } catch(_) { return 0; } }
+                function _setSeenNow(){ try { localStorage.setItem(_seenKey(), String(Date.now())); } catch(_){} }
+                function _afterSeen(v){ var t=new Date(v||0).getTime()||0, seen=_seenAt(); return !seen || t>seen; }
+                function _forMe(m){ var me=_me(); if(!me || !m || m.deleted || m.from===me || !_today(m.timestamp) || !_afterSeen(m.timestamp)) return false; if(m.groupId){ var g=(STATE.chatGroups||{})[m.groupId]||{}, members=m.members||g.members||[]; return members.indexOf(me)!==-1; } return m.to===me; }
                 function _unread(m){ var me=_me(); if(!_forMe(m)) return false; return m.groupId ? !(m.readBy&&m.readBy[me]) : !m.read; }
                 function _setBadge(n){ ['chatNotifyBadge','chatCardNotifyBadge'].forEach(function(id){ var e=document.getElementById(id); if(e){ e.style.display=n?'inline-flex':'none'; e.textContent=n; } }); }
                 async function _readCalls(){
@@ -17398,7 +17506,7 @@
                     var target=m.groupId?m.groupId:m.from, type=m.groupId?'group':'user';
                     return '<div class="notify-row"><div class="notify-icon"><i class="fas fa-message"></i></div><div class="notify-main"><strong>'+_esc(label)+' '+fresh+'</strong><p>'+_esc(body)+'</p><span>'+_esc(when)+'</span></div><button class="btn btn-sm btn-primary" onclick="window._openNotificationChat(\''+type+'\',\''+_esc(target)+'\')">Open</button></div>';
                 }
-                function _callForMe(c){ var me=_me(); if(!me || !c || c.status!=='missed' || !_today(c.endedAt||c.startedAt)) return false; return c.from===me || (c.members||[]).indexOf(me)!==-1 || String(c.to||'')===me; }
+                function _callForMe(c){ var me=_me(), when=c&&(c.endedAt||c.startedAt); if(!me || !c || c.status!=='missed' || !_today(when) || !_afterSeen(when)) return false; return c.from===me || (c.members||[]).indexOf(me)!==-1 || String(c.to||'')===me; }
                 function _callRow(c){
                     var when=(c.endedAt||c.startedAt)?formatDateTime(c.endedAt||c.startedAt):'';
                     return '<div class="notify-row"><div class="notify-icon missed"><i class="fas fa-phone-slash"></i></div><div class="notify-main"><strong>Missed call from '+_esc(_name(c.from))+'</strong><p>Status: missed call</p><span>'+_esc(when)+'</span></div><button class="btn btn-sm btn-outline" onclick="window._openNotificationCalls()">Call Logs</button></div>';
@@ -17419,10 +17527,635 @@
                         html+='</div><div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
                         showModal(html);
                         await _markRead(messages);
+                        _setSeenNow();
                         _setBadge(0);
                     };
                     window.showNotificationCenter.__mrAgentSameDayOnly = true;
                 }
+            })();
+
+            // Additive Bookings module: auto-created from Booked inquiries, permissioned fields,
+            // XLSX export, backup/restore inclusion, and merged backup export.
+            (function _mrBookingsModule(){
+                var BOOKING_PERMS = [
+                    ['canBookings', 'Bookings'],
+                    ['canViewBookings', 'View Own Bookings'],
+                    ['canEditBookings', 'Edit Bookings'],
+                    ['canEditBookingInvoiceNumber', 'Edit Invoice Number'],
+                    ['canEditBookingMargin', 'Edit Margin']
+                ];
+
+                function _me(){ return STATE.currentUser && STATE.currentUser.username; }
+                function _admin(){ try { return typeof isAdmin === 'function' && isAdmin(); } catch (_) { return false; } }
+                function _perm(p){ try { return _admin() || (typeof hasPermission === 'function' && hasPermission(p)); } catch (_) { return _admin(); } }
+                function _canViewBookings(){ return _perm('canBookings') || _perm('canViewBookings'); }
+                function _canEditBooking(b){ return _admin() || (_perm('canEditBookings') && b && b.createdBy === _me()); }
+                function _canEditInvoice(b){ return _admin() || (_perm('canEditBookingInvoiceNumber') && b && b.createdBy === _me()); }
+                function _canEditMargin(b){ return _admin() || (_perm('canEditBookingMargin') && b && b.createdBy === _me()); }
+                function _esc(v){ return (typeof escapeHTML === 'function') ? escapeHTML(v) : String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+                function _idFromInquiry(inq){ return 'inq_' + String(inq && inq.id || '').replace(/[^a-z0-9_-]/gi, '_'); }
+                function _values(o){ if(!o) return []; if(Array.isArray(o)) return o; return Object.keys(o).map(function(k){ var v=o[k]||{}; if(!v.id) v.id=k; return v; }); }
+                function _visibleBookings(list){
+                    list = list || [];
+                    if (_admin()) return list;
+                    var me = _me();
+                    return list.filter(function(b){ return b && (b.createdBy === me || b.agentUsername === me); });
+                }
+                function _bookingDateTime(inq, existing){
+                    var stamp = (existing && existing.bookingAt) || (inq && (inq.bookedAt || inq.updatedAt || inq.createdAt)) || getNowISO();
+                    return {
+                        bookingAt: stamp,
+                        bookingDate: (existing && existing.bookingDate) || (typeof toLocalDateKey === 'function' ? toLocalDateKey(stamp) : String(stamp).slice(0, 10)),
+                        bookingTime: (existing && existing.bookingTime) || (typeof formatTime === 'function' ? formatTime(stamp) : '')
+                    };
+                }
+                function _recordFromInquiry(inq, existing){
+                    existing = existing || {};
+                    var dt = _bookingDateTime(inq, existing);
+                    return Object.assign({}, existing, {
+                        id: existing.id || _idFromInquiry(inq),
+                        inquiryId: inq.id || existing.inquiryId || '',
+                        source: 'inquiry',
+                        bookingAt: dt.bookingAt,
+                        bookingDate: dt.bookingDate,
+                        bookingTime: dt.bookingTime,
+                        agentName: inq.createdByName || existing.agentName || inq.agentName || inq.createdBy || '',
+                        agentUsername: inq.createdBy || existing.agentUsername || '',
+                        createdBy: inq.createdBy || existing.createdBy || '',
+                        createdByName: inq.createdByName || existing.createdByName || inq.createdBy || '',
+                        customerName: inq.passengerName || inq.customerName || existing.customerName || '',
+                        customerEmail: inq.passengerEmail || inq.customerEmail || existing.customerEmail || '',
+                        customerContact: inq.passengerContact || inq.customerPhone || inq.phone || existing.customerContact || '',
+                        inquiryStatus: inq.status || existing.inquiryStatus || '',
+                        invoiceNumber: existing.invoiceNumber || '',
+                        margin: existing.margin == null ? '' : existing.margin,
+                        createdAt: existing.createdAt || getNowISO(),
+                        updatedAt: getNowISO()
+                    });
+                }
+                async function _readBookings(){
+                    var all = await readData('bookings', 'ph_bookings', true) || {};
+                    return all;
+                }
+                async function _writeBookings(all){
+                    await writeData('bookings', all || {}, 'ph_bookings');
+                    try { STATE.bookings = _values(all); } catch (_) {}
+                    _updateBookingCount();
+                }
+                async function _logBookingChange(id, field, oldValue, newValue){
+                    var user = STATE.currentUser || {};
+                    var entry = {
+                        id: genId(),
+                        bookingId: id,
+                        field: field,
+                        oldValue: oldValue == null ? '' : oldValue,
+                        newValue: newValue == null ? '' : newValue,
+                        changedBy: user.username || '',
+                        changedByName: user.name || user.username || '',
+                        changedAt: getNowISO()
+                    };
+                    try { await pushData('bookingAudit', entry, 'ph_booking_audit'); } catch (_) {}
+                    try { if (typeof logPortalActivity === 'function') logPortalActivity('booking-' + field + '-change', 'bookings/' + id, entry); } catch (_) {}
+                }
+                async function _syncInquiryToBooking(inq){
+                    if (!inq || !inq.id || String(inq.status || '').toLowerCase() !== 'booked') return null;
+                    var all = await _readBookings();
+                    var id = _idFromInquiry(inq);
+                    var existing = all[id] || null;
+                    var rec = _recordFromInquiry(inq, existing);
+                    all[id] = rec;
+                    await _writeBookings(all);
+                    if (!existing) await _logBookingChange(id, 'created', '', 'Booked inquiry converted to booking');
+                    return rec;
+                }
+                async function _syncAllBookedInquiries(){
+                    var inqs = await readData('inquiries', 'ph_inquiries_list', true) || {};
+                    var all = await _readBookings();
+                    var changed = false;
+                    _values(inqs).forEach(function(inq){
+                        if (!inq || !inq.id || String(inq.status || '').toLowerCase() !== 'booked') return;
+                        var id = _idFromInquiry(inq);
+                        var next = _recordFromInquiry(inq, all[id] || null);
+                        if (!all[id]) changed = true;
+                        all[id] = next;
+                    });
+                    if (changed) await _writeBookings(all);
+                    return all;
+                }
+                function _bookingRows(list){
+                    return list.map(function(b){
+                        var invEdit = _canEditInvoice(b);
+                        var marginEdit = _canEditMargin(b);
+                        return '<tr>' +
+                            '<td>' + _esc(b.bookingDate || '') + '</td>' +
+                            '<td>' + _esc(b.bookingTime || '') + '</td>' +
+                            '<td>' + _esc(b.agentName || b.createdByName || b.createdBy || '') + '</td>' +
+                            '<td>' + _esc(b.customerName || '') + '</td>' +
+                            '<td>' + _esc(b.customerEmail || '') + '</td>' +
+                            '<td>' + _esc(b.customerContact || '') + '</td>' +
+                            '<td>' + (invEdit ? '<input class="booking-inline-input" value="' + _esc(b.invoiceNumber || '') + '" onchange="window._mrUpdateBookingField(\'' + _esc(b.id) + '\',\'invoiceNumber\',this.value)" placeholder="Invoice Number" />' : _esc(b.invoiceNumber || '')) + '</td>' +
+                            '<td>' + (marginEdit ? '<input class="booking-inline-input" type="number" step="0.01" value="' + _esc(b.margin == null ? '' : b.margin) + '" onchange="window._mrUpdateBookingField(\'' + _esc(b.id) + '\',\'margin\',this.value)" placeholder="Margin" />' : _esc(b.margin == null ? '' : b.margin)) + '</td>' +
+                            '<td><div class="actions-cell">' +
+                            (_canEditBooking(b) ? '<button class="btn btn-sm btn-outline" onclick="window._mrEditBooking(\'' + _esc(b.id) + '\')"><i class="fas fa-pen"></i></button>' : '') +
+                            (_admin() ? '<button class="btn btn-sm btn-outline" onclick="window._mrBookingAudit(\'' + _esc(b.id) + '\')"><i class="fas fa-clock-rotate-left"></i></button>' : '') +
+                            '</div></td></tr>';
+                    }).join('') || '<tr><td colspan="9" class="text-center text-muted">No bookings yet.</td></tr>';
+                }
+                async function _loadBookingList(){
+                    await _syncAllBookedInquiries();
+                    var all = await _readBookings();
+                    var list = _visibleBookings(_values(all));
+                    list.sort(function(a,b){ return new Date(b.bookingAt || b.createdAt || 0) - new Date(a.bookingAt || a.createdAt || 0); });
+                    STATE.bookings = list;
+                    return list;
+                }
+                async function showBookings(){
+                    if (!_canViewBookings()) return showToast('Permission denied.', 'error');
+                    var list = await _loadBookingList();
+                    var rows = _bookingRows(list);
+                    showModal(
+                        '<h3><i class="fas fa-suitcase-rolling"></i> Bookings' + (_admin() ? ' (All Agents)' : ' (Yours)') + '</h3>' +
+                        '<p class="text-muted text-sm">Bookings are created automatically when an inquiry status becomes Booked.</p>' +
+                        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0;">' +
+                        '<button class="btn btn-outline" onclick="window._mrRefreshBookings()"><i class="fas fa-rotate"></i> Refresh</button>' +
+                        (_admin() ? '<button class="btn btn-success" onclick="window._mrExportBookingsXlsx()"><i class="fas fa-file-excel"></i> Export</button>' : '') +
+                        '<input id="bookingSearchInput" placeholder="Search bookings..." style="flex:1;min-width:200px;" oninput="window._mrFilterBookings()" />' +
+                        '</div>' +
+                        '<div class="history-table-wrap"><table><thead><tr><th>Booking Date</th><th>Booking Time</th><th>Agent Name</th><th>Customer Name</th><th>Customer Email</th><th>Customer Contact Number</th><th>Invoice Number</th><th>Margin</th><th>Actions</th></tr></thead><tbody id="bookingsTableBody">' + rows + '</tbody></table></div>' +
+                        '<div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>'
+                    );
+                    window._mrAllBookings = list;
+                    window._mrRefreshBookings = function(){ showBookings(); };
+                    window._mrFilterBookings = function(){
+                        var q = (document.getElementById('bookingSearchInput').value || '').toLowerCase();
+                        var filtered = (window._mrAllBookings || []).filter(function(b){
+                            return [b.bookingDate,b.bookingTime,b.agentName,b.customerName,b.customerEmail,b.customerContact,b.invoiceNumber,b.margin].join(' ').toLowerCase().indexOf(q) !== -1;
+                        });
+                        var body = document.getElementById('bookingsTableBody');
+                        if (body) body.innerHTML = _bookingRows(filtered);
+                    };
+                }
+                async function _updateBookingField(id, field, value){
+                    var all = await _readBookings();
+                    var b = all[id];
+                    if (!b) return showToast('Booking not found.', 'error');
+                    if (field === 'invoiceNumber' && !_canEditInvoice(b)) return showToast('No permission to edit invoice number.', 'error');
+                    if (field === 'margin' && !_canEditMargin(b)) return showToast('No permission to edit margin.', 'error');
+                    var oldValue = b[field] == null ? '' : b[field];
+                    b[field] = field === 'margin' && value !== '' ? parseFloat(value) || 0 : String(value || '').trim();
+                    b.updatedAt = getNowISO();
+                    all[id] = b;
+                    await _writeBookings(all);
+                    await _logBookingChange(id, field, oldValue, b[field]);
+                    showToast((field === 'invoiceNumber' ? 'Invoice number' : 'Margin') + ' saved.', 'success');
+                }
+                async function _editBooking(id){
+                    var all = await _readBookings();
+                    var b = all[id];
+                    if (!b) return showToast('Booking not found.', 'error');
+                    if (!_canEditBooking(b)) return showToast('Permission denied.', 'error');
+                    showModal(
+                        '<h3>Edit Booking</h3><div class="form-row">' +
+                        '<div class="form-group"><label>Booking Date</label><input type="date" id="bkDate" value="' + _esc(b.bookingDate || '') + '" /></div>' +
+                        '<div class="form-group"><label>Booking Time</label><input type="time" id="bkTime" value="' + _esc((b.bookingTime || '').slice(0,5)) + '" /></div>' +
+                        '<div class="form-group"><label>Agent Name</label><input id="bkAgent" value="' + _esc(b.agentName || '') + '" /></div>' +
+                        '<div class="form-group"><label>Customer Name</label><input id="bkCustomer" value="' + _esc(b.customerName || '') + '" /></div>' +
+                        '<div class="form-group"><label>Customer Email</label><input id="bkEmail" value="' + _esc(b.customerEmail || '') + '" /></div>' +
+                        '<div class="form-group"><label>Customer Contact Number</label><input id="bkContact" value="' + _esc(b.customerContact || '') + '" /></div>' +
+                        '</div><div class="modal-actions"><button class="btn btn-primary" id="btnSaveBooking">Save</button><button class="btn btn-outline" onclick="window._mrShowBookings()">Back</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>'
+                    );
+                    document.getElementById('btnSaveBooking').onclick = async function(){
+                        var fields = {
+                            bookingDate: document.getElementById('bkDate').value,
+                            bookingTime: document.getElementById('bkTime').value,
+                            agentName: document.getElementById('bkAgent').value.trim(),
+                            customerName: document.getElementById('bkCustomer').value.trim(),
+                            customerEmail: document.getElementById('bkEmail').value.trim(),
+                            customerContact: document.getElementById('bkContact').value.trim()
+                        };
+                        for (var k in fields) {
+                            if ((b[k] || '') !== (fields[k] || '')) await _logBookingChange(id, k, b[k] || '', fields[k] || '');
+                            b[k] = fields[k];
+                        }
+                        b.updatedAt = getNowISO();
+                        all[id] = b;
+                        await _writeBookings(all);
+                        showToast('Booking saved.', 'success');
+                        showBookings();
+                    };
+                }
+                async function _showBookingAudit(id){
+                    if (!_admin()) return;
+                    var raw = await readData('bookingAudit', 'ph_booking_audit', true) || {};
+                    var rows = _values(raw).filter(function(a){ return a.bookingId === id; }).sort(function(a,b){ return new Date(b.changedAt||0)-new Date(a.changedAt||0); });
+                    var html = rows.map(function(a){
+                        return '<tr><td>' + _esc(a.field || '') + '</td><td>' + _esc(a.oldValue || '') + '</td><td>' + _esc(a.newValue || '') + '</td><td>' + _esc(a.changedByName || a.changedBy || '') + '</td><td>' + _esc(a.changedAt ? formatDateTime(a.changedAt) : '') + '</td></tr>';
+                    }).join('') || '<tr><td colspan="5" class="text-center text-muted">No audit entries.</td></tr>';
+                    showModal('<h3>Booking Audit</h3><div class="history-table-wrap"><table><thead><tr><th>Field</th><th>Old</th><th>New</th><th>User</th><th>Time</th></tr></thead><tbody>' + html + '</tbody></table></div><div class="modal-actions"><button class="btn btn-outline" onclick="window._mrShowBookings()">Back</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');
+                }
+                function _bookingExportRows(list){
+                    return (list || []).map(function(b){
+                        return {
+                            'Booking Date': b.bookingDate || '',
+                            'Booking Time': b.bookingTime || '',
+                            'Agent Name': b.agentName || b.createdByName || '',
+                            'Agent Username': b.agentUsername || b.createdBy || '',
+                            'Customer Name': b.customerName || '',
+                            'Customer Email': b.customerEmail || '',
+                            'Customer Contact Number': b.customerContact || '',
+                            'Invoice Number': b.invoiceNumber || '',
+                            'Margin': b.margin == null ? '' : b.margin,
+                            'Inquiry ID': b.inquiryId || '',
+                            'Created At': b.createdAt || '',
+                            'Updated At': b.updatedAt || ''
+                        };
+                    });
+                }
+                async function _exportBookingsXlsx(){
+                    if (!_admin()) return showToast('Admin access required.', 'error');
+                    var all = await _readBookings();
+                    var rows = _bookingExportRows(_values(all));
+                    if (!rows.length) return showToast('No bookings to export.', 'warning');
+                    if (typeof XLSX === 'undefined') return showToast('Excel export library not loaded.', 'error');
+                    var wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Bookings');
+                    XLSX.writeFile(wb, 'bookings_export_' + getToday() + '.xlsx');
+                    showToast('Bookings exported.', 'success');
+                }
+                function _updateBookingCount(){
+                    var badge = document.getElementById('bookingCountBadge');
+                    if (!badge) return;
+                    _readBookings().then(function(all){ badge.textContent = _visibleBookings(_values(all)).length; }).catch(function(){});
+                }
+                function _ensureDashboardCard(){
+                    var grid = document.querySelector('.dashboard-grid');
+                    if (!grid) return;
+                    var card = grid.querySelector('.dash-card[data-action="bookings"]');
+                    if (!card) {
+                        card = document.createElement('div');
+                        card.className = 'dash-card';
+                        card.dataset.action = 'bookings';
+                        card.dataset.perm = 'canViewBookings';
+                        card.innerHTML = '<i class="fas fa-suitcase-rolling"></i><h4>Bookings</h4><p>Booked inquiries and booking margins</p><span class="badge-count" id="bookingCountBadge">0</span>';
+                        card.addEventListener('click', function(){ handleDashAction('bookings'); });
+                        var inquiries = grid.querySelector('.dash-card[data-action="inquiries"]');
+                        if (inquiries && inquiries.nextSibling) grid.insertBefore(card, inquiries.nextSibling); else grid.appendChild(card);
+                    }
+                    card.style.display = _canViewBookings() ? 'block' : 'none';
+                    if (typeof sortDashboardCardsAlphabetically === 'function') sortDashboardCardsAlphabetically();
+                    _updateBookingCount();
+                }
+                function _injectPermissionStyles(){
+                    if (document.getElementById('mr-bookings-style')) return;
+                    var st = document.createElement('style');
+                    st.id = 'mr-bookings-style';
+                    st.textContent = '.booking-inline-input{width:150px;max-width:100%;padding:8px 10px;border:1px solid var(--card-border);border-radius:10px;background:var(--input-bg);color:var(--text)}';
+                    document.head.appendChild(st);
+                }
+                function _permLabels(cls, current, isAdminUser){
+                    return BOOKING_PERMS.map(function(p){
+                        return '<label><input type="checkbox" class="' + cls + '" value="' + p[0] + '" ' + ((isAdminUser || (current && current[p[0]])) ? 'checked' : '') + (isAdminUser ? ' disabled' : '') + ' /> ' + p[1] + '</label>';
+                    }).join('');
+                }
+                var _editingBookingPermUser = '';
+                async function _injectPermsIntoOpenUserModal(){
+                    var addBox = document.querySelector('.perm-check');
+                    if (addBox && !document.querySelector('.perm-check[value="canBookings"]') && !document.getElementById('mrBookingPermsAdd')) {
+                        var wrap = document.createElement('span');
+                        wrap.id = 'mrBookingPermsAdd';
+                        wrap.style.display = 'contents';
+                        wrap.innerHTML = _permLabels('perm-check', {}, false);
+                        addBox.closest('div').appendChild(wrap);
+                    }
+                    var editBox = document.querySelector('.edit-perm');
+                    if (editBox && !document.querySelector('.edit-perm[value="canBookings"]') && !document.getElementById('mrBookingPermsEdit')) {
+                        var current = {};
+                        document.querySelectorAll('.edit-perm:checked').forEach(function(cb){ current[cb.value] = true; });
+                        if (_editingBookingPermUser) {
+                            try {
+                                var users = await readData('users', 'ph_users', true) || {};
+                                var saved = (users[_editingBookingPermUser] && users[_editingBookingPermUser].permissions) || {};
+                                BOOKING_PERMS.forEach(function(p){ if (saved[p[0]]) current[p[0]] = true; });
+                            } catch (_) {}
+                        }
+                        var isAdminUser = !!document.querySelector('.edit-perm[disabled]');
+                        var wrap2 = document.createElement('span');
+                        wrap2.id = 'mrBookingPermsEdit';
+                        wrap2.style.display = 'contents';
+                        wrap2.innerHTML = _permLabels('edit-perm', current, isAdminUser);
+                        editBox.closest('div').appendChild(wrap2);
+                    }
+                }
+                Object.assign(DEFAULT_ADMIN.permissions, {
+                    canBookings: true,
+                    canViewBookings: true,
+                    canEditBookings: true,
+                    canEditBookingInvoiceNumber: true,
+                    canEditBookingMargin: true
+                });
+                (async function _backfillAdminBookingPerms(){
+                    try {
+                        var users = await readData('users', 'ph_users', true);
+                        if (users && users.Plan) {
+                            var changed = false;
+                            users.Plan.permissions = users.Plan.permissions || {};
+                            BOOKING_PERMS.forEach(function(p){ if (!users.Plan.permissions[p[0]]) { users.Plan.permissions[p[0]] = true; changed = true; } });
+                            if (changed) {
+                                await writeData('users', users, 'ph_users');
+                                await writeData('users/Plan', users.Plan, 'ph_users_Plan');
+                            }
+                        }
+                    } catch (_) {}
+                })();
+                function _arrayToObjectById(rows){
+                    var out = {};
+                    (rows || []).forEach(function(r, i){
+                        var id = r.id || r._key || r.bookingId || r.inquiryId || ('row_' + i);
+                        out[id] = r;
+                    });
+                    return out;
+                }
+                function _mergeArraysUnique(arrays){
+                    var map = {};
+                    arrays.forEach(function(arr){
+                        (arr || []).forEach(function(r, i){
+                            var id = r.id || r._key || r.bookingId || r.inquiryId || [r['Inquiry ID'], r['Customer Email'], r['Booking Date'], r['Booking Time']].join('|') || ('row_' + i);
+                            map[id] = Object.assign({}, map[id] || {}, r);
+                        });
+                    });
+                    return Object.keys(map).map(function(k){ return map[k]; });
+                }
+                async function _parseBackupFile(file){
+                    var name = (file.name || '').toLowerCase();
+                    if (name.endsWith('.json')) return JSON.parse(await file.text());
+                    if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+                        if (typeof XLSX === 'undefined') throw new Error('Excel library not loaded.');
+                        var buf = await file.arrayBuffer();
+                        var wb = XLSX.read(buf, { type:'array' });
+                        var pack = {};
+                        wb.SheetNames.forEach(function(s){
+                            var rows = XLSX.utils.sheet_to_json(wb.Sheets[s], { defval:'' });
+                            var key = s.replace(/\s+/g, '').toLowerCase();
+                            if (key === 'bookings') pack.bookings = rows;
+                            else if (key === 'quotes') pack.quotes = rows;
+                            else if (key === 'invoices') pack.invoices = rows;
+                            else if (key === 'inquiries') pack.inquiries = rows;
+                            else if (key === 'accounts') pack.accounts = rows;
+                            else if (key === 'timetable') pack.agentTimes = rows;
+                            else if (key === 'users') pack.users = rows;
+                            else if (key === 'loginhistory') pack.loginHistory = rows;
+                        });
+                        return pack;
+                    }
+                    throw new Error('Unsupported backup file: ' + file.name);
+                }
+                async function _mergeBackupFiles(files){
+                    var packs = [];
+                    for (var i = 0; i < files.length; i++) packs.push(await _parseBackupFile(files[i]));
+                    var merged = { version:'merged', exportedAt:getNowISO(), range:{ from:null, to:null } };
+                    ['quotes','invoices','inquiries','accounts','agentTimes','loginHistory','bookings'].forEach(function(k){
+                        var rows = _mergeArraysUnique(packs.map(function(p){ return _values(p[k]); }));
+                        if (rows.length) merged[k] = rows;
+                    });
+                    packs.forEach(function(p){ if (p.users && !merged.users) merged.users = p.users; });
+                    return merged;
+                }
+                function _patchBackupRestoreModal(){
+                    if (!document.getElementById('btnBackupNow')) return;
+                    var grid = document.querySelector('#bkAll') && document.querySelector('#bkAll').closest('div');
+                    if (grid && !document.querySelector('.bkChk[value="bookings"]')) {
+                        grid.insertAdjacentHTML('beforeend', '<label><input type="checkbox" class="bkChk" value="bookings"/> Bookings</label>');
+                    }
+                    var note = document.querySelector('#btnRestoreNow') && document.querySelector('#btnRestoreNow').parentNode;
+                    if (note && !document.getElementById('bkMergeFiles')) {
+                        note.insertAdjacentHTML('afterend',
+                            '<div class="form-group" style="margin-top:10px;"><label><strong>Merge Multiple Backup Files</strong></label>' +
+                            '<input type="file" id="bkMergeFiles" multiple accept=".json,.xlsx,.xls" style="margin-top:6px;display:block;" />' +
+                            '<button class="btn btn-success" id="btnMergeBackups" style="margin-top:8px;"><i class="fas fa-file-excel"></i> Download Merged Excel</button>' +
+                            '<div class="input-hint">Select multiple backup files and download one merged Excel workbook. Booking rows are deduplicated.</div></div>');
+                    }
+                    var oldBtn = document.getElementById('btnBackupNow');
+                    if (oldBtn && !oldBtn.__mrBookingsReplaced) {
+                        var btn = oldBtn.cloneNode(true);
+                        btn.__mrBookingsReplaced = true;
+                        oldBtn.parentNode.replaceChild(btn, oldBtn);
+                        btn.addEventListener('click', async function(){
+                            var checks = Array.prototype.slice.call(document.querySelectorAll('.bkChk'));
+                            var wantAll = document.getElementById('bkAll') && document.getElementById('bkAll').checked;
+                            var picks = wantAll ? ['quotes','invoices','inquiries','accounts','agentTimes','users','loginHistory','branding','conditions','bookings'] : checks.filter(function(c){ return c.value !== 'all' && c.checked; }).map(function(c){ return c.value; });
+                            if (!picks.length) return showToast('Choose at least one dataset.', 'warning');
+                            var preset = (document.getElementById('bkPreset') || {}).value || 'all';
+                            var from = preset === 'all' ? '' : (document.getElementById('bkFrom') || {}).value || '';
+                            var to = preset === 'all' ? '' : (document.getElementById('bkTo') || {}).value || '';
+                            var fmt = (document.querySelector('input[name="bkFmt"]:checked') || {}).value || 'xlsx';
+                            showLoading(true);
+                            try {
+                                var pack = await collectBackupData(picks, from, to);
+                                if (fmt === 'json') downloadBlob(new Blob([JSON.stringify(pack, null, 2)], { type:'application/json' }), 'planholidays_backup_' + getToday() + '.json');
+                                else exportBackupToXlsx(pack, 'planholidays_backup_' + getToday() + '.xlsx');
+                                showToast('Backup downloaded.', 'success');
+                            } catch(e) { showToast('Backup failed: ' + e.message, 'error'); }
+                            showLoading(false);
+                        });
+                    }
+                    var oldRestore = document.getElementById('btnRestoreNow');
+                    if (oldRestore && !oldRestore.__mrBookingsReplaced) {
+                        var rst = oldRestore.cloneNode(true);
+                        rst.__mrBookingsReplaced = true;
+                        oldRestore.parentNode.replaceChild(rst, oldRestore);
+                        rst.addEventListener('click', function(){
+                            var input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = '.json';
+                            input.onchange = async function(e){
+                                var file = e.target.files[0]; if (!file) return;
+                                try {
+                                    var data = JSON.parse(await file.text());
+                                    if (!data.users && !data.quotes && !data.bookings) return showToast('Invalid backup.', 'error');
+                                    if (!confirm('Restore will overwrite selected backed-up data. Continue?')) return;
+                                    if (data.users) await writeData('users', data.users, 'ph_users');
+                                    if (data.quotes) await writeData('quotes', _arrayToObjectById(_values(data.quotes)), 'ph_quotes_list');
+                                    if (data.invoices) await writeData('invoices', _arrayToObjectById(_values(data.invoices)), 'ph_invoices_list');
+                                    if (data.inquiries) await writeData('inquiries', _arrayToObjectById(_values(data.inquiries)), 'ph_inquiries_list');
+                                    if (data.bookings) await writeData('bookings', _arrayToObjectById(_values(data.bookings)), 'ph_bookings');
+                                    if (data.loginHistory) await writeData('loginHistory', data.loginHistory, 'ph_login_history');
+                                    if (data.branding) await writeData('branding', data.branding, 'ph_branding');
+                                    if (data.quoteConditions) await writeData('quoteConditions', data.quoteConditions, 'ph_quote_conditions');
+                                    if (data.invoiceConditions) await writeData('invoiceConditions', data.invoiceConditions, 'ph_invoice_conditions');
+                                    if (data.agentTimes) await writeData('agentTimes', _arrayToObjectById(_values(data.agentTimes)), 'ph_agent_times_list');
+                                    showToast('Restore successful. Refreshing...', 'success');
+                                    setTimeout(function(){ location.reload(); }, 1200);
+                                } catch(err) { showToast('Restore failed: ' + err.message, 'error'); }
+                            };
+                            input.click();
+                        });
+                    }
+                    var merge = document.getElementById('btnMergeBackups');
+                    if (merge && !merge.__mrBookingsBound) {
+                        merge.__mrBookingsBound = true;
+                        merge.addEventListener('click', async function(){
+                            var files = Array.prototype.slice.call((document.getElementById('bkMergeFiles') || {}).files || []);
+                            if (files.length < 2) return showToast('Select multiple backup files first.', 'warning');
+                            try {
+                                var merged = await _mergeBackupFiles(files);
+                                exportBackupToXlsx(merged, 'planholidays_merged_backups_' + getToday() + '.xlsx');
+                                showToast('Merged backup exported.', 'success');
+                            } catch(e) { showToast('Merge failed: ' + e.message, 'error'); }
+                        });
+                    }
+                }
+                function _patchExportDialog(){
+                    if (!document.getElementById('btnExportSelected')) return;
+                    var wrap = document.querySelector('.expChk') && document.querySelector('.expChk').closest('div');
+                    if (wrap && !document.querySelector('.expChk[value="bookings"]')) {
+                        wrap.insertAdjacentHTML('beforeend', '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" class="expChk" value="bookings"/> Bookings</label>');
+                    }
+                    var btn = document.getElementById('btnExportSelected');
+                    if (btn && !btn.__mrBookingsExportBound) {
+                        btn.__mrBookingsExportBound = true;
+                        btn.addEventListener('click', async function(){
+                            var chosen = document.querySelector('.expChk[value="bookings"]');
+                            if (!chosen || !chosen.checked) return;
+                            var rows = _bookingExportRows(_visibleBookings(_values(await _readBookings())));
+                            if (!rows.length) return;
+                            var h = Object.keys(rows[0]);
+                            var csv = [h.join(',')].concat(rows.map(function(r){ return h.map(function(k){ return '"' + String(r[k] == null ? '' : r[k]).replace(/"/g, '""') + '"'; }).join(','); })).join('\n');
+                            downloadBlob(new Blob(["\ufeff" + csv], { type:'text/csv;charset=utf-8;' }), 'bookings_export_' + getToday() + '.csv');
+                        });
+                    }
+                }
+
+                window._mrShowBookings = showBookings;
+                window._mrUpdateBookingField = _updateBookingField;
+                window._mrEditBooking = _editBooking;
+                window._mrBookingAudit = _showBookingAudit;
+                window._mrExportBookingsXlsx = _exportBookingsXlsx;
+
+                if (typeof saveInquiry === 'function' && !saveInquiry.__mrBookingsPatched) {
+                    var prevSaveInquiry = saveInquiry;
+                    saveInquiry = async function(){
+                        var saved = await prevSaveInquiry.apply(this, arguments);
+                        try { if (saved && String(saved.status || '').toLowerCase() === 'booked') await _syncInquiryToBooking(saved); } catch(e) { console.warn('Booking sync failed:', e); }
+                        return saved;
+                    };
+                    saveInquiry.__mrBookingsPatched = true;
+                }
+                if (typeof showDashboard === 'function' && !showDashboard.__mrBookingsPatched) {
+                    var prevDashboard = showDashboard;
+                    showDashboard = function(){
+                        var result = prevDashboard.apply(this, arguments);
+                        _ensureDashboardCard();
+                        _updateBookingCount();
+                        return result;
+                    };
+                    showDashboard.__mrBookingsPatched = true;
+                }
+                if (typeof handleDashAction === 'function' && !handleDashAction.__mrBookingsPatched) {
+                    var prevHandle = handleDashAction;
+                    handleDashAction = function(action){
+                        if (action === 'bookings') { showBookings(); return; }
+                        return prevHandle.apply(this, arguments);
+                    };
+                    handleDashAction.__mrBookingsPatched = true;
+                }
+                if (typeof renderUserManagement === 'function' && !renderUserManagement.__mrBookingsPatched) {
+                    var prevUsers = renderUserManagement;
+                    renderUserManagement = async function(){
+                        var result = await prevUsers.apply(this, arguments);
+                        setTimeout(_injectPermsIntoOpenUserModal, 80);
+                        return result;
+                    };
+                    renderUserManagement.__mrBookingsPatched = true;
+                }
+                if (typeof showAddUser === 'function' && !showAddUser.__mrBookingsPatched) {
+                    var prevAddUser = showAddUser;
+                    showAddUser = function(){ var r = prevAddUser.apply(this, arguments); setTimeout(_injectPermsIntoOpenUserModal, 40); return r; };
+                    showAddUser.__mrBookingsPatched = true;
+                }
+                if (typeof showEditUser === 'function' && !showEditUser.__mrBookingsPatched) {
+                    var prevEditUser = showEditUser;
+                    showEditUser = function(username){ _editingBookingPermUser = username || ''; var r = prevEditUser.apply(this, arguments); setTimeout(_injectPermsIntoOpenUserModal, 120); return r; };
+                    showEditUser.__mrBookingsPatched = true;
+                }
+                if (typeof collectBackupData === 'function' && !collectBackupData.__mrBookingsPatched) {
+                    var prevCollect = collectBackupData;
+                    collectBackupData = async function(picks, from, to){
+                        var out = await prevCollect.apply(this, arguments);
+                        if ((picks || []).indexOf('bookings') !== -1) {
+                            var all = _values(await _readBookings());
+                            out.bookings = all.filter(function(x){ return _inDateRange(x.bookingAt || x.createdAt || x.bookingDate, from, to); });
+                        }
+                        return out;
+                    };
+                    collectBackupData.__mrBookingsPatched = true;
+                }
+                if (typeof exportBackupToXlsx === 'function' && !exportBackupToXlsx.__mrBookingsPatched) {
+                    var prevBackupXlsx = exportBackupToXlsx;
+                    exportBackupToXlsx = function(pack, filename){
+                        if (!pack || !pack.bookings || typeof XLSX === 'undefined') return prevBackupXlsx.apply(this, arguments);
+                        var oldBookings = pack.bookings;
+                        var copy = Object.assign({}, pack);
+                        delete copy.bookings;
+                        prevBackupXlsx(copy, filename);
+                        if (copy === pack) pack.bookings = oldBookings;
+                    };
+                    exportBackupToXlsx = function(pack, filename){
+                        if (typeof XLSX === 'undefined') return prevBackupXlsx.apply(this, arguments);
+                        var wb = XLSX.utils.book_new();
+                        function addSheet(name, rows) {
+                            if (!rows) return;
+                            var arr = Array.isArray(rows) ? rows : _values(rows);
+                            if (!arr.length) arr = [{ _empty:'No records' }];
+                            arr = arr.map(function(r){
+                                var out = {};
+                                Object.keys(r || {}).forEach(function(k){
+                                    var v = r[k];
+                                    out[k] = v && typeof v === 'object' ? JSON.stringify(v).slice(0, 32000) : v;
+                                });
+                                return out;
+                            });
+                            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(arr), name.substring(0,31));
+                        }
+                        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ exportedAt:pack.exportedAt, version:pack.version, from:pack.range&&pack.range.from, to:pack.range&&pack.range.to }]), 'Meta');
+                        if (pack.quotes) addSheet('Quotes', pack.quotes);
+                        if (pack.invoices) addSheet('Invoices', pack.invoices);
+                        if (pack.inquiries) addSheet('Inquiries', pack.inquiries);
+                        if (pack.bookings) addSheet('Bookings', _bookingExportRows(_values(pack.bookings)));
+                        if (pack.accounts) addSheet('Accounts', pack.accounts);
+                        if (pack.agentTimes) addSheet('TimeTable', pack.agentTimes);
+                        if (pack.users) addSheet('Users', pack.users);
+                        if (pack.loginHistory) addSheet('LoginHistory', pack.loginHistory);
+                        if (pack.branding) addSheet('Branding', [pack.branding]);
+                        if (pack.quoteConditions) addSheet('QuoteConditions', [typeof pack.quoteConditions === 'object' ? pack.quoteConditions : { text:pack.quoteConditions }]);
+                        if (pack.invoiceConditions) addSheet('InvoiceConditions', [typeof pack.invoiceConditions === 'object' ? pack.invoiceConditions : { text:pack.invoiceConditions }]);
+                        XLSX.writeFile(wb, filename);
+                    };
+                    exportBackupToXlsx.__mrBookingsPatched = true;
+                }
+                if (typeof showBackupRestore === 'function' && !showBackupRestore.__mrBookingsPatched) {
+                    var prevBackup = showBackupRestore;
+                    showBackupRestore = function(){ var r = prevBackup.apply(this, arguments); setTimeout(_patchBackupRestoreModal, 80); return r; };
+                    showBackupRestore.__mrBookingsPatched = true;
+                }
+                if (typeof showExportDialog === 'function' && !showExportDialog.__mrBookingsPatched) {
+                    var prevExport = showExportDialog;
+                    showExportDialog = function(){ var r = prevExport.apply(this, arguments); setTimeout(_patchExportDialog, 80); return r; };
+                    showExportDialog.__mrBookingsPatched = true;
+                }
+                if (typeof afterLogin === 'function' && !afterLogin.__mrBookingsPatched) {
+                    var prevAfterLogin = afterLogin;
+                    afterLogin = async function(){
+                        var r = await prevAfterLogin.apply(this, arguments);
+                        _injectPermissionStyles();
+                        _ensureDashboardCard();
+                        try { await _syncAllBookedInquiries(); } catch (_) {}
+                        _updateBookingCount();
+                        return r;
+                    };
+                    afterLogin.__mrBookingsPatched = true;
+                }
+                _injectPermissionStyles();
+                document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ _ensureDashboardCard(); _updateBookingCount(); }, 1400); });
             })();
             document.addEventListener('DOMContentLoaded', init);
         })();
@@ -17464,6 +18197,9 @@
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 </body>
 </html>
