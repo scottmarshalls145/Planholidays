@@ -21004,7 +21004,894 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
     setTimeout(rewire, 500);
 })();
 </script>
+<!-- ==== PH-FIX v3: hide Latest Quote card, silence chat badge, calendar edit UX ==== -->
+<style>
+/* v3: hide Latest Quote / Bookings history card on dashboard */
+.mr-stat[data-mract="history"]{display:none !important;}
+#mrListPanel{display:none !important;}
+/* v3: hide the flickering chat badges completely — we replace them */
+#chatNotifyBadge, #chatCardNotifyBadge{display:none !important;}
+/* Only the PH-controlled badge is allowed to show */
+#phChatBadge{display:none;position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--danger,#e74c3c);color:#fff;font-size:.7rem;font-weight:800;align-items:center;justify-content:center;z-index:5;}
+#phChatBadge.on{display:inline-flex;}
+</style>
+<script>
+/* PH-FIX v3 */
+(function(){
+    'use strict';
+    if(window.__PH_FIX_V3_INSTALLED) return;
+    window.__PH_FIX_V3_INSTALLED = true;
+
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+    function $$(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));}
+
+    /* ---------- A) REMOVE LATEST QUOTE STAT CARD + PANEL ---------- */
+    function stripLatestQuote(){
+        try{
+            $$('.mr-stat').forEach(function(el){
+                if(el.getAttribute('data-mract')==='history'){ el.style.display='none'; }
+                var lbl = el.querySelector('.mr-stat-lbl');
+                if(lbl && /latest quote|quote history|latest booking/i.test(lbl.textContent||'')){
+                    el.style.display='none';
+                }
+            });
+            var lp = document.getElementById('mrListPanel');
+            if(lp) lp.style.display='none';
+        }catch(_){}
+    }
+    setInterval(stripLatestQuote, 1000);
+    setTimeout(stripLatestQuote, 200);
+
+    /* ---------- B) CHAT BADGE — SHOW ONLY NEW MESSAGES SINCE PAGE LOAD ----------
+       The badge was thrashing between 0 and 49 because two loops call
+       _mrSetBadge with different counts. We:
+       1) Hide the old badges via CSS.
+       2) Install our own badge (#phChatBadge) that only counts messages
+          whose timestamp > page-load baseline AND are still unread.
+       3) Override _mrSetBadge and every other setter to route through us. */
+    var _baseline = Date.now();
+    /* If we already know the current server messages, treat them all as
+       seen: bump baseline past the max timestamp we can find. */
+    function bumpBaseline(){
+        try{
+            var arr = [];
+            var cm = (window.STATE&&window.STATE.chatMessages)||[];
+            if(Array.isArray(cm)){ arr = cm; }
+            else if(cm && typeof cm==='object'){ arr = Object.keys(cm).map(function(k){return cm[k];}); }
+            var maxTs = _baseline;
+            arr.forEach(function(m){ if(!m) return; var t = new Date(m.timestamp||0).getTime(); if(t>maxTs) maxTs = t; });
+            _baseline = maxTs + 1;
+        }catch(_){}
+    }
+    bumpBaseline();
+    setTimeout(bumpBaseline, 1500);
+    setTimeout(bumpBaseline, 5000);
+
+    /* Track ids we already alerted so we don't recount */
+    var _seenIds = {};
+    var _newCount = 0;
+
+    function ensurePhBadge(){
+        /* Put on chat dashcard */
+        try{
+            var card = document.querySelector('.dash-card[data-action="chat"]');
+            if(card && !card.querySelector('#phChatBadge')){
+                var b = document.createElement('span');
+                b.id = 'phChatBadge'; b.textContent = '0';
+                card.style.position = 'relative';
+                card.appendChild(b);
+            }
+        }catch(_){}
+    }
+    function paintPhBadge(){
+        ensurePhBadge();
+        var b = document.getElementById('phChatBadge');
+        if(!b) return;
+        if(_newCount>0){ b.textContent = String(_newCount); b.classList.add('on'); }
+        else { b.classList.remove('on'); b.textContent = '0'; }
+    }
+    setInterval(ensurePhBadge, 1500);
+    setInterval(paintPhBadge, 1500);
+
+    /* Neutralize legacy badge setters so they can't flicker */
+    function neuter(name){
+        try{
+            if(typeof window[name] === 'function' && !window[name].__phNeutBadge){
+                window[name] = function(){ /* no-op: we control the badge now */ };
+                window[name].__phNeutBadge = true;
+            }
+        }catch(_){}
+    }
+    setInterval(function(){ neuter('_mrSetBadge'); }, 800);
+
+    /* Observe chatMessages for new-arrival counting. We prefer Firebase
+       realtime if available; otherwise we poll our own state periodically. */
+    async function pollNewChats(){
+        try{
+            var u = window.STATE && window.STATE.currentUser; if(!u) return;
+            var all = null;
+            if(typeof window.readData === 'function'){
+                all = await window.readData('chatMessages','ph_chat_messages',true);
+            }
+            all = all || {};
+            var arr = Array.isArray(all) ? all : Object.keys(all).map(function(k){ return Object.assign({_key:k}, all[k]); });
+            var count = 0;
+            arr.forEach(function(m){
+                if(!m || m.deleted) return;
+                var ts = new Date(m.timestamp||0).getTime();
+                if(ts < _baseline) return; /* old — never count */
+                if(m.from === u.username) return; /* mine */
+                if(m.to !== u.username && !(m.groupId && (m.members||[]).indexOf(u.username)!==-1)) return;
+                if(m.read) return; /* already read */
+                var id = m._key || m.id || (m.from+'|'+ts);
+                if(_seenIds[id]) return;
+                _seenIds[id] = true;
+                count++;
+            });
+            /* Add only NEW increments since last tick (do not include old) */
+            _newCount += count;
+            paintPhBadge();
+        }catch(_){}
+    }
+    /* Poll every 8s (light, only counts truly new) */
+    setInterval(pollNewChats, 8000);
+    setTimeout(pollNewChats, 3000);
+
+    /* When user opens chat, reset the new-count */
+    document.addEventListener('click', function(ev){
+        var el = ev.target;
+        if(!el) return;
+        var card = el.closest && el.closest('.dash-card[data-action="chat"]');
+        var nav  = el.closest && el.closest('[data-mrnav="chat"]');
+        if(card || nav){
+            _newCount = 0;
+            _baseline = Date.now();
+            _seenIds = {};
+            paintPhBadge();
+        }
+    }, true);
+
+    /* ---------- C) CALENDAR: MAKE SURE EDIT/DELETE ARE PRESENT ----------
+       Re-assert once more with a stronger interval + explicit UX. */
+    if(typeof window.showCalendarDay === 'function' && !window.showCalendarDay.__phV3Guard){
+        var _prev = window.showCalendarDay;
+        var reasserted = _prev;
+        var guard = function(){
+            if(window.showCalendarDay !== reasserted){
+                reasserted = window.showCalendarDay;
+                /* Wrap so that every override still routes into our edit-capable
+                   version when we detect it lacks edit buttons. */
+                var _wrapper = function(date){
+                    var r = reasserted.apply(this, arguments);
+                    /* If modal doesn't contain edit buttons, inject them post-render */
+                    setTimeout(function(){
+                        try{
+                            var modal = document.getElementById('modalContent');
+                            if(!modal) return;
+                            if(modal.querySelector('.ph-cal-edit')) return; /* already ours */
+                            /* Inject our version instead */
+                            if(window.__phPrevShowCalendarDay !== _wrapper && typeof window.__phCalOverride === 'function'){
+                                window.__phCalOverride(date);
+                            }
+                        }catch(_){}
+                    }, 40);
+                    return r;
+                };
+                _wrapper.__phV3Guard = true;
+                window.showCalendarDay = _wrapper;
+            }
+        };
+        setInterval(guard, 1200);
+    }
+
+    /* Expose our v1 calendar-day override globally for guard to call. */
+    window.__phCalOverride = window.showCalendarDay;
+
+})();
+</script>
+<!-- ==== end PH-FIX v3 ==== -->
+
+<!-- ==== PH-FIX v2: stronger scroll lock, contact freeze, profile fix, welcome name ==== -->
+<style>
+/* v2 additions */
+#dashWelcomeName{white-space:nowrap;}
+</style>
+<script>
+/* PH-FIX v2 — layered on top of v1, applied last so it wins. */
+(function(){
+    'use strict';
+    if(window.__PH_FIX_V2_INSTALLED) return;
+    window.__PH_FIX_V2_INSTALLED = true;
+
+    function $(s,r){return (r||document).querySelector(s);}
+    function $$(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));}
+
+    /* ---------- A) DASHBOARD WELCOME + TOPBAR NAME: FORCE LOGGED-IN USER ---------- */
+    function currentDisplayName(){
+        try{
+            var u = (window.STATE&&window.STATE.currentUser)||{};
+            if(!u || !u.username) return null;
+            var full = (window.STATE&&window.STATE.users&&window.STATE.users[u.username])||{};
+            return full.name || u.name || u.username;
+        }catch(_){ return null; }
+    }
+    function forceNames(){
+        var name = currentDisplayName();
+        if(!name) return;
+        var role = ((window.STATE&&window.STATE.currentUser&&window.STATE.currentUser.role)||'agent').toUpperCase();
+        ['dashWelcomeName','userNameDisplay'].forEach(function(id){
+            var el = document.getElementById(id);
+            if(el && el.textContent !== name) el.textContent = name;
+        });
+        var ur = document.getElementById('userRoleDisplay');
+        if(ur && ur.textContent !== role) ur.textContent = role;
+        var pn = document.querySelector('#mrProfileWrap .mr-profile-name');
+        if(pn && pn.textContent !== name) pn.textContent = name;
+        /* Kill any residual "User" placeholder in the welcome paragraph */
+        var p = document.querySelector('#dashboard > p.text-muted');
+        if(p){
+            var span = p.querySelector('#dashWelcomeName');
+            if(span && span.textContent !== name) span.textContent = name;
+        }
+    }
+    setInterval(forceNames, 500);
+    setTimeout(forceNames, 200);
+    document.addEventListener('DOMContentLoaded', forceNames);
+
+    /* ---------- B) PROFILE DROPDOWN — FIX CLICK ROUTING ----------
+       Delegate on document (capture phase) so we intercept the click on
+       any [data-mract="profile"] BEFORE the panel's own handler closes the
+       menu and swallows the event. */
+    document.addEventListener('click', function(ev){
+        var el = ev.target;
+        if(!el) return;
+        var hit = el.closest && el.closest('[data-mract="profile"]');
+        if(!hit) return;
+        /* Only inside the profile dropdown */
+        if(!hit.closest('#mrProfilePanel')) return;
+        ev.preventDefault();
+        ev.stopImmediatePropagation && ev.stopImmediatePropagation();
+        ev.stopPropagation && ev.stopPropagation();
+        try{
+            var p = document.getElementById('mrProfilePanel');
+            if(p) p.classList.remove('open');
+            if(typeof window.showProfileCenter === 'function'){ window.showProfileCenter('mine'); return; }
+            if(typeof window.handleDashAction === 'function'){ window.handleDashAction('profile'); return; }
+        }catch(_){}
+    }, true);
+
+    /* ---------- C) CHAT SCROLL: HARD LOCK ----------
+       If the user has scrolled up, no programmatic set of scrollTop is
+       allowed to jump them back down. We patch scrollTop *on the specific
+       element* (chatMessagesContainer) via defineProperty. */
+    var _origScrollTopDesc = Object.getOwnPropertyDescriptor(Element.prototype,'scrollTop');
+    function _atBottomEl(el){ try{ return (el.scrollHeight - el.scrollTop - el.clientHeight) < 60; }catch(_){ return true; } }
+    function armScrollLock(){
+        var el = document.getElementById('chatMessagesContainer');
+        if(!el || el.__phLockV2) return;
+        el.__phLockV2 = true;
+        el.__phWasAtBottom = true;
+        el.addEventListener('scroll', function(){
+            el.__phWasAtBottom = _atBottomEl(el);
+        }, {passive:true});
+        el.addEventListener('wheel', function(ev){
+            /* Track intent: if user scrolls up (deltaY<0) they explicitly
+               want to be free. If they scroll down and reach the bottom,
+               resume auto-follow. */
+            if(ev.deltaY < 0){ el.__phUserScrolledUp = true; }
+            if(ev.deltaY > 0 && _atBottomEl(el)){ el.__phUserScrolledUp = false; }
+        }, {passive:true});
+        el.addEventListener('touchmove', function(){ /* mobile: same idea */
+            setTimeout(function(){ el.__phWasAtBottom = _atBottomEl(el); }, 0);
+        }, {passive:true});
+        if(_origScrollTopDesc && _origScrollTopDesc.set){
+            Object.defineProperty(el, 'scrollTop', {
+                configurable: true,
+                get: function(){ return _origScrollTopDesc.get.call(this); },
+                set: function(v){
+                    if(this.__phUserScrolledUp){
+                        /* refuse programmatic bottom-jumps while user is scrolled up */
+                        var cur = _origScrollTopDesc.get.call(this);
+                        if(v > cur){ return; }
+                    }
+                    _origScrollTopDesc.set.call(this, v);
+                }
+            });
+        }
+    }
+    setInterval(armScrollLock, 500);
+    setTimeout(armScrollLock, 300);
+
+    /* Also neutralize scrollIntoView on children of chatMessagesContainer
+       when the user is scrolled up. */
+    var _origSIV = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function(){
+        try{
+            var host = this.closest && this.closest('#chatMessagesContainer');
+            if(host && host.__phUserScrolledUp) return; /* skip */
+        }catch(_){}
+        return _origSIV.apply(this, arguments);
+    };
+
+    /* ---------- D) CHAT CONTACT LIST: STOP RE-RENDER FLICKER ----------
+       Freeze the DOM when the new HTML hash matches what's already shown.
+       This kills the "names keep refreshing" flicker caused by the
+       periodic online-agent + presence refresh loops. */
+    function _hash(s){ var h=0; s=String(s||''); for(var i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i)|0;} return h; }
+    function armContactFreeze(){
+        var list = document.getElementById('chatContactsList');
+        if(!list || list.__phFreezeV2) return;
+        list.__phFreezeV2 = true;
+        list.__phLastHash = _hash(list.innerHTML);
+        var descProto = Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');
+        if(descProto && descProto.set){
+            Object.defineProperty(list, 'innerHTML', {
+                configurable: true,
+                get: function(){ return descProto.get.call(this); },
+                set: function(v){
+                    var h = _hash(v);
+                    if(h === this.__phLastHash){ return; } /* skip repaint */
+                    this.__phLastHash = h;
+                    descProto.set.call(this, v);
+                }
+            });
+        }
+        /* Watch subtree so any inner replacements that would flash names
+           are throttled: if a mutation happens more than once in 800ms,
+           we snapshot & revert. */
+        var lastSnap = list.innerHTML;
+        var lastTs = 0;
+        var mo = new MutationObserver(function(){
+            var now = Date.now();
+            if(now - lastTs < 800){
+                /* revert if the DOM shape matches snapshot (only child re-attaches) */
+                if(list.children.length && list.innerHTML.length === lastSnap.length){
+                    /* same size — probably a redraw of identical content; ignore */
+                    return;
+                }
+            }
+            lastTs = now;
+            lastSnap = list.innerHTML;
+        });
+        mo.observe(list, {childList:true, subtree:true});
+    }
+    setInterval(armContactFreeze, 700);
+    setTimeout(armContactFreeze, 400);
+
+    /* Suppress the online-agents periodic re-render that overwrites names */
+    (function stopOnlinePolling(){
+        var _origSetInterval = window.setInterval;
+        /* We can't blindly ban setInterval; just kill known re-renderers by
+           wrapping them to no-op after first call while chat modal is open. */
+        function neutralize(name){
+            try{
+                if(typeof window[name] === 'function' && !window[name].__phNeutralized){
+                    var orig = window[name];
+                    var last = 0;
+                    window[name] = function(){
+                        var t = Date.now();
+                        /* Throttle to at most once per 30s */
+                        if(t - last < 30000) return;
+                        last = t;
+                        return orig.apply(this, arguments);
+                    };
+                    window[name].__phNeutralized = true;
+                }
+            }catch(_){}
+        }
+        setInterval(function(){
+            ['_mrRenderOnlineAgentsPanel','_mrAnnotateOnlineContacts','_refreshOnlineAgents','_renderOnlineAgents','loadChatContacts'].forEach(neutralize);
+        }, 1000);
+    })();
+
+})();
+</script>
+
+<!-- ==== PH-FIX v1: chat/scroll/profile/dashboard/calendar/search patches ==== -->
+<style>
+/* Calendar light-theme readability */
+body.mr-light .mr-cal-day,
+body.mr-new-theme.mr-light .mr-cal-day{color:#1e1e2a !important;}
+body.mr-light .mr-cal-dow,
+body.mr-new-theme.mr-light .mr-cal-dow{color:#4a4560 !important;}
+body.mr-light .mr-cal-title,
+body.mr-new-theme.mr-light .mr-cal-title{color:#1e1e2a !important;}
+body.mr-light .mr-cal-head button,
+body.mr-new-theme.mr-light .mr-cal-head button{color:#1e1e2a !important;background:rgba(0,0,0,.04) !important;border-color:rgba(20,20,40,.15) !important;}
+body.mr-light .calendar-day,
+body.mr-new-theme.mr-light .calendar-day{color:#1e1e2a !important;}
+body.mr-light .calendar-day strong,
+body.mr-new-theme.mr-light .calendar-day strong{color:var(--primary,#b8860b) !important;}
+body.mr-light .calendar-pill,
+body.mr-new-theme.mr-light .calendar-pill{color:#1e1e2a !important;background:rgba(184,134,11,.14) !important;}
+body.mr-light .mr-cal-day.other,
+body.mr-new-theme.mr-light .mr-cal-day.other{color:rgba(30,30,50,.32) !important;}
+body.mr-light .mr-cal-day.today,
+body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
+/* Free scroll in chat: no forced scroll and preserve user position */
+.messenger-messages{overscroll-behavior:contain;scroll-behavior:auto !important;}
+</style>
+<script>
+/* ================================================================
+   PH-FIX v1
+   1) Stop client-side auto-refresh loops on chat area
+   2) Free scroll in chat conversations (no forced scroll)
+   3) Profile menu in user dropdown -> opens Profile Center
+   4) Remove Latest Bookings & Quote History from dashboard
+   5) Calendar day: save / edit / delete daily tasks
+   6) Show logged-in agent name on dashboard (welcome)
+   7) Global search: works portal-wide, permission-scoped
+   8) Calendar readable in light theme (CSS above)
+   ================================================================ */
+(function(){
+    'use strict';
+    if (window.__PH_FIX_V1_INSTALLED) return;
+    window.__PH_FIX_V1_INSTALLED = true;
+
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+    function $(s,r){ return (r||document).querySelector(s); }
+    function $$(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); }
+
+    /* ---------- 1) STOP CLIENT-SIDE CHAT AUTO-REFRESH ----------
+       The chat rerenders on realtime + polling. Frontend auto-refresh
+       (redraw of the same messages) causes flicker + jump. We wrap
+       renderChatMessages so if the message signature is unchanged we
+       skip DOM writes entirely. Real new messages still render. */
+    var _chatSig = '';
+    function _sigOf(list){
+        if(!list || !list.length) return '0';
+        var s = list.length + '|';
+        for(var i=0;i<list.length;i++){
+            var m=list[i]||{};
+            s += (m._key||m.id||'')+'|'+(m.timestamp||'')+'|'+(m.message||'').length+'|'+(m.edited?1:0)+'|'+(m.deleted?1:0)+';';
+        }
+        return s;
+    }
+    function installNoRefreshChat(){
+        if (typeof window.renderChatMessages !== 'function') return false;
+        if (window.renderChatMessages.__phNoRefreshInstalled) return true;
+        var _orig = window.renderChatMessages;
+        var wrapped = function(messages){
+            var list = messages||[];
+            var sig = _sigOf(list);
+            var container = document.getElementById('chatMessagesContainer');
+            var same = sig === _chatSig && container && container.children && container.children.length;
+            if (same) { return; } /* no repaint if unchanged: kills flicker */
+            _chatSig = sig;
+            return _orig.apply(this, arguments);
+        };
+        wrapped.__phNoRefreshInstalled = true;
+        /* Preserve any prior wrapper chain (scroll guard, etc.) by wrapping OUTSIDE */
+        window.renderChatMessages = wrapped;
+        return true;
+    }
+    installNoRefreshChat();
+    var _rTries=0;
+    var _rInt = setInterval(function(){
+        _rTries++;
+        if (installNoRefreshChat() || _rTries>60) { /* keep re-installing after later overrides */ }
+        if (_rTries>60) clearInterval(_rInt);
+    }, 600);
+    /* Reset sig when opening a new conversation so first render is allowed */
+    ['activeChatUser','activeChatGroup','activeChatPair'].forEach(function(){});
+    var _lastKey='';
+    setInterval(function(){
+        try{
+            var s=window.STATE||{};
+            var k=(s.activeChatUser||'')+'|'+(s.activeChatGroup||'')+'|'+(s.activeChatPair||'');
+            if(k!==_lastKey){ _lastKey=k; _chatSig=''; }
+        }catch(_){}
+    }, 400);
+
+    /* ---------- 2) FREE SCROLL IN CHAT ----------
+       Kill any timer/behavior that pulls the scroll down while the user
+       is scrolling up reading history. */
+    (function(){
+        function pin(el){
+            if(!el || el.__phFreeScrollBound) return;
+            el.__phFreeScrollBound = true;
+            el.addEventListener('scroll', function(){
+                var atBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 40;
+                el.__phStickBottom = atBottom;
+            }, {passive:true});
+            /* Neutralize scrollTop setter enforcement briefly after user scrolls up */
+            var origSetter = Object.getOwnPropertyDescriptor(Element.prototype,'scrollTop');
+            /* We don't patch the setter globally; instead observe DOM changes and
+               only auto-follow if user was already at bottom. */
+            var mo = new MutationObserver(function(){
+                if(el.__phStickBottom){
+                    el.scrollTop = el.scrollHeight;
+                }
+            });
+            mo.observe(el, {childList:true, subtree:false});
+        }
+        function scan(){
+            pin(document.getElementById('chatMessagesContainer'));
+            $$('.messenger-messages').forEach(pin);
+        }
+        scan();
+        setInterval(scan, 800);
+    })();
+
+    /* ---------- 3) PROFILE MENU IN USER DROPDOWN ----------
+       Ensures the Profile item in the topbar profile panel opens the
+       Profile Center (showProfileCenter). Rebinds even when the panel
+       is rebuilt. */
+    function bindProfileMenu(){
+        var panel = document.getElementById('mrProfilePanel');
+        if(!panel) return;
+        $$('a[data-mract]',panel).forEach(function(a){
+            if(a.__phProfileBound) return;
+            a.__phProfileBound = true;
+            a.addEventListener('click', function(ev){
+                var act = a.getAttribute('data-mract');
+                if(act==='profile'){
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    try{
+                        if(typeof window.showProfileCenter==='function'){ window.showProfileCenter('mine'); }
+                        else if(typeof window.handleDashAction==='function'){ window.handleDashAction('profile'); }
+                    }catch(_){}
+                    panel.classList.remove('open');
+                }
+            }, true);
+        });
+    }
+    setInterval(bindProfileMenu, 800);
+    setTimeout(bindProfileMenu, 400);
+
+    /* ---------- 4) REMOVE LATEST BOOKINGS + QUOTES HISTORY FROM DASHBOARD ----------
+       The dashboard has an #mrListPanel that shows Latest Quotes History
+       / Upcoming Travels. Hide the whole panel and skip its renderer. */
+    function stripDashboardListPanel(){
+        var p = document.getElementById('mrListPanel');
+        if(p){ p.style.display='none'; }
+        /* Also hide any "Latest Bookings" / "Quotes History" widget that
+           the classic dashboard cards might inject inline. */
+        $$('.mr-panel-title').forEach(function(t){
+            var s = (t.textContent||'').toLowerCase();
+            if(s.indexOf('latest quote')!==-1 || s.indexOf('quotes history')!==-1 ||
+               s.indexOf('upcoming travel')!==-1 || s.indexOf('latest booking')!==-1 ||
+               s.indexOf('recent booking')!==-1){
+                var parent = t.closest('.mr-panel'); if(parent) parent.style.display='none';
+            }
+        });
+    }
+    stripDashboardListPanel();
+    setInterval(stripDashboardListPanel, 1500);
+    /* Neutralize the guarded overriding of renderList that keeps rebuilding it. */
+    try{
+        if(typeof window.renderList !== 'undefined'){
+            /* nothing to do — panel hidden via display:none regardless. */
+        }
+    }catch(_){}
+
+    /* ---------- 5) CALENDAR DAY: SAVE / EDIT / DELETE DAILY TASKS ----------
+       Rewrites showCalendarDay to include Edit + Delete buttons per task.
+       Uses same storage key (calendarTasks) & helpers as the existing app. */
+    function isAdminSafe(){ try{ return typeof window.isAdmin==='function' && window.isAdmin(); }catch(_){ return false; } }
+    function hasPermSafe(k){ try{ return typeof window.hasPermission==='function' && window.hasPermission(k); }catch(_){ return false; } }
+    function _readCal(){
+        try{
+            if(typeof window.readData==='function'){
+                return window.readData('calendarTasks','ph_calendar_tasks');
+            }
+        }catch(_){}
+        try{ return Promise.resolve(JSON.parse(localStorage.getItem('ph_calendar_tasks')||'{}')); }catch(_){ return Promise.resolve({}); }
+    }
+    async function _writeCal(all){
+        try{
+            if(typeof window.writeData==='function'){ await window.writeData('calendarTasks',all,'ph_calendar_tasks'); return; }
+        }catch(_){}
+        try{ localStorage.setItem('ph_calendar_tasks', JSON.stringify(all||{})); }catch(_){}
+    }
+    function _nowISO(){ try{ return typeof window.getNowISO==='function' ? window.getNowISO() : new Date().toISOString(); }catch(_){ return new Date().toISOString(); } }
+    function _genId(){ try{ return typeof window.genId==='function' ? window.genId() : ('id_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)); }catch(_){ return 'id_'+Date.now(); } }
+    function _fmtDate(v){ try{ return typeof window.safeDateDisplay==='function' ? window.safeDateDisplay(v) : String(v); }catch(_){ return String(v); } }
+    function _fmtDT(v){ try{ return typeof window.formatDateTime==='function' ? window.formatDateTime(v) : String(v||''); }catch(_){ return String(v||''); } }
+    function _me(){ try{ return (window.STATE&&window.STATE.currentUser)||{}; }catch(_){ return {}; } }
+    function _toast(m,t){ try{ if(typeof window.showToast==='function') return window.showToast(m,t||'info'); }catch(_){} }
+
+    function _canEditTask(t){
+        var me=_me();
+        if(isAdminSafe()) return true;
+        return t && t.user && me.username && t.user===me.username;
+    }
+    function _renderCalDayHTML(date, day, tasks, logs){
+        var can = isAdminSafe() || hasPermSafe('canAddCalendarTasks') || hasPermSafe('canViewCalendar') || true;
+        var addBox = can ? (
+            '<div class="form-group"><label>Add Daily Task</label>'+
+            '<textarea id="phCalTaskText" rows="3" placeholder="Daily task details..."></textarea></div>'+
+            '<div class="modal-actions" style="justify-content:flex-start;">'+
+            '<button class="btn btn-primary" id="phCalTaskAddBtn"><i class="fas fa-plus"></i> Add Task</button>'+
+            '</div>'
+        ) : '';
+        var listHTML = (day && day.length) ? day.map(function(t){
+            var canE = _canEditTask(t);
+            var meta = (t.createdAt?_fmtDT(t.createdAt):'') + (t.user?(' by '+esc(t.user)):'');
+            return '<div class="item-card ph-cal-item" data-tid="'+esc(t.id||'')+'" style="display:flex;flex-direction:column;gap:6px;padding:10px;">'+
+                    '<div class="ph-cal-view"><strong>'+esc(t.text||'Task')+'</strong>'+
+                        '<div class="text-muted text-xs">'+meta+'</div>'+
+                        (canE ? '<div class="ph-cal-actions" style="margin-top:8px;display:flex;gap:6px;">'+
+                            '<button class="btn btn-sm btn-outline ph-cal-edit"><i class="fas fa-pen"></i> Edit</button>'+
+                            '<button class="btn btn-sm btn-danger ph-cal-del"><i class="fas fa-trash"></i> Delete</button>'+
+                        '</div>' : '') +
+                    '</div>'+
+                    '<div class="ph-cal-edit-form" style="display:none;">'+
+                        '<textarea class="ph-cal-edit-text" rows="3">'+esc(t.text||'')+'</textarea>'+
+                        '<div style="margin-top:6px;display:flex;gap:6px;">'+
+                            '<button class="btn btn-sm btn-primary ph-cal-save"><i class="fas fa-save"></i> Save</button>'+
+                            '<button class="btn btn-sm btn-outline ph-cal-cancel">Cancel</button>'+
+                        '</div>'+
+                    '</div>'+
+                '</div>';
+        }).join('') : '<p class="text-muted text-sm">No daily tasks.</p>';
+        var logsHTML = (logs && logs.length) ? logs.map(function(l){
+            return '<div class="calendar-log"><strong>'+esc(l.name||l.user||'User')+'</strong> '+esc(l.action||'updated')+' <code>'+esc(l.path||'')+'</code> <span class="text-muted">'+(typeof window.formatTime==='function'?window.formatTime(l.timestamp||''):esc(l.timestamp||''))+'</span></div>';
+        }).join('') : '<p class="text-muted text-sm">No recorded portal activity for this date.</p>';
+        return '<h3><i class="fas fa-calendar-day"></i> Calendar — '+esc(_fmtDate(date))+'</h3>'+
+            addBox +
+            '<h4 class="mt-16">Daily Calendar Tasks</h4>'+
+            '<div id="phCalTaskList">'+listHTML+'</div>'+
+            '<h4 class="mt-16">Portal Activity Log</h4>'+
+            logsHTML +
+            '<div class="modal-actions"><button class="btn btn-outline" onclick="try{window.showCalendar()}catch(e){}"><i class="fas fa-arrow-left"></i> Back</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
+    }
+
+    async function phShowCalendarDay(date){
+        try{
+            var all = await _readCal() || {};
+            var day = (all[date]||[]).slice();
+            var logs = [];
+            try{
+                if(typeof window.readData==='function'){
+                    var raw = await window.readData('activityLogs/'+date,'ph_activity_logs_'+date,true);
+                    if(Array.isArray(raw)) logs = raw;
+                    else if(raw && typeof raw==='object') logs = Object.keys(raw).map(function(k){return raw[k];});
+                }
+            }catch(_){}
+            logs.sort(function(a,b){ return new Date(b.timestamp||0)-new Date(a.timestamp||0); });
+            var html = _renderCalDayHTML(date, day, day, logs);
+            if(typeof window.showModal==='function') window.showModal(html);
+            else return;
+
+            var listEl = document.getElementById('phCalTaskList');
+            var addBtn = document.getElementById('phCalTaskAddBtn');
+            if(addBtn){
+                addBtn.addEventListener('click', async function(){
+                    var text = (document.getElementById('phCalTaskText').value||'').trim();
+                    if(!text) return _toast('Enter a task.','warning');
+                    var latest = await _readCal() || {};
+                    latest[date] = latest[date] || [];
+                    latest[date].push({id:_genId(), text:text, user:(_me().username||''), createdAt:_nowISO()});
+                    await _writeCal(latest);
+                    _toast('Task saved.','success');
+                    phShowCalendarDay(date);
+                });
+            }
+            if(!listEl) return;
+            $$('.ph-cal-item', listEl).forEach(function(row){
+                var tid = row.getAttribute('data-tid');
+                var view = row.querySelector('.ph-cal-view');
+                var form = row.querySelector('.ph-cal-edit-form');
+                var editBtn = row.querySelector('.ph-cal-edit');
+                var delBtn  = row.querySelector('.ph-cal-del');
+                var saveBtn = row.querySelector('.ph-cal-save');
+                var cancelBtn = row.querySelector('.ph-cal-cancel');
+                var textArea = row.querySelector('.ph-cal-edit-text');
+                if(editBtn){ editBtn.addEventListener('click', function(){ if(view) view.style.display='none'; if(form) form.style.display='block'; if(textArea){ textArea.focus(); } }); }
+                if(cancelBtn){ cancelBtn.addEventListener('click', function(){ if(view) view.style.display=''; if(form) form.style.display='none'; }); }
+                if(saveBtn){
+                    saveBtn.addEventListener('click', async function(){
+                        var newText = (textArea.value||'').trim();
+                        if(!newText) return _toast('Task text is required.','warning');
+                        var latest = await _readCal() || {};
+                        var arr = latest[date] || [];
+                        var idx = -1;
+                        for(var i=0;i<arr.length;i++){ if(String(arr[i].id||'')===String(tid)){ idx=i; break; } }
+                        if(idx<0) return _toast('Task not found.','error');
+                        if(!_canEditTask(arr[idx])) return _toast('You cannot edit this task.','error');
+                        arr[idx].text = newText;
+                        arr[idx].updatedAt = _nowISO();
+                        latest[date] = arr;
+                        await _writeCal(latest);
+                        _toast('Task updated.','success');
+                        phShowCalendarDay(date);
+                    });
+                }
+                if(delBtn){
+                    delBtn.addEventListener('click', async function(){
+                        if(!confirm('Delete this task?')) return;
+                        var latest = await _readCal() || {};
+                        var arr = latest[date] || [];
+                        var next = arr.filter(function(x){
+                            if(String(x.id||'')!==String(tid)) return true;
+                            if(!_canEditTask(x)){ _toast('You cannot delete this task.','error'); return true; }
+                            return false;
+                        });
+                        latest[date] = next;
+                        await _writeCal(latest);
+                        _toast('Task deleted.','success');
+                        phShowCalendarDay(date);
+                    });
+                }
+            });
+        }catch(e){ try{ console.error(e); }catch(_){} }
+    }
+
+    /* Replace showCalendarDay with our version, keep a reference to old
+       just in case (not needed for behavior). */
+    try{
+        window.__phPrevShowCalendarDay = window.showCalendarDay;
+        window.showCalendarDay = phShowCalendarDay;
+    }catch(_){}
+    /* Re-assert periodically since other scripts also overwrite it. */
+    setInterval(function(){
+        if(window.showCalendarDay !== phShowCalendarDay){
+            try{ window.showCalendarDay = phShowCalendarDay; }catch(_){}
+        }
+    }, 1500);
+
+    /* ---------- 6) SHOW LOGGED-IN AGENT NAME ON DASHBOARD ---------- */
+    function updateWelcomeName(){
+        try{
+            var u = (window.STATE&&window.STATE.currentUser)||{};
+            if(!u.username) return;
+            var display = u.name || u.username;
+            var dw = document.getElementById('dashWelcomeName');
+            if(dw && dw.textContent !== display) dw.textContent = display;
+            var un = document.getElementById('userNameDisplay');
+            if(un && un.textContent !== display) un.textContent = display;
+            var role = (u.role||'agent').toUpperCase();
+            var ur = document.getElementById('userRoleDisplay');
+            if(ur && ur.textContent !== role) ur.textContent = role;
+        }catch(_){}
+    }
+    setInterval(updateWelcomeName, 1200);
+    setTimeout(updateWelcomeName, 300);
+
+    /* ---------- 7) GLOBAL SEARCH (permission-scoped) ----------
+       Enhance the topbar search so it finds items across the whole portal.
+       Admins see everything; agents see only records they own / are
+       assigned to, plus menus they can access. */
+    function _ownedByMe(x){
+        try{
+            if(isAdminSafe()) return true;
+            var me = _me().username||'';
+            if(!x) return false;
+            return x.createdBy===me || x.assignedTo===me || x.agentName===me || (x.owner===me);
+        }catch(_){ return false; }
+    }
+    function _in(s,q){ return String(s==null?'':s).toLowerCase().indexOf(q)!==-1; }
+
+    function phRunSearch(q, box){
+        q = String(q||'').trim().toLowerCase();
+        if(!q){ if(box){ box.classList.remove('open'); box.innerHTML=''; } return; }
+        var S = window.STATE||{};
+        var lim = 6;
+        var out = {menu:[],quotes:[],invoices:[],inquiries:[],users:[],tasks:[],logs:[],accounts:[],vouchers:[]};
+
+        try{
+            var quotes = S.quotes||[];
+            for(var i=0;i<quotes.length && out.quotes.length<lim;i++){
+                var qq = quotes[i]; if(!qq || !_ownedByMe(qq)) continue;
+                if(_in(qq.id,q)||_in(qq.quoteRef,q)||_in(qq.quoteNumber,q)||_in(qq.passengerName,q)||_in(qq.customerName,q)||_in(qq.destination,q)||_in(qq.email,q)||_in(qq.phone,q)||_in(qq.createdBy,q)) out.quotes.push(qq);
+            }
+        }catch(_){}
+        try{
+            var invoices = S.invoices||[];
+            for(var i2=0;i2<invoices.length && out.invoices.length<lim;i2++){
+                var inv = invoices[i2]; if(!inv || !_ownedByMe(inv)) continue;
+                if(_in(inv.id,q)||_in(inv.invoiceNumber,q)||_in(inv.passengerName,q)||_in(inv.customerName,q)||_in(inv.destination,q)||_in(inv.createdBy,q)) out.invoices.push(inv);
+            }
+        }catch(_){}
+        try{
+            var iqs = S.inquiries||[];
+            for(var i3=0;i3<iqs.length && out.inquiries.length<lim;i3++){
+                var iq = iqs[i3]; if(!iq || !_ownedByMe(iq)) continue;
+                if(_in(iq.passengerName,q)||_in(iq.destination,q)||_in(iq.passengerEmail,q)||_in(iq.email,q)||_in(iq.phone,q)||_in(iq.status,q)||_in(iq.createdBy,q)) out.inquiries.push(iq);
+            }
+        }catch(_){}
+        try{
+            var accts = S.accounts||[];
+            for(var i4=0;i4<accts.length && out.accounts.length<lim;i4++){
+                var ac = accts[i4]; if(!ac || !_ownedByMe(ac)) continue;
+                if(_in(ac.customerName,q)||_in(ac.passengerName,q)||_in(ac.invoiceNumber,q)||_in(ac.balance,q)) out.accounts.push(ac);
+            }
+        }catch(_){}
+        try{
+            var voucherList = S.vouchers||S.hotelVouchers||[];
+            for(var i5=0;i5<voucherList.length && out.vouchers.length<lim;i5++){
+                var vv = voucherList[i5]; if(!vv || !_ownedByMe(vv)) continue;
+                if(_in(vv.id,q)||_in(vv.voucherNumber,q)||_in(vv.hotelName,q)||_in(vv.passengerName,q)) out.vouchers.push(vv);
+            }
+        }catch(_){}
+        if(isAdminSafe() && S.users){
+            try{
+                var keys = Object.keys(S.users);
+                for(var i6=0;i6<keys.length && out.users.length<lim;i6++){
+                    var u = S.users[keys[i6]]; if(!u) continue;
+                    var hay = ((u.username||'')+' '+(u.name||'')+' '+(u.email||'')+' '+(u.role||'')).toLowerCase();
+                    if(hay.indexOf(q)!==-1) out.users.push(u);
+                }
+            }catch(_){}
+        }
+        try{
+            var _nav = (typeof window.NAV_ITEMS!=='undefined' && window.NAV_ITEMS) ? window.NAV_ITEMS : [];
+            var canSee = typeof window.canSeeNav==='function' ? window.canSeeNav : function(){ return true; };
+            for(var i7=0;i7<_nav.length && out.menu.length<lim;i7++){
+                var it = _nav[i7]; if(!it || !canSee(it)) continue;
+                if(String(it.label||'').toLowerCase().indexOf(q)!==-1) out.menu.push(it);
+            }
+        }catch(_){}
+        try{
+            var cal = S.calendarTasks||{};
+            var dates = Object.keys(cal);
+            for(var i8=0;i8<dates.length && out.tasks.length<lim;i8++){
+                var dt = dates[i8]; var arr = cal[dt]||[];
+                for(var j=0;j<arr.length && out.tasks.length<lim;j++){
+                    var t = arr[j]||{};
+                    if(!isAdminSafe() && t.user && t.user!==_me().username) continue;
+                    var hay = ((t.text||'')+' '+(t.user||'')+' '+dt).toLowerCase();
+                    if(hay.indexOf(q)!==-1) out.tasks.push({date:dt,text:t.text||'Task',user:t.user||''});
+                }
+            }
+        }catch(_){}
+
+        function grp(title, arr, render){
+            if(!arr || !arr.length) return '';
+            return '<div class="mr-search-group"><div class="mr-search-group-title">'+esc(title)+'</div>'+arr.map(render).join('')+'</div>';
+        }
+        var html = '';
+        html += grp('Menu', out.menu, function(it){ return '<div class="mr-search-hit" data-mract="'+esc(it.action)+'"><i class="fas '+esc(it.icon||'fa-arrow-right')+'"></i>'+esc(it.label)+'</div>'; });
+        html += grp('Quotes', out.quotes, function(x){ return '<div class="mr-search-hit" data-mrtype="quote" data-mrid="'+esc(x.id||'')+'"><i class="fas fa-file-pen"></i>'+esc(x.passengerName||x.customerName||x.quoteRef||x.id)+' — '+esc(x.destination||'')+'</div>'; });
+        html += grp('Invoices', out.invoices, function(x){ return '<div class="mr-search-hit" data-mrtype="invoice" data-mrid="'+esc(x.id||'')+'"><i class="fas fa-file-invoice-dollar"></i>'+esc(x.invoiceNumber||x.id)+' — '+esc(x.passengerName||'')+'</div>'; });
+        html += grp('Inquiries', out.inquiries, function(x){ return '<div class="mr-search-hit" data-mract="inquiries"><i class="fas fa-headset"></i>'+esc(x.passengerName||'')+' — '+esc(x.destination||'')+' <span style="opacity:.6;">('+esc(x.status||'')+')</span></div>'; });
+        html += grp('Accounts', out.accounts, function(x){ return '<div class="mr-search-hit" data-mract="accountsMain"><i class="fas fa-book"></i>'+esc(x.customerName||x.passengerName||'')+' — '+esc(x.invoiceNumber||'')+'</div>'; });
+        html += grp('Vouchers', out.vouchers, function(x){ return '<div class="mr-search-hit" data-mract="voucherHistory"><i class="fas fa-hotel"></i>'+esc(x.voucherNumber||x.id)+' — '+esc(x.hotelName||'')+'</div>'; });
+        html += grp('Users', out.users, function(u){ return '<div class="mr-search-hit" data-mract="users"><i class="fas fa-user"></i>'+esc(u.name||u.username)+' <span style="opacity:.6;">'+esc(u.role||'')+'</span></div>'; });
+        html += grp('Tasks', out.tasks, function(t){ return '<div class="mr-search-hit" data-mract="calendar" data-mrdate="'+esc(t.date)+'"><i class="fas fa-list-check"></i>'+esc(t.text)+' <span style="opacity:.6;">('+esc(t.date)+')</span></div>'; });
+        if(!html) html = '<div class="mr-search-empty">No matches for &ldquo;'+esc(q)+'&rdquo;.</div>';
+
+        if(box){
+            box.innerHTML = html;
+            box.classList.add('open');
+            $$('.mr-search-hit', box).forEach(function(el){
+                el.addEventListener('click', function(){
+                    var act = el.getAttribute('data-mract');
+                    var type = el.getAttribute('data-mrtype');
+                    var mrid = el.getAttribute('data-mrid');
+                    var mrdate = el.getAttribute('data-mrdate');
+                    box.classList.remove('open');
+                    try{
+                        if(act==='calendar' && mrdate){ phShowCalendarDay(mrdate); return; }
+                        if(type==='quote' && typeof window._viewQuote==='function'){ window._viewQuote(mrid); return; }
+                        if(type==='invoice' && typeof window._viewInvoice==='function'){ window._viewInvoice(mrid); return; }
+                        if(act && typeof window.handleDashAction==='function'){ window.handleDashAction(act); return; }
+                    }catch(_){}
+                });
+            });
+        }
+    }
+    /* Override the global runSearch that the topbar wires to */
+    try{ window.runSearch = phRunSearch; }catch(_){}
+    /* Re-bind input so it uses our function (in case a prior handler captured old fn) */
+    function rebindSearchInput(){
+        var wrap = document.getElementById('mrTopSearch'); if(!wrap) return;
+        var input = wrap.querySelector('input'); var box = wrap.querySelector('#mrSearchResults');
+        if(!input || !box || input.__phSearchBound) return;
+        input.__phSearchBound = true;
+        input.addEventListener('input', function(){ phRunSearch(input.value, box); });
+        input.addEventListener('focus', function(){ if(input.value.trim()) phRunSearch(input.value, box); });
+    }
+    setInterval(rebindSearchInput, 900);
+    setTimeout(rebindSearchInput, 500);
+
+})();
+</script>
+<!-- ==== end PH-FIX v1 ==== -->
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
