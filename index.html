@@ -22177,6 +22177,200 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
 })();
 </script>
 <!-- ==== end PH-FIX v2 ==== -->
+
+<!-- ==== PH-FIX v3: role-scoped tasks, calendar-widget delete, task-manager name lock ==== -->
+<style>
+.ph-cal-owner-badge{font-size:.75rem;color:var(--primary,#b8860b);font-weight:700;margin-top:4px;}
+.ph-final-del{margin-top:6px;}
+</style>
+<script>
+(function(){
+    'use strict';
+    if(window.__PH_FIX_V3_INSTALLED) return;
+    window.__PH_FIX_V3_INSTALLED = true;
+
+    function meU(){ try{ return ((window.STATE&&window.STATE.currentUser)||{}).username||''; }catch(_){ return ''; } }
+    function isAdm(){ try{ return typeof window.isAdmin==='function' && window.isAdmin(); }catch(_){ return false; } }
+    function toast(m,t){ try{ window.showToast && window.showToast(m,t||'info'); }catch(_){} }
+    function userDisp(u){ try{ var x=((window.STATE&&window.STATE.users)||{})[u]; return x?(x.name||u):u; }catch(_){ return u; } }
+
+    /* ---------- 1) TASK MANAGER: agent name dropdown restricted to self for non-admins ---------- */
+    function patchTaskForm(){
+        if(typeof window.showTaskForm !== 'function') return;
+        if(window.showTaskForm.__phV3) return;
+        var orig = window.showTaskForm;
+        window.showTaskForm = async function(id, readOnly){
+            var r = await orig.apply(this, arguments);
+            var apply = function(){
+                try{
+                    if(isAdm()) return;
+                    var sel = document.getElementById('taskAssignedTo');
+                    if(!sel) return;
+                    var my = meU();
+                    Array.prototype.slice.call(sel.options).forEach(function(o){
+                        if(o.value !== my) sel.removeChild(o);
+                    });
+                    if(!sel.querySelector('option[value="'+my+'"]')){
+                        var o = document.createElement('option');
+                        o.value = my;
+                        o.textContent = userDisp(my)+' (@'+my+')';
+                        sel.appendChild(o);
+                    }
+                    sel.value = my;
+                    sel.disabled = true;
+                }catch(_){}
+            };
+            setTimeout(apply, 30);
+            setTimeout(apply, 200);
+            return r;
+        };
+        window.showTaskForm.__phV3 = true;
+    }
+    setTimeout(patchTaskForm, 400);
+    setInterval(patchTaskForm, 900);
+
+    /* ---------- 2) CALENDAR DAY: filter tasks per role, delete button per item ---------- */
+    var _lastCalDate = '';
+    function trackShowCalendarDay(){
+        if(typeof window.showCalendarDay !== 'function') return;
+        if(window.showCalendarDay.__phV3Track) return;
+        var orig = window.showCalendarDay;
+        var wrapped = function(date){
+            _lastCalDate = date;
+            var r = orig.apply(this, arguments);
+            [40, 200, 500, 1000].forEach(function(ms){ setTimeout(function(){ decorateDay(date); }, ms); });
+            return r;
+        };
+        wrapped.__phV3Track = true;
+        window.showCalendarDay = wrapped;
+    }
+    setInterval(trackShowCalendarDay, 700);
+    setTimeout(trackShowCalendarDay, 400);
+
+    async function decorateDay(date){
+        try{
+            if(!date) return;
+            var modal = document.querySelector('.modal-box, #modalContent, .modal-content');
+            if(!modal) return;
+            var h3 = modal.querySelector('h3');
+            if(!h3 || !/Calendar/i.test(h3.textContent||'')) return;
+
+            var all = {};
+            try{
+                if(typeof window.readData==='function'){
+                    all = await window.readData('calendarTasks','ph_calendar_tasks') || {};
+                }
+            }catch(_){}
+            var arr = all[date] || [];
+            var my = meU();
+            var admin = isAdm();
+
+            /* Daily calendar tasks section */
+            var items = modal.querySelectorAll('#phCalTaskList .ph-cal-item, .item-card');
+            items.forEach(function(card){
+                if(card.__phV3Done) return;
+                var tid = card.getAttribute('data-tid') || '';
+                var owner = '';
+                if(tid){
+                    var t = arr.filter(function(x){ return String(x.id||'')===String(tid); })[0];
+                    if(t) owner = t.user || '';
+                } else {
+                    var strong = card.querySelector('strong');
+                    if(strong){
+                        var text = (strong.textContent||'').trim();
+                        var t2 = arr.filter(function(x){ return (x.text||'').trim()===text; })[0];
+                        if(t2){ tid = t2.id || ''; owner = t2.user || ''; if(tid) card.setAttribute('data-tid', tid); }
+                    }
+                }
+                /* Agent: hide items not owned by me */
+                if(!admin && owner && owner !== my){
+                    card.style.display = 'none';
+                    card.__phV3Done = true;
+                    return;
+                }
+                /* Admin: show creator name */
+                if(admin && owner && !card.querySelector('.ph-cal-owner-badge')){
+                    var badge = document.createElement('div');
+                    badge.className = 'ph-cal-owner-badge';
+                    badge.textContent = 'Added by: ' + userDisp(owner) + ' (@' + owner + ')';
+                    var view = card.querySelector('.ph-cal-view') || card;
+                    view.appendChild(badge);
+                }
+                /* Ensure a Delete button */
+                var canDel = admin || (owner && owner === my) || !owner;
+                if(canDel && tid && !card.querySelector('.ph-cal-del') && !card.querySelector('.ph-final-del')){
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'btn btn-sm btn-danger ph-final-del';
+                    btn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+                    btn.addEventListener('click', function(e){
+                        e.preventDefault(); e.stopPropagation();
+                        if(!confirm('Delete this task?')) return;
+                        (async function(){
+                            try{
+                                var latest = (typeof window.readData==='function') ? (await window.readData('calendarTasks','ph_calendar_tasks',true) || {}) : {};
+                                var list = latest[date] || [];
+                                latest[date] = list.filter(function(x){ return String(x.id||'') !== String(tid); });
+                                if(typeof window.writeData==='function') await window.writeData('calendarTasks', latest, 'ph_calendar_tasks');
+                                if(window.STATE) window.STATE.calendarTasks = latest;
+                                toast('Task deleted.','success');
+                                if(typeof window.showCalendarDay==='function') window.showCalendarDay(date);
+                            }catch(err){ toast('Delete failed.','error'); }
+                        })();
+                    });
+                    card.appendChild(btn);
+                }
+                card.__phV3Done = true;
+            });
+
+            /* Scheduled Agent Tasks section — filter for non-admins, show name for admins */
+            var headers = Array.prototype.filter.call(modal.querySelectorAll('h4'), function(h){
+                return /Scheduled Agent Tasks/i.test(h.textContent||'');
+            });
+            headers.forEach(function(h){
+                var node = h.nextElementSibling;
+                while(node && node.tagName !== 'H4' && !(node.classList && node.classList.contains('modal-actions'))){
+                    if(node.classList && node.classList.contains('item-card')){
+                        var txt = node.textContent || '';
+                        if(!admin){
+                            /* Detect owner by "Agent: @user" pattern */
+                            var mine = (txt.indexOf('Agent: ' + my) !== -1) || (txt.indexOf('Agent: ' + userDisp(my)) !== -1);
+                            if(!mine) node.style.display = 'none';
+                        }
+                    }
+                    node = node.nextElementSibling;
+                }
+            });
+        }catch(_){}
+    }
+
+    /* Also react whenever the modal DOM changes */
+    var obs = new MutationObserver(function(){
+        try{
+            var modal = document.querySelector('.modal-box, #modalContent, .modal-content');
+            if(!modal) return;
+            var h3 = modal.querySelector('h3');
+            if(!h3 || !/Calendar/i.test(h3.textContent||'')) return;
+            /* attempt to derive current date from add button */
+            var dt = _lastCalDate;
+            if(!dt){
+                var btn = modal.querySelector('[onclick*="_saveCalTask"], #phCalTaskAddBtn');
+                if(btn){
+                    var oc = btn.getAttribute('onclick') || '';
+                    var mm = /_saveCalTask\(['"]([^'"]+)['"]\)/.exec(oc);
+                    if(mm) dt = mm[1];
+                }
+            }
+            if(dt) decorateDay(dt);
+        }catch(_){}
+    });
+    try{ obs.observe(document.body, { childList:true, subtree:true }); }catch(_){}
+
+    try{ console.log('[PH-FIX v3] role-scoped tasks + calendar delete ready'); }catch(_){}
+})();
+</script>
+<!-- ==== end PH-FIX v3 ==== -->
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 </body>
 </html>
