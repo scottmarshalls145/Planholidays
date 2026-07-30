@@ -21703,288 +21703,480 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
 })();
 </script>
 <!-- ==== end PH-FIX v1 ==== -->
-
-<!-- ==== PH-FIX v3: freeze online-status flicker + refresh button + 24h notifications ==== -->
-<script>
-(function(){
-    'use strict';
-
-    /* ------------------------------------------------------------------
-     * 1. Stop the chat online/offline "keep refreshing" behaviour.
-     *    The existing code re-runs _mrAnnotateOnlineContacts,
-     *    _mrRenderOnlineAgentsPanel, _renderOnlineAgents, and
-     *    loadChatContacts on short intervals — that's what causes the
-     *    contact names / dots to flicker between online and offline.
-     *    We neutralise those recurring calls; the manual Refresh button
-     *    below (and normal actions like opening chat / sending messages)
-     *    still trigger a real refresh.
-     * ------------------------------------------------------------------ */
-    function _phFreezeRefreshers(){
-        var names = [
-            '_mrAnnotateOnlineContacts',
-            '_mrRenderOnlineAgentsPanel',
-            '_renderOnlineAgents',
-            '_refreshOnlineAgents',
-            '_updateOnlineBadge'
-        ];
-        names.forEach(function(n){
-            try {
-                var fn = window[n];
-                if (typeof fn !== 'function' || fn.__phV3Frozen) return;
-                var wrapped = function(){
-                    /* Allow explicit calls but block automatic timer-driven storms:
-                       throttle to once every 60s unless forced. */
-                    var now = Date.now();
-                    wrapped.__lastCall = wrapped.__lastCall || 0;
-                    if (wrapped.__forceNext) {
-                        wrapped.__forceNext = false;
-                        wrapped.__lastCall = now;
-                        return fn.apply(this, arguments);
-                    }
-                    if (now - wrapped.__lastCall < 60000) return;
-                    wrapped.__lastCall = now;
-                    return fn.apply(this, arguments);
-                };
-                wrapped.__phV3Frozen = true;
-                wrapped.__orig = fn;
-                window[n] = wrapped;
-            } catch(_){}
-        });
-    }
-    /* Re-apply periodically because other modules replace these globals. */
-    setInterval(_phFreezeRefreshers, 1500);
-    setTimeout(_phFreezeRefreshers, 400);
-
-    /* Helper to force one real refresh of every presence renderer. */
-    window._phForceAgentStatusRefresh = function(){
-        ['_mrAnnotateOnlineContacts','_mrRenderOnlineAgentsPanel','_renderOnlineAgents','_refreshOnlineAgents','_updateOnlineBadge'].forEach(function(n){
-            try {
-                var fn = window[n];
-                if (typeof fn !== 'function') return;
-                if (fn.__phV3Frozen) fn.__forceNext = true;
-                fn();
-            } catch(_){}
-        });
-        try {
-            if (typeof loadChatContacts === 'function') loadChatContacts();
-        } catch(_){}
-    };
-
-    /* ------------------------------------------------------------------
-     * 2. Insert a "Refresh" button into the chat sidebar header so the
-     *    user can pull the current online/offline status on demand.
-     * ------------------------------------------------------------------ */
-    function _phInjectRefreshButton(){
-        var head = document.querySelector('.chat-sidebar .chat-sidebar-head');
-        if (!head) return;
-        if (head.querySelector('#phChatStatusRefreshBtn')) return;
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.id = 'phChatStatusRefreshBtn';
-        btn.className = 'btn btn-sm btn-outline';
-        btn.style.cssText = 'margin-top:6px;width:100%;display:inline-flex;align-items:center;justify-content:center;gap:6px;';
-        btn.innerHTML = '<i class="fas fa-rotate"></i> Refresh Status';
-        btn.title = 'Refresh online/offline status of agents';
-        btn.addEventListener('click', function(){
-            btn.disabled = true;
-            var old = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-rotate fa-spin"></i> Refreshing...';
-            try { window._phForceAgentStatusRefresh(); } catch(_){}
-            setTimeout(function(){
-                btn.disabled = false;
-                btn.innerHTML = old;
-            }, 900);
-        });
-        head.appendChild(btn);
-    }
-    setInterval(_phInjectRefreshButton, 800);
-    setTimeout(_phInjectRefreshButton, 500);
-
-    /* ------------------------------------------------------------------
-     * 3. Restrict notifications to the last 24 hours, only add a
-     *    notification when a new message arrives that has NOT been read
-     *    or when a call is missed. Once the notification panel/center is
-     *    opened, mark items as read.
-     *
-     *    The application has two notification surfaces:
-     *      (a) The topbar bell (#mrNotifyBtn -> renderNotifications) —
-     *          already uses a 24h cutoff (collectNotifications). We just
-     *          make sure clicking a row and closing the panel marks it
-     *          read.
-     *      (b) The chat notification center (window.showNotificationCenter)
-     *          — currently shows recent 30 messages regardless of age.
-     *          We wrap it to filter to the last 24 hours and to include
-     *          only unread messages + missed calls.
-     * ------------------------------------------------------------------ */
-    var ONE_DAY_MS = 24 * 3600 * 1000;
-
-    /* (a) Topbar bell: mark all as read when the panel closes */
-    document.addEventListener('click', function(e){
-        try {
-            var panel = document.getElementById('mrNotifyPanel');
-            if (!panel) return;
-            var wrap = document.getElementById('mrNotifyWrap');
-            if (!wrap) return;
-            if (!wrap.contains(e.target) && panel.classList.contains('open')) {
-                /* Panel is about to close — the existing outside-click
-                   handler will close it; mark items read now. */
-                var user = (window.STATE && window.STATE.currentUser) || {};
-                if (user.username) {
-                    try { localStorage.setItem('ph_notify_read_all_'+user.username, new Date().toISOString()); } catch(_){}
-                    if (typeof window.updateNotifyBadge === 'function') window.updateNotifyBadge();
-                }
-            }
-        } catch(_){}
-    }, true);
-
-    /* (b) Notification center: filter to unread messages / missed calls
-       within the last 24 hours. We keep wrapping any newer definition. */
-    function _phWrapNotificationCenter(){
-        var fn = window.showNotificationCenter;
-        if (typeof fn !== 'function' || fn.__phV3Filtered) return;
-        var prev = fn;
-        var wrapped = async function(){
-            try {
-                var STATE_ = window.STATE || {};
-                if (!STATE_.currentUser) return prev.apply(this, arguments);
-                var me = STATE_.currentUser.username;
-                var cutoff = Date.now() - ONE_DAY_MS;
-
-                function _esc(v){ return (typeof escapeHTML === 'function') ? escapeHTML(v) : String(v==null?'':v).replace(/[&<>"']/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c];}); }
-                function _vals(o){ if(!o) return []; if(Array.isArray(o)) return o; return Object.keys(o).map(function(k){var v=o[k]||{}; if(!v._key) v._key=k; return v;}); }
-                function _name(u){ var users=STATE_.users||{}, x=users[u]||{}; return x.name || x.displayName || u || 'User'; }
-                function _admin(){ try { return typeof isAdmin === 'function' && isAdmin(); } catch(_){ return false; } }
-                function _forMe(m){
-                    if (!m || m.deleted || m.from === me) return false;
-                    if (m.groupId) return (m.members||[]).indexOf(me) !== -1;
-                    return m.to === me;
-                }
-                function _unread(m){
-                    if (!_forMe(m)) return false;
-                    return m.groupId ? !(m.readBy && m.readBy[me]) : !m.read;
-                }
-                function _callForMe(c){
-                    if (!c || c.status !== 'missed') return false;
-                    if (_admin()) return true;
-                    return c.from === me || (c.members||[]).indexOf(me) !== -1 || String(c.to||'') === me || (c.acceptedBy||[]).indexOf(me) !== -1;
-                }
-                async function _readCalls(){
-                    var out = {};
-                    try { var fb = await readData('callLogs', null, true); if (fb && typeof fb === 'object') out = fb; } catch(_){}
-                    try { for (var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(k && k.indexOf('ph_call_logs_')===0){ try { var v=JSON.parse(localStorage.getItem(k)); if(v && v.id) out[v.id]=v; } catch(_){} } } } catch(_){}
-                    return out;
-                }
-
-                var msgs = {}, calls = {};
-                try { msgs = await readData('chatMessages','ph_chat_messages',true) || {}; } catch(_){}
-                try { calls = await _readCalls(); } catch(_){}
-
-                /* Only unread messages within last 24h */
-                var messages = _vals(msgs).filter(function(m){
-                    if (!_unread(m)) return false;
-                    var t = new Date(m.timestamp||0).getTime() || 0;
-                    return t >= cutoff;
-                }).sort(function(a,b){ return new Date(b.timestamp||0) - new Date(a.timestamp||0); });
-
-                /* Only missed calls within last 24h */
-                var missed = _vals(calls).filter(function(c){
-                    if (!_callForMe(c)) return false;
-                    var t = new Date(c.endedAt || c.startedAt || 0).getTime() || 0;
-                    return t >= cutoff;
-                }).sort(function(a,b){ return new Date(b.endedAt||b.startedAt||0) - new Date(a.endedAt||a.startedAt||0); });
-
-                function _msgRow(m){
-                    var label = m.groupId ? (((STATE_.chatGroups||{})[m.groupId]||{}).name || m.groupId) : _name(m.from);
-                    var body = m.message || (m.attachment ? '[Image]' : 'Message');
-                    var when = m.timestamp ? formatDateTime(m.timestamp) : '';
-                    var target = m.groupId ? m.groupId : m.from, type = m.groupId ? 'group' : 'user';
-                    return '<div class="notify-row"><div class="notify-icon"><i class="fas fa-message"></i></div><div class="notify-main"><strong>New message from '+_esc(label)+'</strong><p>'+_esc(body)+'</p><span>'+_esc(when)+'</span></div><button class="btn btn-sm btn-primary" onclick="window._openNotificationChat(\''+type+'\',\''+_esc(target)+'\')">Open</button></div>';
-                }
-                function _callRowHtml(c){
-                    var when = (c.endedAt || c.startedAt) ? formatDateTime(c.endedAt||c.startedAt) : '';
-                    return '<div class="notify-row"><div class="notify-icon missed"><i class="fas fa-phone-slash"></i></div><div class="notify-main"><strong>Missed call from '+_esc(_name(c.from))+'</strong><p>Status: missed call</p><span>'+_esc(when)+'</span></div><button class="btn btn-sm btn-outline" onclick="window._openNotificationCalls()">Call Logs</button></div>';
-                }
-
-                var html = '<h3><i class="fas fa-bell"></i> Notifications</h3>' +
-                    '<p class="text-muted text-sm">Last 24 hours only. New messages you haven\'t read and calls you missed.</p>' +
-                    '<div class="notify-center">' +
-                    '<h4>New Messages</h4>' + (messages.length ? messages.map(_msgRow).join('') : '<p class="text-muted text-sm">No new messages in the last 24 hours.</p>') +
-                    '<h4 class="mt-16">Missed Calls</h4>' + (missed.length ? missed.map(_callRowHtml).join('') : '<p class="text-muted text-sm">No missed calls in the last 24 hours.</p>') +
-                    '</div><div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
-
-                showModal(html);
-
-                /* Mark them read now — opening the notification panel
-                   consumes them. */
-                try {
-                    if (window.firebaseConnected && window.db) {
-                        messages.forEach(function(m){
-                            if (!m._key) return;
-                            if (m.groupId) db.ref('chatMessages/'+m._key+'/readBy/'+me).set(true);
-                            else if (m.to === me) db.ref('chatMessages/'+m._key+'/read').set(true);
-                        });
-                    } else {
-                        var all = await readData('chatMessages','ph_chat_messages',true) || {};
-                        var keys = Array.isArray(all) ? all.map(function(_,i){return i;}) : Object.keys(all);
-                        keys.forEach(function(k){
-                            var m = all[k]; if(!m) return;
-                            if (_unread(m)) { if (m.groupId) { m.readBy=m.readBy||{}; m.readBy[me]=true; } else m.read=true; }
-                        });
-                        await writeData('chatMessages', all, 'ph_chat_messages');
-                    }
-                } catch(_){}
-                try { localStorage.setItem('ph_notifications_seen_at_'+me, String(Date.now())); } catch(_){}
-                try { localStorage.setItem('ph_notify_read_all_'+me, new Date().toISOString()); } catch(_){}
-                ['chatNotifyBadge','chatCardNotifyBadge','mrNotifyBadge'].forEach(function(id){
-                    var e = document.getElementById(id);
-                    if (e) { e.textContent = '0'; e.setAttribute('data-count','0'); e.style.display='none'; }
-                });
-                if (typeof window.updateNotifyBadge === 'function') window.updateNotifyBadge();
-            } catch (err) {
-                try { return prev.apply(this, arguments); } catch(_){}
-            }
-        };
-        wrapped.__phV3Filtered = true;
-        window.showNotificationCenter = wrapped;
-    }
-    setInterval(_phWrapNotificationCenter, 800);
-    setTimeout(_phWrapNotificationCenter, 500);
-
-    /* Wrap collectNotifications (topbar bell) so it only reports items
-       the user actually needs: unread chat + missed calls in last 24h. */
-    function _phWrapCollectNotifications(){
-        var fn = window.collectNotifications;
-        if (typeof fn !== 'function' || fn.__phV3Filtered) return;
-        var prev = fn;
-        var wrapped = function(){
-            try {
-                var items = prev.apply(this, arguments) || [];
-                var cutoff = Date.now() - ONE_DAY_MS;
-                return items.filter(function(n){
-                    if (!n) return false;
-                    var t = n.when ? (n.when.getTime ? n.when.getTime() : new Date(n.when).getTime()) : 0;
-                    if (!t || t < cutoff) return false;
-                    /* Keep only chat + missed-call related items */
-                    if (n.type === 'chat') return true;
-                    if (n.type === 'missed' || n.type === 'call') return true;
-                    return false;
-                });
-            } catch(_) { return []; }
-        };
-        wrapped.__phV3Filtered = true;
-        window.collectNotifications = wrapped;
-    }
-    setInterval(_phWrapCollectNotifications, 800);
-    setTimeout(_phWrapCollectNotifications, 500);
-
-})();
-</script>
-<!-- ==== end PH-FIX v3 ==== -->
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<!-- ==== PH-FIX v2: minor targeted UI polish (agents online sticky+refresh, notifications trimmed, sidebar shortcuts, per-user theme persistence) ==== -->
+<style>
+/* Refresh button styling */
+.ph-refresh-btn{border:1px solid var(--card-border,rgba(255,255,255,.2));background:var(--primary,#b8860b);color:#fff;border-radius:10px;padding:8px 14px;font-size:.82rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(0,0,0,.15);}
+.ph-refresh-btn:hover{filter:brightness(1.08);transform:translateY(-1px);}
+.ph-refresh-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;margin-bottom:10px;background:rgba(184,134,11,.08);border:1px solid var(--card-border,rgba(255,255,255,.08));border-radius:12px;}
+.ph-refresh-bar .ph-online-count{font-size:.82rem;color:var(--text2,#888);flex:1;font-weight:600;}
+.mr-notify-item.read{opacity:.62;}
+.mr-notify-item.read .mr-notify-item-title{font-weight:400;}
+</style>
+<script>
+/* PH-FIX v2 — minor UI changes:
+   (a) online agent list stops flickering; a Refresh button re-queries presence.
+   (b) notifications: only unread chat msgs + missed calls in last 24h; click = read.
+   (c) sidebar nav items appear in Settings > Shortcuts picker.
+   (d) custom theme + chat theme persist per-user across login.
+*/
+(function(){
+    'use strict';
+    if (window.__PH_MINOR_V1_INSTALLED) return;
+    window.__PH_MINOR_V1_INSTALLED = true;
+    console.log('[PH-MINOR v1] installing minor UI patches (agents/notify/shortcuts/theme)');
+
+    function $(s,r){ return (r||document).querySelector(s); }
+    function $$(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); }
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+    function me(){ try{ return (window.STATE&&window.STATE.currentUser)||{}; }catch(_){ return {}; } }
+
+    /* ========== (a) STICKY ONLINE / OFFLINE + MANUAL REFRESH ==========
+       Freeze presence-status per user in a session map. Original _isOnline
+       is on window (line ~13187, wrapped again at line ~19825). We wrap it
+       AGAIN with a session-freeze layer. Only the Refresh button rebuilds.
+    */
+    var _phSticky = {};        /* username -> true|false (frozen) */
+    var _phFrozen = false;     /* is the map populated? */
+
+    function _origIsOnlineCall(u){
+        try{
+            /* Save any current window._isOnline before we wrap, so we can call it. */
+            if(window.__phOrigIsOnline) return !!window.__phOrigIsOnline(u);
+            if(typeof window._isOnline === 'function' && !window._isOnline.__phFrozen) return !!window._isOnline(u);
+        }catch(_){}
+        return false;
+    }
+
+    function freezeMap(){
+        try{
+            var users = (window.STATE&&window.STATE.users)||{};
+            var next = {};
+            Object.keys(users).forEach(function(k){
+                next[k] = _origIsOnlineCall(k);
+            });
+            _phSticky = next;
+            _phFrozen = true;
+        }catch(_){ _phSticky = {}; }
+    }
+
+    function installFreeze(){
+        if(typeof window._isOnline !== 'function') return false;
+        if(window._isOnline.__phFrozen) return true;
+        window.__phOrigIsOnline = window._isOnline;
+        var wrapped = function(u){
+            if(!_phFrozen){
+                /* first call — populate map lazily so we get a snapshot */
+                _phSticky[u] = !!window.__phOrigIsOnline(u);
+                return _phSticky[u];
+            }
+            if(_phSticky.hasOwnProperty(u)) return _phSticky[u];
+            /* new user we haven't seen — fetch once and freeze */
+            _phSticky[u] = !!window.__phOrigIsOnline(u);
+            return _phSticky[u];
+        };
+        wrapped.__phFrozen = true;
+        window._isOnline = wrapped;
+        /* Do initial freeze in ~2s so presence has time to load */
+        setTimeout(freezeMap, 2200);
+        return true;
+    }
+    /* Also block later scripts from re-wrapping our version */
+    (function shield(){
+        var tries = 0;
+        var iv = setInterval(function(){
+            tries++;
+            if(installFreeze() || tries > 40){ if(tries > 40) clearInterval(iv); }
+        }, 400);
+    })();
+
+    /* Manual refresh: rebuild sticky map + re-render lists */
+    window.phRefreshAgents = function(){
+        try{ if(typeof window._refreshOnlineAgents==='function') window._refreshOnlineAgents(); }catch(_){}
+        /* Give presence a moment to update, then re-freeze */
+        setTimeout(function(){
+            freezeMap();
+            /* re-render whatever online list is open */
+            try{ if(typeof window._renderOnlineAgents==='function') window._renderOnlineAgents(); }catch(_){}
+            try{ if(typeof window._mrRenderOnlineAgentsPanel==='function') window._mrRenderOnlineAgentsPanel(); }catch(_){}
+            /* Also update our own count display and any card DOM we've decorated */
+            phUpdateOnlineCounts();
+            phDecorateContactCards();
+            try{ if(typeof window.showToast==='function') window.showToast('Agent status refreshed.','success'); }catch(_){}
+        }, 400);
+    };
+
+    /* Inject a visible Refresh button into every online-agent surface we know */
+    function ensureRefreshButtons(){
+        function injectAt(anchorEl, keyId){
+            if(!anchorEl) return;
+            if(document.getElementById(keyId)) return;
+            var bar = document.createElement('div');
+            bar.className = 'ph-refresh-bar';
+            bar.innerHTML = '<span class="ph-online-count" data-count-slot></span>'+
+                '<button type="button" class="ph-refresh-btn" id="'+keyId+'"><i class="fas fa-rotate"></i> Refresh Agents</button>';
+            anchorEl.parentElement.insertBefore(bar, anchorEl);
+            bar.querySelector('#'+keyId).addEventListener('click', function(e){
+                e.preventDefault(); e.stopPropagation();
+                window.phRefreshAgents();
+            });
+        }
+        injectAt(document.getElementById('ccOnlineList'), 'phRefreshCC');
+        injectAt(document.getElementById('mrChatOnlineList'), 'phRefreshMR');
+        /* Also inject into the main chat contact list header, once */
+        var chatSideHead = document.querySelector('.chat-sidebar-head');
+        if(chatSideHead && !document.getElementById('phRefreshCS')){
+            var b = document.createElement('button');
+            b.type='button'; b.id='phRefreshCS'; b.className='ph-refresh-btn';
+            b.style.width='100%'; b.style.marginTop='8px'; b.style.justifyContent='center';
+            b.innerHTML = '<i class="fas fa-rotate"></i> Refresh Agents';
+            b.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); window.phRefreshAgents(); });
+            chatSideHead.appendChild(b);
+        }
+        phUpdateOnlineCounts();
+    }
+    function phUpdateOnlineCounts(){
+        try{
+            var users = (window.STATE&&window.STATE.users)||{};
+            var meU = (me().username)||'';
+            var n = 0;
+            Object.keys(users).forEach(function(k){
+                if(k===meU) return;
+                var v = _phSticky.hasOwnProperty(k) ? _phSticky[k] : _origIsOnlineCall(k);
+                if(v) n++;
+            });
+            Array.prototype.forEach.call(document.querySelectorAll('[data-count-slot]'), function(el){
+                el.textContent = n + ' agent'+(n===1?'':'s')+' online';
+            });
+        }catch(_){}
+    }
+    setInterval(ensureRefreshButtons, 700);
+
+    /* ---- Freeze rendered cards: any repaint of the online list gets overlaid
+       with the sticky status class so text stays stable across polling. ---- */
+    function phDecorateContactCards(){
+        var users = (window.STATE&&window.STATE.users)||{};
+        /* Calls-center cards */
+        Array.prototype.forEach.call(document.querySelectorAll('#ccOnlineList .cc-agent-card'), function(card){
+            var u = card.getAttribute('data-username'); if(!u) return;
+            var online = _phSticky.hasOwnProperty(u) ? _phSticky[u] : _origIsOnlineCall(u);
+            card.classList.toggle('offline', !online);
+            var sub = card.querySelector('.cc-agent-sub');
+            if(sub){
+                var role = (users[u]&&users[u].role)||'agent';
+                var name = (users[u]&&users[u].name)||u;
+                sub.innerHTML = '@'+u+' · '+role+' · '+(online?'<span style="color:#27ae60;font-weight:600;">Online</span>':'Offline');
+                var nameEl = card.querySelector('.cc-agent-name');
+                if(nameEl) nameEl.textContent = name;
+            }
+            var btn = card.querySelector('[data-call-agent]');
+            if(btn){ btn.disabled = !online; }
+        });
+    }
+    setInterval(phDecorateContactCards, 900);
+
+    /* ========== (b) NOTIFICATIONS: only unread chat + missed calls, 24h ==========
+       Because the original renderNotifications is a closure (not on window),
+       we intercept via MutationObserver: whenever the notify panel opens or
+       its list content changes, we replace it with our filtered content. */
+
+    function inLast24h(t){ try{ return (Date.now() - (new Date(t)).getTime()) < 24*3600*1000; }catch(_){ return false; } }
+
+    function phGetReadMap(){
+        var user = me(); if(!user.username) return {};
+        try{ return JSON.parse(localStorage.getItem('ph_notify_read_ids_'+user.username)||'{}')||{}; }catch(_){ return {}; }
+    }
+    function phMarkRead(id){
+        var user = me(); if(!user.username) return;
+        var map = phGetReadMap(); map[id] = Date.now();
+        try{ localStorage.setItem('ph_notify_read_ids_'+user.username, JSON.stringify(map)); }catch(_){}
+    }
+
+    function phCollectNotifications(){
+        var user = me();
+        if(!user || !user.username) return [];
+        var items = [];
+        var readMap = phGetReadMap();
+        try{
+            var msgs = (window.STATE && window.STATE.chatMessages) || [];
+            (Array.isArray(msgs)?msgs:Object.keys(msgs).map(function(k){return msgs[k];})).forEach(function(m){
+                if(!m || !m.timestamp) return;
+                if(m.from === user.username) return;
+                var toMe = m.to===user.username || (Array.isArray(m.members) && m.members.indexOf(user.username)>-1) || (m.pair && String(m.pair).indexOf(user.username)>-1);
+                if(!toMe) return;
+                if(!inLast24h(m.timestamp)) return;
+                if(m.readBy && m.readBy[user.username]) return;
+                var id = 'chat-'+(m._key||m.id||m.timestamp);
+                items.push({
+                    id:id, when:m.timestamp,
+                    title:'Message from '+((m.fromName||m.from||'')),
+                    sub: String(m.text||m.message||(m.file&&m.file.name)||'(image)').slice(0,80),
+                    type:'chat', action:'chat',
+                    read: !!readMap[id]
+                });
+            });
+        }catch(_){}
+        try{
+            var logs = window._callLogs || {};
+            Object.keys(logs).forEach(function(k){
+                var l = logs[k]; if(!l) return;
+                if(l.status !== 'missed') return;
+                if(!inLast24h(l.startedAt)) return;
+                if(l.from===user.username) return;
+                var involved = (l.to||[]).indexOf(user.username)!==-1 || (l.members||[]).indexOf(user.username)!==-1;
+                if(!involved) return;
+                var id = 'miss-'+k;
+                items.push({
+                    id:id, when:l.startedAt,
+                    title:'Missed call from '+(l.from||''),
+                    sub:'Tap to view call logs',
+                    type:'missed', action:'callLogs',
+                    read: !!readMap[id]
+                });
+            });
+        }catch(_){}
+        items.sort(function(a,b){ return (new Date(b.when)).getTime() - (new Date(a.when)).getTime(); });
+        return items;
+    }
+
+    function phRenderNotifyPanel(){
+        var list = document.getElementById('mrNotifyList');
+        if(!list) return;
+        var items = phCollectNotifications();
+        if(!items.length){
+            var html = '<div class="mr-notify-empty">No unread messages or missed calls in the last 24 hours.</div>';
+            if(list.innerHTML !== html) list.innerHTML = html;
+            list.dataset.phRendered = '1';
+            phUpdateBadge();
+            return;
+        }
+        var icoMap = { chat:'fa-comments', missed:'fa-phone-slash' };
+        var html = items.map(function(n){
+            var d = ''; try{ d = new Date(n.when).toLocaleString(); }catch(_){}
+            return '<div class="mr-notify-item '+(n.read?'read':'unread')+'" data-mrid="'+esc(n.id)+'" data-mract="'+esc(n.action||'')+'">'+
+                '<div class="mr-notify-ico"><i class="fas '+(icoMap[n.type]||'fa-bell')+'"></i></div>'+
+                '<div class="mr-notify-item-body"><div class="mr-notify-item-title">'+esc(n.title)+'</div>'+
+                '<div class="mr-notify-item-sub">'+esc(n.sub||'')+' · '+esc(d)+'</div></div>'+
+                '</div>';
+        }).join('');
+        if(list.innerHTML !== html){ list.innerHTML = html; }
+        list.dataset.phRendered = '1';
+        Array.prototype.forEach.call(list.querySelectorAll('.mr-notify-item'), function(el){
+            if(el.__phBound) return; el.__phBound = true;
+            el.addEventListener('click', function(){
+                var id = el.dataset.mrid;
+                phMarkRead(id);
+                el.classList.remove('unread'); el.classList.add('read');
+                phUpdateBadge();
+                var act = el.dataset.mract;
+                var p = document.getElementById('mrNotifyPanel'); if(p) p.classList.remove('open');
+                try{
+                    if(act==='chat' && typeof window.showChatUI==='function') window.showChatUI();
+                    else if(act==='callLogs' && typeof window.showCallsCenter==='function') window.showCallsCenter('logs');
+                    else if(typeof window.handleDashAction==='function') window.handleDashAction(act);
+                }catch(_){}
+            });
+        });
+        phUpdateBadge();
+    }
+
+    function phUpdateBadge(){
+        var b = document.getElementById('mrNotifyBadge');
+        if(!b) return;
+        var items = phCollectNotifications();
+        var n = items.filter(function(x){ return !x.read; }).length;
+        b.textContent = n>99?'99+':String(n);
+        b.setAttribute('data-count', String(n));
+        b.style.display = n>0 ? 'inline-flex' : 'none';
+    }
+
+    /* Observe the notify list: whenever it changes or the panel opens,
+       we overwrite with our filtered content. */
+    (function watchNotify(){
+        function attach(){
+            var list = document.getElementById('mrNotifyList');
+            if(!list || list.__phObserved) return;
+            list.__phObserved = true;
+            var mo = new MutationObserver(function(muts){
+                /* Debounce: if we just rendered, ignore. */
+                if(list.dataset.phRendering==='1') return;
+                list.dataset.phRendering='1';
+                setTimeout(function(){
+                    phRenderNotifyPanel();
+                    list.dataset.phRendering='0';
+                }, 30);
+            });
+            mo.observe(list, {childList:true, subtree:true});
+            /* Also re-render on panel open */
+            var panel = document.getElementById('mrNotifyPanel');
+            if(panel && !panel.__phObserved){
+                panel.__phObserved = true;
+                var mo2 = new MutationObserver(function(){
+                    if(panel.classList.contains('open')){ phRenderNotifyPanel(); }
+                });
+                mo2.observe(panel, {attributes:true, attributeFilter:['class']});
+            }
+            /* Notify button */
+            var btn = document.getElementById('mrNotifyBtn');
+            if(btn && !btn.__phV2){
+                btn.__phV2 = true;
+                btn.addEventListener('click', function(){
+                    setTimeout(phRenderNotifyPanel, 30);
+                }, true);
+            }
+            /* Mark all read */
+            var mall = document.getElementById('mrMarkAllRead');
+            if(mall && !mall.__phV2){
+                mall.__phV2 = true;
+                mall.addEventListener('click', function(){
+                    phCollectNotifications().forEach(function(n){ phMarkRead(n.id); });
+                    phRenderNotifyPanel();
+                }, true);
+            }
+            phRenderNotifyPanel();
+        }
+        var tries = 0;
+        var iv = setInterval(function(){
+            tries++; attach();
+            if(tries>200) clearInterval(iv);
+        }, 700);
+    })();
+
+    /* Recompute badge periodically */
+    setInterval(phUpdateBadge, 4000);
+
+    /* ========== (c) SIDEBAR NAV ITEMS IN SHORTCUTS SETTINGS ========== */
+    function phInjectSidebarShortcuts(){
+        var grid = document.getElementById('phShortcutGrid');
+        if(!grid || grid.__phSidebarInjected) return;
+        var nav = document.getElementById('mrNav');
+        if(!nav){ /* nav not built yet; try again later */ return; }
+        var existing = {};
+        Array.prototype.forEach.call(grid.querySelectorAll('input[type=checkbox]'), function(cb){ existing[cb.value] = true; });
+        var savedKey = 'ph_shortcuts_'+((me().username)||'guest');
+        var saved = {}; try{ (JSON.parse(localStorage.getItem(savedKey)||'[]')||[]).forEach(function(a){ saved[a]=true; }); }catch(_){}
+        var added = 0;
+        Array.prototype.forEach.call(nav.querySelectorAll('[data-mract]'), function(a){
+            var action = a.getAttribute('data-mract'); if(!action || existing[action]) return;
+            var label = ((a.querySelector('.mr-nav-lbl')||{}).textContent||action).trim();
+            var iconEl = a.querySelector('i');
+            var iconCls = iconEl ? iconEl.className : 'fas fa-arrow-right';
+            var lbl = document.createElement('label');
+            lbl.className = 'ph-shortcut-pick';
+            lbl.innerHTML = '<input type="checkbox" value="'+esc(action)+'" '+(saved[action]?'checked':'')+' />'+
+                '<i class="'+esc(iconCls)+'"></i><span>'+esc(label)+' <em style="opacity:.55;font-size:.7rem;">(sidebar)</em></span>';
+            grid.appendChild(lbl);
+            existing[action] = true; added++;
+        });
+        if(added>0) grid.__phSidebarInjected = true;
+    }
+    /* Watch for the settings modal opening */
+    setInterval(function(){
+        if(document.getElementById('phShortcutGrid')) phInjectSidebarShortcuts();
+    }, 400);
+
+    /* ========== (d) PERSIST CUSTOM THEME + CHAT THEME PER USER LOGIN ==========
+       Any theme change is mirrored under a per-user localStorage key.
+       On login we restore that user's saved theme + chat settings. */
+
+    var PH_THEME_KEYS = ['ph_theme_mode','ph_custom_theme_image','ph_custom_theme_meta','ph_chat_settings'];
+
+    function phMirrorNow(){
+        var u = me().username; if(!u) return;
+        try{
+            PH_THEME_KEYS.forEach(function(k){
+                var v = localStorage.getItem(k);
+                if(v!==null && v!==undefined) localStorage.setItem(k+'_u_'+u, v);
+            });
+        }catch(_){}
+    }
+
+    function phRestoreForUser(){
+        var u = me().username; if(!u) return false;
+        try{
+            var applied = false;
+            PH_THEME_KEYS.forEach(function(k){
+                var v = localStorage.getItem(k+'_u_'+u);
+                if(v!==null && v!==undefined){ localStorage.setItem(k, v); applied = true; }
+            });
+            /* apply */
+            var mode = localStorage.getItem('ph_theme_mode');
+            if(mode==='custom'){
+                var img  = localStorage.getItem('ph_custom_theme_image');
+                var meta = null; try{ meta = JSON.parse(localStorage.getItem('ph_custom_theme_meta')||'null'); }catch(_){}
+                if(img && typeof window.applyCustomThemeImage==='function') window.applyCustomThemeImage(img, meta||{isDark:true});
+            } else if(mode==='dark' || mode==='light'){
+                if(typeof window.applyThemeMode==='function') window.applyThemeMode(mode);
+            }
+            try{ if(typeof window._applyChatAppearance==='function') window._applyChatAppearance(); }catch(_){}
+            return applied;
+        }catch(_){ return false; }
+    }
+
+    /* Hook the setters so a change immediately mirrors to per-user key */
+    function hookThemeSetters(){
+        try{
+            if(typeof window.applyThemeMode==='function' && !window.applyThemeMode.__phMirror){
+                var _a = window.applyThemeMode;
+                window.applyThemeMode = function(mode){
+                    var r = _a.apply(this, arguments);
+                    try{ localStorage.setItem('ph_theme_mode', mode==='dark'?'dark':(mode==='light'?'light':(mode||'light'))); }catch(_){}
+                    phMirrorNow();
+                    return r;
+                };
+                window.applyThemeMode.__phMirror = true;
+            }
+        }catch(_){}
+        try{
+            if(typeof window.applyCustomThemeImage==='function' && !window.applyCustomThemeImage.__phMirror){
+                var _b = window.applyCustomThemeImage;
+                window.applyCustomThemeImage = function(img, meta){
+                    var r = _b.apply(this, arguments);
+                    try{
+                        localStorage.setItem('ph_theme_mode','custom');
+                        if(img) localStorage.setItem('ph_custom_theme_image', img);
+                        if(meta) localStorage.setItem('ph_custom_theme_meta', JSON.stringify(meta));
+                    }catch(_){}
+                    phMirrorNow();
+                    return r;
+                };
+                window.applyCustomThemeImage.__phMirror = true;
+            }
+        }catch(_){}
+    }
+    var _tries2 = 0;
+    var _hookIv = setInterval(function(){
+        _tries2++;
+        hookThemeSetters();
+        if(_tries2>60) clearInterval(_hookIv);
+    }, 500);
+
+    /* Also mirror periodically (catches _saveChatSettings which is a closure) */
+    setInterval(phMirrorNow, 3000);
+
+    /* Restore on login */
+    var _phRestored = false;
+    setInterval(function(){
+        var u = me().username;
+        if(u && !_phRestored){
+            _phRestored = true;
+            /* small delay to make sure applyThemeMode / applyCustomThemeImage are on window */
+            setTimeout(phRestoreForUser, 400);
+        }
+        if(!u && _phRestored){ _phRestored = false; }
+    }, 800);
+
+    /* Mark the console so we can verify install */
+    try{ console.log('[PH-FIX v2] ready — refresh agents, notify filter, sidebar shortcuts, per-user theme persistence'); }catch(_){}
+
+})();
+</script>
+<!-- ==== end PH-FIX v2 ==== -->
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 </body>
 </html>
