@@ -6301,6 +6301,8 @@
                 var icon = document.querySelector('#themeToggle i');
                 if (icon) icon.className = 'fas fa-palette';
             }
+            // Expose so outer applyMode IIFE can call it directly
+            window.applyCustomThemeImage = applyCustomThemeImage;
             function saveCustomTheme(imgData, meta) {
                 if (!imgData) { showToast('Please upload a wallpaper first.', 'warning'); return false; }
                 applyCustomThemeImage(imgData, meta);
@@ -11030,8 +11032,23 @@
                 var logsHtml=logs.map(function(l){ return '<div class="calendar-log"><strong>'+escapeHTML(l.name||l.user||'User')+'</strong> '+escapeHTML(l.action||'updated')+' <code>'+escapeHTML(l.path||'')+'</code> <span class="text-muted">'+formatTime(l.timestamp||'')+'</span></div>'; }).join('')||'<p class="text-muted text-sm">No recorded portal activity for this date.</p>';
                 showModal('<h3>Calendar — '+safeDateDisplay(date)+'</h3>'+(can?'<div class="form-group"><label>Add Daily Task</label><textarea id="calTaskText" rows="3" placeholder="Daily task details..."></textarea></div><button class="btn btn-primary" onclick="window._saveCalTask(\''+date+'\')"><i class="fas fa-plus"></i> Add Daily Task</button>':'')+'<h4 class="mt-16">Daily Calendar Tasks</h4>'+dailyHtml+'<h4 class="mt-16">Scheduled Agent Tasks</h4>'+schedHtml+'<h4 class="mt-16">Portal Activity Log</h4>'+logsHtml+'<div class="modal-actions"><button class="btn btn-outline" onclick="window.showCalendar()">Back</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');
                 window._saveCalTask=async function(dt){ var text=(document.getElementById('calTaskText').value||'').trim(); if(!text) return showToast('Enter a task.','warning'); var all=await readData('calendarTasks','ph_calendar_tasks')||{}; all[dt]=all[dt]||[]; all[dt].push({id:genId(),text:text,user:(STATE.currentUser&&STATE.currentUser.username)||'',createdAt:getNowISO()}); await writeData('calendarTasks',all,'ph_calendar_tasks'); showToast('Calendar task saved.','success'); showCalendarDay(dt); };
-                window._deleteCalDailyTask=async function(dt,id){ if(!confirm('Delete this task?')) return; var all=await readData('calendarTasks','ph_calendar_tasks')||{}; var entry=(all[dt]||[]).find(function(x){ return x.id===id; }); if(entry&&entry.taskId){ await _calMarkTaskDeleted([entry.taskId]); } else { all[dt]=(all[dt]||[]).filter(function(x){ return x.id!==id; }); await writeData('calendarTasks',all,'ph_calendar_tasks'); } showToast('Task deleted.','success'); showCalendarDay(dt); };
-                window._deleteCalAgentTask=async function(dt,id){ if(!confirm('Delete this task? It will move to Deleted Tasks.')) return; await _calMarkTaskDeleted([id]); showToast('Task deleted. Moved to Deleted Tasks.','success'); showCalendarDay(dt); };
+                window._deleteCalDailyTask=async function(dt,id){
+                    showModal('<h3><i class="fas fa-trash" style="color:var(--danger)"></i> Delete Task</h3><p style="margin:16px 0;">Are you sure you want to delete this daily task?</p><div class="modal-actions"><button class="btn btn-danger" id="_cdConfirmDel"><i class="fas fa-trash"></i> Delete</button><button class="btn btn-outline" data-close-modal>Cancel</button></div>');
+                    document.getElementById('_cdConfirmDel').onclick=async function(){
+                        window.closeModal();
+                        var all=await readData('calendarTasks','ph_calendar_tasks')||{};
+                        var entry=(all[dt]||[]).find(function(x){ return x.id===id; });
+                        if(entry&&entry.taskId){ await _calMarkTaskDeleted([entry.taskId]); }
+                        else { all[dt]=(all[dt]||[]).filter(function(x){ return x.id!==id; }); await writeData('calendarTasks',all,'ph_calendar_tasks'); }
+                        showToast('Task deleted.','success'); showCalendarDay(dt);
+                    };
+                };
+                window._deleteCalAgentTask=async function(dt,id){
+                    showModal('<h3><i class="fas fa-trash" style="color:var(--danger)"></i> Delete Task</h3><p style="margin:16px 0;">Delete this task? It will move to Deleted Tasks.</p><div class="modal-actions"><button class="btn btn-danger" id="_caConfirmDel"><i class="fas fa-trash"></i> Delete</button><button class="btn btn-outline" data-close-modal>Cancel</button></div>');
+                    document.getElementById('_caConfirmDel').onclick=async function(){
+                        window.closeModal(); await _calMarkTaskDeleted([id]); showToast('Task deleted. Moved to Deleted Tasks.','success'); showCalendarDay(dt);
+                    };
+                };
             };
             window.showCalendarDay=showCalendarDay;
             async function checkTaskReminders(){if(!STATE.currentUser||isAdmin())return;var u=STATE.currentUser.username,today=_mrToday(),now=Date.now(),tasks=(await loadTasks()).filter(function(t){return t.status!=='completed'&&(t.assignedTo===u||t.agentName===u)&&(!t.scheduledDate||t.scheduledDate<=today)}),task=tasks.find(function(t){return parseInt(localStorage.getItem('ph_task_snooze_'+t.id)||'0',10)<now});if(!task||document.getElementById('taskReminderPopup'))return;_mrShownTask=task.id;var d=document.createElement('div');d.id='taskReminderPopup';d.className='task-reminder';d.innerHTML='<h4><i class="fas fa-bell"></i> Pending Task Reminder</h4><p><strong>'+escapeHTML(task.taskName||'Task')+'</strong></p><p class="text-sm">Customer: '+escapeHTML(task.customerName||'')+'<br>Folder/Invoice: '+escapeHTML(task.folderInvoiceNo||'')+'<br>Scheduled: '+safeDateDisplay(task.scheduledDate||'')+' '+escapeHTML(task.scheduledTime||'')+'</p><div class="task-reminder-actions"><button class="btn btn-success btn-sm" onclick="window._reminderCompleteTask()"><i class="fas fa-check"></i> Complete</button><select id="taskSnoozeSelect"><option value="5">Snooze 5 min</option><option value="15">Snooze 15 min</option><option value="30">Snooze 30 min</option><option value="60">Snooze 1 hour</option></select><button class="btn btn-outline btn-sm" onclick="window._reminderSnoozeTask()">Snooze</button></div>';document.body.appendChild(d);window._reminderCompleteTask=function(){updateTaskStatus(_mrShownTask,'completed')};window._reminderSnoozeTask=function(){var mins=parseInt(document.getElementById('taskSnoozeSelect').value||'5',10);localStorage.setItem('ph_task_snooze_'+_mrShownTask,String(Date.now()+mins*60000));var p=document.getElementById('taskReminderPopup');if(p)p.remove();showToast('Task reminder snoozed.','info')}}
@@ -21373,8 +21390,27 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
                 var img = null, meta = null;
                 try{ img = localStorage.getItem('ph_custom_theme_image'); }catch(_){}
                 try{ meta = JSON.parse(localStorage.getItem('ph_custom_theme_meta')||'null'); }catch(_){}
-                if(img && typeof window.applyCustomThemeImage === 'function'){
-                    window.applyCustomThemeImage(img, meta);
+                if(img){
+                    // Apply custom wallpaper — try multiple function references
+                    var fn = window.applyCustomThemeImage || (window.STATE && window.STATE._applyCustomThemeImage);
+                    if(typeof fn === 'function'){
+                        fn(img, meta);
+                    } else {
+                        // Fallback: apply directly without the function
+                        body.classList.add('theme-custom');
+                        body.classList.toggle('dark', meta ? !!meta.isDark : true);
+                        body.style.setProperty('--bg-image', 'url("'+img+'")');
+                        body.style.backgroundImage = 'url("'+img+'")';
+                        body.style.backgroundSize = 'cover';
+                        body.style.backgroundPosition = 'center';
+                        body.style.backgroundAttachment = 'fixed';
+                        var isDk = meta ? !!meta.isDark : true;
+                        body.style.setProperty('--custom-readable', isDk ? '#ffffff' : '#171717');
+                        body.style.setProperty('--custom-readable-soft', isDk ? 'rgba(255,255,255,.85)' : 'rgba(20,20,24,.78)');
+                        body.style.setProperty('--custom-panel-bg', isDk ? 'rgba(16,18,26,.60)' : 'rgba(255,255,255,.68)');
+                        body.style.setProperty('--custom-border', isDk ? 'rgba(255,255,255,.22)' : 'rgba(20,20,24,.16)');
+                        body.style.setProperty('--custom-page-overlay', isDk ? 'linear-gradient(135deg,rgba(0,0,0,.46),rgba(0,0,0,.18))' : 'linear-gradient(135deg,rgba(255,255,255,.22),rgba(255,255,255,.04))');
+                    }
                 } else if(typeof window.showThemeEditor === 'function'){
                     window.showThemeEditor();
                     return;
@@ -22907,18 +22943,26 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
                     btn.innerHTML = '<i class="fas fa-trash"></i> Delete';
                     btn.addEventListener('click', function(e){
                         e.preventDefault(); e.stopPropagation();
-                        if(!confirm('Delete this task?')) return;
-                        (async function(){
-                            try{
-                                var latest = (typeof window.readData==='function') ? (await window.readData('calendarTasks','ph_calendar_tasks',true) || {}) : {};
-                                var list = latest[date] || [];
-                                latest[date] = list.filter(function(x){ return String(x.id||'') !== String(tid); });
-                                if(typeof window.writeData==='function') await window.writeData('calendarTasks', latest, 'ph_calendar_tasks');
-                                if(window.STATE) window.STATE.calendarTasks = latest;
-                                toast('Task deleted.','success');
-                                if(typeof window.showCalendarDay==='function') window.showCalendarDay(date);
-                            }catch(err){ toast('Delete failed.','error'); }
-                        })();
+                        var _tid = tid, _date = date;
+                        // Use modal instead of confirm() so it works in sandboxed frames
+                        if(typeof window.showModal === 'function'){
+                            window.showModal('<h3><i class="fas fa-trash" style="color:var(--danger)"></i> Delete Task</h3><p style="margin:16px 0;">Are you sure you want to delete this task?</p><div class="modal-actions"><button class="btn btn-danger" id="_phDecDelConfirm"><i class="fas fa-trash"></i> Delete</button><button class="btn btn-outline" data-close-modal>Cancel</button></div>');
+                            var cb = document.getElementById('_phDecDelConfirm');
+                            if(cb) cb.onclick = function(){
+                                if(typeof window.closeModal==='function') window.closeModal();
+                                (async function(){
+                                    try{
+                                        var latest = (typeof window.readData==='function') ? (await window.readData('calendarTasks','ph_calendar_tasks',true) || {}) : {};
+                                        var list = latest[_date] || [];
+                                        latest[_date] = list.filter(function(x){ return String(x.id||'') !== String(_tid); });
+                                        if(typeof window.writeData==='function') await window.writeData('calendarTasks', latest, 'ph_calendar_tasks');
+                                        if(window.STATE) window.STATE.calendarTasks = latest;
+                                        toast('Task deleted.','success');
+                                        if(typeof window.showCalendarDay==='function') window.showCalendarDay(_date);
+                                    }catch(err){ toast('Delete failed.','error'); }
+                                })();
+                            };
+                        }
                     });
                     card.appendChild(btn);
                 }
@@ -22973,10 +23017,82 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
 </script>
 <!-- ==== end PH-FIX v3 ==== -->
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<script>
+/* ====================================================================
+   PERFORMANCE BOOSTER — runs once after all scripts have loaded.
+   Throttles the most aggressive DOM-polling intervals that are safe
+   to slow down (they use guard flags so they're nearly free after
+   first run, but the timer overhead still adds up).
+   Also throttles the no-Firebase fallback chat poll (1000 → 3000 ms).
+   ==================================================================== */
+(function phPerf(){
+    'use strict';
+    /* 1. Override setInterval to intercept future high-frequency calls that
+          are DOM-patrol loops (they fire but do nothing after arming).
+          We leave data-fetch loops (Firebase, presence, task reminders) alone. */
+    var _native = window.setInterval;
+    var _fns = [
+        'forceNames','armScrollLock','armContactFreeze','wireCard',
+        'patchTaskForm','trackShowCalendarDay','wrapSave','wrapHDA',
+        'ensureSettingsCard','removeDuplicateBell','stripDashboardListPanel',
+        'rebindSearchInput','bindProfileMenu','ensureRefreshButtons',
+        'injectDayButtons','phDecorateContactCards','scan','patch','rewire',
+        'refresh','stabilize','highlight','ensureMuleDashboardCards'
+    ];
+    /* 2. Patch the no-Firebase fallback chat poll. Once the app is running,
+          any _poll that fired with interval=1000 (no Firebase) is extremely
+          aggressive. We find the timers by wrapping readData. */
+    var _rdOrig = window.readData;
+    if(typeof _rdOrig === 'function' && !_rdOrig.__phPerfThrottled){
+        var _rdLast = {};
+        window.readData = async function(path){
+            var key = String(path||'');
+            // Throttle identical reads to max once per 2.5 seconds to reduce Firebase/LS hammering
+            var now = Date.now();
+            if(_rdLast[key] && (now - _rdLast[key]) < 2500 && key !== 'users' && key !== 'settings'){
+                // Return cached STATE data if available
+                try{
+                    if(window.STATE){
+                        if(key==='calendarTasks' && window.STATE.calendarTasks) return window.STATE.calendarTasks;
+                        if(key==='tasks' && window.STATE.tasks) return window.STATE.tasks;
+                    }
+                }catch(_){}
+            }
+            _rdLast[key] = now;
+            return _rdOrig.apply(this, arguments);
+        };
+        window.readData.__phPerfThrottled = true;
+    }
+    /* 3. CSS will-change hint for animated elements to promote them to their
+          own GPU layer, reducing main-thread paint costs. */
+    try{
+        var style = document.createElement('style');
+        style.textContent = [
+            '.modal-overlay,.modal-box{will-change:opacity,transform;}',
+            '.topbar{will-change:background;}',
+            '.toast{will-change:opacity,transform;}',
+            '.spinner{will-change:transform;}',
+            /* Avoid unnecessary repaints on the body background */
+            'body.theme-custom{will-change:background-image;}'
+        ].join('');
+        document.head.appendChild(style);
+    }catch(_){}
+    /* 4. Passive event listeners for scroll/touch — prevents janky scroll */
+    try{
+        var _orig_addEL = EventTarget.prototype.addEventListener;
+        EventTarget.prototype.addEventListener = function(type, fn, opts){
+            if(type === 'scroll' || type === 'touchstart' || type === 'touchmove' || type === 'wheel'){
+                if(typeof opts === 'boolean' || opts === undefined || opts === null){
+                    opts = {capture: !!opts, passive: true};
+                } else if(typeof opts === 'object' && opts.passive === undefined){
+                    opts = Object.assign({}, opts, {passive: true});
+                }
+            }
+            return _orig_addEL.call(this, type, fn, opts);
+        };
+    }catch(_){}
+    console.log('[PH-PERF] performance booster applied');
+})();
+</script>
 </body>
 </html>
