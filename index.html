@@ -1040,6 +1040,42 @@
             padding: 2px 12px;
             border-radius: 30px;
         }
+        input.smart-date {
+            font-variant-numeric: tabular-nums;
+            letter-spacing: .5px;
+        }
+        input.smart-date.date-invalid {
+            border-color: #e07070 !important;
+            box-shadow: 0 0 0 2px rgba(224,112,112,.18);
+        }
+        .date-input-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .date-input-wrap .date-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary);
+            font-size: .9rem;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .date-input-wrap input.smart-date {
+            padding-left: 34px !important;
+            width: 100%;
+        }
+        /* Payment schedule date inputs */
+        .payment-table-wrap td .date-input-wrap {
+            width: 100%;
+        }
+        .item-card .item-header .btn.btn-sm.btn-outline[disabled],
+        .item-card .item-header .btn.btn-sm.btn-outline:disabled {
+            opacity: .35;
+            cursor: not-allowed;
+        }
         .hotel-images-wrap {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2742,6 +2778,11 @@
                     <h4>Theme</h4>
                     <p>Light, dark or custom wallpaper</p>
                 </div>
+                <div class="dash-card" data-action="proBackground" data-perm="canManageProBackground">
+                    <i class="fas fa-image"></i>
+                    <h4>Professional Background</h4>
+                    <p>Upload your quote PDF background</p>
+                </div>
                 <div class="dash-card" data-action="backup" data-perm="canExportData">
                     <i class="fas fa-database"></i>
                     <h4>Backup &amp; Restore</h4>
@@ -2786,8 +2827,7 @@
             <div class="tabs-wrap" id="quoteTabs">
                 <button class="tab-btn active" data-tab="tabCustomer"><i class="fas fa-user"></i> Customer</button>
                 <button class="tab-btn" data-tab="tabFlights"><i class="fas fa-plane"></i> Flights</button>
-                <button class="tab-btn" data-tab="tabHotels"><i class="fas fa-hotel"></i> Hotels</button>
-                <button class="tab-btn" data-tab="tabTransfers"><i class="fas fa-car"></i> Transfers</button>
+                <button class="tab-btn" data-tab="tabHotels"><i class="fas fa-hotel"></i> Hotels &amp; Transfers</button>
                 <button class="tab-btn" data-tab="tabOthers"><i class="fas fa-person-hiking"></i> Others</button>
                 <button class="tab-btn" data-tab="tabPayment"><i class="fas fa-credit-card"></i> Payment</button>
                 <button class="tab-btn" data-tab="tabConditions"><i class="fas fa-file-lines"></i> Conditions</button>
@@ -2809,8 +2849,8 @@
                         <div class="form-group"><label>Infants</label><input type="number" id="paxInfantCount" min="0" value="0" /></div>
                         <div class="form-group"><label>Agent Name</label><input type="text" id="agentName" placeholder="Agent name" /></div>
                         <div class="form-group"><label>Quote Number</label><input type="text" id="quoteNumber" placeholder="Quote number" /></div>
-                        <div class="form-group"><label>Quote Date</label><input type="date" id="quoteDate" /></div>
-                        <div class="form-group"><label>Expiry Date</label><input type="date" id="expiryDate" /></div>
+                        <div class="form-group"><label>Quote Date</label><div class="date-input-wrap"><i class="fas fa-calendar-alt date-icon"></i><input type="text" class="smart-date smart-date-standalone" id="quoteDate" placeholder="DD-MM-YYYY" maxlength="10" /></div></div>
+                        <div class="form-group"><label>Expiry Date</label><div class="date-input-wrap"><i class="fas fa-calendar-alt date-icon"></i><input type="text" class="smart-date smart-date-standalone" id="expiryDate" placeholder="DD-MM-YYYY" maxlength="10" /></div></div>
                         <div class="form-group"><label>Reference Number</label><input type="text" id="refNumber" placeholder="Optional ref" /></div>
                     </div>
                     <div class="form-row"><div class="form-group full"><label>Notes</label><textarea id="custNotes" rows="2" placeholder="Any special notes about this customer..."></textarea></div></div>
@@ -2836,28 +2876,21 @@
                 <input type="file" id="flightImageInput" accept=".jpg,.jpeg,.png,.pdf" style="display:none;" />
             </div>
 
-            <!-- ===== TAB: HOTELS ===== -->
+            <!-- ===== TAB: HOTELS + TRANSFERS (INTERLEAVED ITINERARY) ===== -->
             <div class="tab-panel" id="tabHotels">
                 <div class="form-card">
-                    <h3><i class="fas fa-hotel"></i> Hotels</h3>
+                    <h3><i class="fas fa-hotel"></i> Hotels &amp; Transfers <span class="text-muted text-sm" style="font-weight:400;">— reorder freely with the up/down arrows</span></h3>
                     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
                         <button class="btn btn-primary" id="btnAddHotel"><i class="fas fa-plus"></i> Add Hotel</button>
+                        <button class="btn btn-primary" id="btnAddTransfer"><i class="fas fa-plus"></i> Add Transfer</button>
                         <button class="btn" id="btnSearchPexels"><i class="fas fa-image"></i> Search Pexels Images</button>
                         <button class="btn" id="btnUploadHotelImage"><i class="fas fa-upload"></i> Upload Hotel Image</button>
                     </div>
-                    <div id="hotelsContainer"></div>
+                    <div id="itineraryContainer"></div>
+                    <!-- legacy containers kept for backward-compat; hidden -->
+                    <div id="hotelsContainer" style="display:none;"></div>
+                    <div id="transfersContainer" style="display:none;"></div>
                     <input type="file" id="hotelImageInput" accept=".jpg,.jpeg,.png" style="display:none;" multiple />
-                </div>
-            </div>
-
-            <!-- ===== TAB: TRANSFERS ===== -->
-            <div class="tab-panel" id="tabTransfers">
-                <div class="form-card">
-                    <h3><i class="fas fa-car"></i> Transfers</h3>
-                    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
-                        <button class="btn btn-primary" id="btnAddTransfer"><i class="fas fa-plus"></i> Add Transfer</button>
-                    </div>
-                    <div id="transfersContainer"></div>
                 </div>
             </div>
 
@@ -2935,7 +2968,7 @@
     </div>
 
     <!-- ===== HIDDEN PDF CONTENT ===== -->
-    <div id="pdfContent" style="display:none;"></div>
+    <div id="pdfContent" style="display:none;margin:0;padding:0;border:0;"></div>
 
     <script>
         // ================================================================
@@ -3007,6 +3040,7 @@
                 isNewQuote: true,
                 darkMode: false,
                 activeAgentShift: null,
+                proBackgrounds: {},
                 _cache: {},
                 chatUsers: {},
                 chatMessages: {},
@@ -3057,14 +3091,21 @@
             function formatDateDisplay(d) {
                 var dt = parseDateLocal(d);
                 if (!dt) return '';
-                return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                var dd = String(dt.getDate()).padStart(2, '0');
+                var mm = String(dt.getMonth() + 1).padStart(2, '0');
+                var yyyy = dt.getFullYear();
+                return dd + '-' + mm + '-' + yyyy;
             }
 
             function formatDateTime(d) {
                 var dt = parseDateLocal(d);
                 if (!dt) return '';
-                return dt.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit' });
+                var dd = String(dt.getDate()).padStart(2, '0');
+                var mm = String(dt.getMonth() + 1).padStart(2, '0');
+                var yyyy = dt.getFullYear();
+                var hh = String(dt.getHours()).padStart(2, '0');
+                var min = String(dt.getMinutes()).padStart(2, '0');
+                return dd + '-' + mm + '-' + yyyy + ' ' + hh + ':' + min;
             }
 
             function formatTime(d) {
@@ -4098,6 +4139,23 @@
                     var appLogo = document.getElementById('appLogo');
                     if (appLogo) appLogo.src = data.logo;
                 }
+                // Apply background image to in-page quote/invoice preview wrappers
+                var quotePreviews = document.querySelectorAll('.quote-pdf-preview, .invoice-pdf-preview, [data-quote-bg]');
+                quotePreviews.forEach(function(el) {
+                    if (data.bgImage) {
+                        el.style.backgroundImage = 'url(' + data.bgImage + ')';
+                        el.style.backgroundSize = 'cover';
+                        el.style.backgroundPosition = 'center';
+                    } else {
+                        el.style.backgroundImage = '';
+                    }
+                });
+                // Store bgImage on a CSS variable for any uses via CSS
+                if (data.bgImage) {
+                    document.documentElement.style.setProperty('--quote-bg-image', 'url(' + data.bgImage + ')');
+                } else {
+                    document.documentElement.style.removeProperty('--quote-bg-image');
+                }
             }
 
             async function loadQuoteConditions() {
@@ -4173,16 +4231,31 @@
             function updateFlightField(id, field, value) {
                 var f = (STATE.currentQuote.flights || []).find(function(x) { return x.id === id; });
                 if (!f) return;
-                f[field] = value;
-                if (field === 'departDate') {
-                    f.departDay = getWeekdayName(value);
-                    var depDay = document.getElementById('flight_' + id + '_departDay');
-                    if (depDay) depDay.value = f.departDay;
-                }
-                if (field === 'arriveDate') {
-                    f.arriveDay = getWeekdayName(value);
-                    var arrDay = document.getElementById('flight_' + id + '_arriveDay');
-                    if (arrDay) arrDay.value = f.arriveDay;
+                if (field === 'departDate' || field === 'arriveDate') {
+                    var parsedDate = _parseDateSmart(value) || value;
+                    f[field] = parsedDate;
+                    if (field === 'departDate') {
+                        f.departDay = getWeekdayName(parsedDate);
+                        var depDay = document.getElementById('flight_' + id + '_departDay');
+                        if (depDay) depDay.value = f.departDay;
+                    }
+                    if (field === 'arriveDate') {
+                        f.arriveDay = getWeekdayName(parsedDate);
+                        var arrDay = document.getElementById('flight_' + id + '_arriveDay');
+                        if (arrDay) arrDay.value = f.arriveDay;
+                    }
+                } else {
+                    f[field] = value;
+                    if (field === 'departDate') {
+                        f.departDay = getWeekdayName(value);
+                        var depDay2 = document.getElementById('flight_' + id + '_departDay');
+                        if (depDay2) depDay2.value = f.departDay;
+                    }
+                    if (field === 'arriveDate') {
+                        f.arriveDay = getWeekdayName(value);
+                        var arrDay2 = document.getElementById('flight_' + id + '_arriveDay');
+                        if (arrDay2) arrDay2.value = f.arriveDay;
+                    }
                 }
             }
 
@@ -4255,14 +4328,14 @@
                         '<div class="form-group"><label>Departure Airport Code</label><input type="text" value="' + escapeHTML(f.origin || '') + '" placeholder="LHR" oninput="window._updateFlightField(\'' + f.id + '\',\'origin\',this.value)" /></div>' +
                         '<div class="form-group"><label>Departure City</label><input type="text" value="' + escapeHTML(f.originCity || '') + '" placeholder="London" oninput="window._updateFlightField(\'' + f.id + '\',\'originCity\',this.value)" /></div>' +
                         '<div class="form-group"><label>Departure Country</label><input type="text" value="' + escapeHTML(f.originCountry || '') + '" placeholder="United Kingdom" oninput="window._updateFlightField(\'' + f.id + '\',\'originCountry\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Departure Date</label><input type="date" value="' + escapeHTML(f.departDate || '') + '" oninput="window._updateFlightField(\'' + f.id + '\',\'departDate\',this.value)" /></div>' +
+                        '<div class="form-group"><label>Departure Date</label><div class="date-input-wrap"><i class="fas fa-calendar-alt date-icon"></i><input type="text" class="smart-date smart-date-flight" placeholder="DD-MM-YYYY" maxlength="10" value="' + escapeHTML(f.departDate ? formatDateDisplay(f.departDate) : '') + '" data-flight-id="' + f.id + '" data-flight-field="departDate" /></div></div>' +
                         '<div class="form-group"><label>Departure Day</label><input type="text" id="flight_' + f.id + '_departDay" value="' + escapeHTML(f.departDay || getWeekdayName(f.departDate)) + '" placeholder="Friday" oninput="window._updateFlightField(\'' + f.id + '\',\'departDay\',this.value)" /></div>' +
                         '<div class="form-group"><label>Departure Time</label><input type="time" value="' + escapeHTML(f.departTime || '') + '" oninput="window._updateFlightField(\'' + f.id + '\',\'departTime\',this.value);window._updateFlightTimePreview(\'flight_' + f.id + '_departTimePreview\',this.value)" /><div id="flight_' + f.id + '_departTimePreview" class="input-hint" style="font-weight:700;color:var(--custom-readable,var(--text));opacity:1;">' + (f.departTime ? escapeHTML(window._formatFlightTime12(f.departTime)) : '') + '</div></div>' +
                         '<div class="form-group"><label>Arrival Airport Full Name</label><input type="text" value="' + escapeHTML(f.destinationAirportName || '') + '" placeholder="Dubai International Airport" oninput="window._updateFlightField(\'' + f.id + '\',\'destinationAirportName\',this.value)" /></div>' +
                         '<div class="form-group"><label>Arrival Airport Code</label><input type="text" value="' + escapeHTML(f.destination || '') + '" placeholder="DXB" oninput="window._updateFlightField(\'' + f.id + '\',\'destination\',this.value)" /></div>' +
                         '<div class="form-group"><label>Arrival City</label><input type="text" value="' + escapeHTML(f.destinationCity || '') + '" placeholder="Dubai" oninput="window._updateFlightField(\'' + f.id + '\',\'destinationCity\',this.value)" /></div>' +
                         '<div class="form-group"><label>Arrival Country</label><input type="text" value="' + escapeHTML(f.destinationCountry || '') + '" placeholder="United Arab Emirates" oninput="window._updateFlightField(\'' + f.id + '\',\'destinationCountry\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Arrival Date</label><input type="date" value="' + escapeHTML(f.arriveDate || '') + '" oninput="window._updateFlightField(\'' + f.id + '\',\'arriveDate\',this.value)" /></div>' +
+                        '<div class="form-group"><label>Arrival Date</label><div class="date-input-wrap"><i class="fas fa-calendar-alt date-icon"></i><input type="text" class="smart-date smart-date-flight" placeholder="DD-MM-YYYY" maxlength="10" value="' + escapeHTML(f.arriveDate ? formatDateDisplay(f.arriveDate) : '') + '" data-flight-id="' + f.id + '" data-flight-field="arriveDate" /></div></div>' +
                         '<div class="form-group"><label>Arrival Day</label><input type="text" id="flight_' + f.id + '_arriveDay" value="' + escapeHTML(f.arriveDay || getWeekdayName(f.arriveDate)) + '" placeholder="Friday" oninput="window._updateFlightField(\'' + f.id + '\',\'arriveDay\',this.value)" /></div>' +
                         '<div class="form-group"><label>Arrival Time</label><input type="time" value="' + escapeHTML(f.arriveTime || '') + '" oninput="window._updateFlightField(\'' + f.id + '\',\'arriveTime\',this.value);window._updateFlightTimePreview(\'flight_' + f.id + '_arriveTimePreview\',this.value)" /><div id="flight_' + f.id + '_arriveTimePreview" class="input-hint" style="font-weight:700;color:var(--custom-readable,var(--text));opacity:1;">' + (f.arriveTime ? escapeHTML(window._formatFlightTime12(f.arriveTime)) : '') + '</div></div>' +
                         '</div></div>';
@@ -4310,17 +4383,63 @@
             // --------------------------------------------------------------
             // 12. HOTEL FUNCTIONS + PEXELS AUTO-SEARCH
             // --------------------------------------------------------------
+            // ---- Unified itinerary order (hotels + transfers interleaved) ----
+            function ensureItineraryOrder() {
+                var q = STATE.currentQuote;
+                if (!q) return [];
+                var hotels = q.hotels || [];
+                var transfers = q.transfers || [];
+                var order = Array.isArray(q.itineraryOrder) ? q.itineraryOrder.slice() : [];
+                // Drop stale entries
+                order = order.filter(function(x) {
+                    if (!x || !x.id || !x.type) return false;
+                    if (x.type === 'hotel') return hotels.some(function(h) { return h.id === x.id; });
+                    if (x.type === 'transfer') return transfers.some(function(t) { return t.id === x.id; });
+                    return false;
+                });
+                // Append any hotel/transfer not yet in the order (new items go to the bottom)
+                hotels.forEach(function(h) {
+                    if (!order.some(function(x) { return x.type === 'hotel' && x.id === h.id; })) {
+                        order.push({ type: 'hotel', id: h.id });
+                    }
+                });
+                transfers.forEach(function(t) {
+                    if (!order.some(function(x) { return x.type === 'transfer' && x.id === t.id; })) {
+                        order.push({ type: 'transfer', id: t.id });
+                    }
+                });
+                q.itineraryOrder = order;
+                return order;
+            }
+
+            function moveItineraryItem(type, id, dir) {
+                var order = ensureItineraryOrder();
+                var idx = order.findIndex(function(x) { return x.type === type && x.id === id; });
+                if (idx === -1) return;
+                var newIdx = idx + dir;
+                if (newIdx < 0 || newIdx >= order.length) return;
+                var item = order.splice(idx, 1)[0];
+                order.splice(newIdx, 0, item);
+                STATE.currentQuote.itineraryOrder = order;
+                renderHotels();
+            }
+
             function addHotelToQuote(hotelData) {
                 var hotels = STATE.currentQuote.hotels || [];
                 var entry = { id: genId(), ...hotelData, images: hotelData.images || [] };
                 hotels.push(entry);
                 STATE.currentQuote.hotels = hotels;
+                STATE.currentQuote.itineraryOrder = (STATE.currentQuote.itineraryOrder || []);
+                STATE.currentQuote.itineraryOrder.push({ type: 'hotel', id: entry.id });
                 renderHotels();
                 return entry;
             }
 
             function removeHotel(id) {
                 STATE.currentQuote.hotels = (STATE.currentQuote.hotels || []).filter(function(h) { return h.id !== id; });
+                if (Array.isArray(STATE.currentQuote.itineraryOrder)) {
+                    STATE.currentQuote.itineraryOrder = STATE.currentQuote.itineraryOrder.filter(function(x) { return !(x.type === 'hotel' && x.id === id); });
+                }
                 renderHotels();
             }
 
@@ -4331,19 +4450,18 @@
                 var copy = { ...hotels[idx], id: genId(), hotelName: hotels[idx].hotelName + ' (copy)' };
                 hotels.splice(idx + 1, 0, copy);
                 STATE.currentQuote.hotels = hotels;
+                // Insert into itinerary order right after the source
+                var order = ensureItineraryOrder();
+                var oIdx = order.findIndex(function(x) { return x.type === 'hotel' && x.id === id; });
+                if (oIdx === -1) order.push({ type: 'hotel', id: copy.id });
+                else order.splice(oIdx + 1, 0, { type: 'hotel', id: copy.id });
+                STATE.currentQuote.itineraryOrder = order;
                 renderHotels();
             }
 
             function moveHotel(id, dir) {
-                var hotels = STATE.currentQuote.hotels || [];
-                var idx = hotels.findIndex(function(h) { return h.id === id; });
-                if (idx === -1) return;
-                var newIdx = idx + dir;
-                if (newIdx < 0 || newIdx >= hotels.length) return;
-                var item = hotels.splice(idx, 1)[0];
-                hotels.splice(newIdx, 0, item);
-                STATE.currentQuote.hotels = hotels;
-                renderHotels();
+                // Now moves within the unified hotel+transfer order
+                moveItineraryItem('hotel', id, dir);
             }
 
             async function searchPexelsForHotel(hotelId) {
@@ -4418,83 +4536,91 @@
                 searchPexelsForHotel(hotelId);
             }
 
+            // Build one hotel card's HTML given position info in the unified list
+            function _buildHotelCardHtml(h, posIdx, posTotal, hotelNum) {
+                if ((h.totalNights === undefined || h.totalNights === null || h.totalNights === '') && h.checkIn && h.checkOut) h.totalNights = calculateHotelNights(h);
+                var imgHtml = (h.images || []).map(function(img) {
+                    return '<div class="img-thumb"><img src="' + img +
+                        '" /><button class="remove-img" onclick="window._removeHotelImg(\'' + h.id +
+                        '\',\'' + img + '\')">&times;</button></div>';
+                }).join('');
+                var upDisabled = posIdx === 0 ? ' disabled' : '';
+                var downDisabled = posIdx === posTotal - 1 ? ' disabled' : '';
+                return '<div class="item-card"><div class="item-header"><h4><i class="fas fa-hotel" style="color:var(--primary);"></i> ' +
+                    (h.hotelName || 'Hotel') + ' <span class="item-index">Hotel #' + hotelNum + '</span></h4><div class="flex gap-4">' +
+                    '<button class="btn btn-sm btn-outline" title="Move up" onclick="window._moveHotel(\'' + h.id + '\',-1)"' + upDisabled + '><i class="fas fa-arrow-up"></i></button>' +
+                    '<button class="btn btn-sm btn-outline" title="Move down" onclick="window._moveHotel(\'' + h.id + '\',1)"' + downDisabled + '><i class="fas fa-arrow-down"></i></button>' +
+                    '<button class="btn btn-sm btn-outline" title="Duplicate" onclick="window._duplicateHotel(\'' + h.id + '\')"><i class="fas fa-copy"></i></button>' +
+                    '<button class="btn btn-sm btn-danger" title="Remove" onclick="window._removeHotel(\'' + h.id + '\')"><i class="fas fa-trash"></i></button>' +
+                    '</div></div>' +
+                    '<div class="form-row">' +
+                    '<div class="form-group"><label>Destination</label><input type="text" value="' + (h.destination || '') + '" onchange="window._updateHotelField(\'' + h.id + '\',\'destination\',this.value)" /></div>' +
+                    '<div class="form-group"><label>Hotel Name</label><input type="text" value="' + (h.hotelName || '') + '" onchange="window._updateHotelField(\'' + h.id + '\',\'hotelName\',this.value)" /></div>' +
+                    '<div class="form-group"><label>Category</label><input type="text" value="' + (h.hotelCategory || '') + '" onchange="window._updateHotelField(\'' + h.id + '\',\'hotelCategory\',this.value)" placeholder="5-star, Boutique..." /></div>' +
+                    '<div class="form-group"><label>Room Category</label><input type="text" value="' + (h.roomCategory || '') + '" onchange="window._updateHotelField(\'' + h.id + '\',\'roomCategory\',this.value)" placeholder="Deluxe, Suite..." /></div>' +
+                    '<div class="form-group"><label>Room Type</label><input type="text" value="' + (h.roomType || '') + '" onchange="window._updateHotelField(\'' + h.id + '\',\'roomType\',this.value)" placeholder="Single, Double, Suite..." /></div>' +
+                    '<div class="form-group"><label>Meal Plan</label><input type="text" value="' + (h.mealPlan || '') + '" onchange="window._updateHotelField(\'' + h.id + '\',\'mealPlan\',this.value)" placeholder="Room Only, Half Board, All Inclusive..." /></div>' +
+                    '<div class="form-group"><label>Adults</label><input type="number" min="0" value="' + (h.adults || 2) + '" onchange="window._updateHotelField(\'' + h.id + '\',\'adults\',parseInt(this.value)||0)" /></div>' +
+                    '<div class="form-group"><label>Children</label><input type="number" min="0" value="' + (h.children || 0) + '" onchange="window._updateHotelField(\'' + h.id + '\',\'children\',parseInt(this.value)||0)" /></div>' +
+                    '<div class="form-group"><label>Infants</label><input type="number" min="0" value="' + (h.infants || 0) + '" onchange="window._updateHotelField(\'' + h.id + '\',\'infants\',parseInt(this.value)||0)" /></div>' +
+                '<div class="form-group"><label>Check-in</label><div class="date-input-wrap"><i class="fas fa-calendar-alt date-icon"></i><input type="text" class="smart-date" placeholder="DD-MM-YYYY" maxlength="10" value="' + (h.checkIn ? formatDateDisplay(h.checkIn) : '') + '" data-hotel-id="' + h.id + '" data-hotel-field="checkIn" /></div></div>' +
+                '<div class="form-group"><label>Check-out</label><div class="date-input-wrap"><i class="fas fa-calendar-alt date-icon"></i><input type="text" class="smart-date" placeholder="DD-MM-YYYY" maxlength="10" value="' + (h.checkOut ? formatDateDisplay(h.checkOut) : '') + '" data-hotel-id="' + h.id + '" data-hotel-field="checkOut" /></div></div>' +
+                    '<div class="form-group"><label>Nights</label><input type="number" min="0" value="' + (h.totalNights || 0) + '" onchange="window._updateHotelField(\'' + h.id + '\',\'totalNights\',parseInt(this.value)||0)" /></div>' +
+                    '<div class="form-group"><label>Special Requests</label><input type="text" value="' + (h.specialRequests || '') + '" onchange="window._updateHotelField(\'' + h.id + '\',\'specialRequests\',this.value)" /></div>' +
+                    '<div class="form-group"><label>Notes</label><input type="text" value="' + (h.notes || '') + '" onchange="window._updateHotelField(\'' + h.id + '\',\'notes\',this.value)" /></div>' +
+                    '</div>' +
+                    '<div class="hotel-images-wrap">' + imgHtml + '</div>' +
+                    '<div class="item-actions">' +
+                    '<button class="btn btn-sm btn-outline" onclick="window._uploadHotelImgFor(\'' + h.id + '\')"><i class="fas fa-upload"></i> Add Image</button>' +
+                    '<button class="btn btn-sm btn-primary" onclick="window._autoSearchPexels(\'' + h.id + '\')"><i class="fas fa-search"></i> Search Pexels</button>' +
+                    '</div></div>';
+            }
+
+            // Build one transfer card's HTML given position info in the unified list
+            function _buildTransferCardHtml(t, posIdx, posTotal, transferNum) {
+                var upDisabled = posIdx === 0 ? ' disabled' : '';
+                var downDisabled = posIdx === posTotal - 1 ? ' disabled' : '';
+                return '<div class="item-card"><div class="item-header"><h4><i class="fas fa-car" style="color:var(--primary);"></i> Transfer <span class="item-index">Transfer #' + transferNum + '</span></h4><div class="flex gap-4">' +
+                    '<button class="btn btn-sm btn-outline" title="Move up" onclick="window._moveTransfer(\'' + t.id + '\',-1)"' + upDisabled + '><i class="fas fa-arrow-up"></i></button>' +
+                    '<button class="btn btn-sm btn-outline" title="Move down" onclick="window._moveTransfer(\'' + t.id + '\',1)"' + downDisabled + '><i class="fas fa-arrow-down"></i></button>' +
+                    '<button class="btn btn-sm btn-outline" title="Duplicate" onclick="window._duplicateTransfer(\'' + t.id + '\')"><i class="fas fa-copy"></i></button>' +
+                    '<button class="btn btn-sm btn-danger" title="Remove" onclick="window._removeTransfer(\'' + t.id + '\')"><i class="fas fa-trash"></i></button>' +
+                    '</div></div>' +
+                    '<div class="form-row">' +
+                    '<div class="form-group"><label>Pickup Point</label><input type="text" value="' + (t.pickupPoint || '') + '" onchange="window._updateTransferField(\'' + t.id + '\',\'pickupPoint\',this.value)" /></div>' +
+                    '<div class="form-group"><label>Drop-off Point</label><input type="text" value="' + (t.dropoffPoint || '') + '" onchange="window._updateTransferField(\'' + t.id + '\',\'dropoffPoint\',this.value)" /></div>' +
+                    '<div class="form-group"><label>Transfer Type</label><input type="text" value="' + (t.transferType || '') + '" onchange="window._updateTransferField(\'' + t.id + '\',\'transferType\',this.value)" placeholder="Private, Shared, Luxury, Minibus..." /></div>' +
+                    '<div class="form-group"><label>Vehicle</label><input type="text" value="' + (t.vehicle || '') + '" onchange="window._updateTransferField(\'' + t.id + '\',\'vehicle\',this.value)" placeholder="e.g. Mercedes E-Class" /></div>' +
+                    '<div class="form-group"><label>Pickup Date</label><div class="date-input-wrap"><i class="fas fa-calendar-alt date-icon"></i><input type="text" class="smart-date" placeholder="DD-MM-YYYY" maxlength="10" value="' + (t.pickupDate ? formatDateDisplay(t.pickupDate) : '') + '" data-transfer-id="' + t.id + '" data-transfer-field="pickupDate" /></div></div>' +
+                    '<div class="form-group"><label>Pickup Time</label><input type="text" placeholder="e.g. 14:30 or TBC" value="' + (t.pickupTime || '') + '" onchange="window._updateTransferField(\'' + t.id + '\',\'pickupTime\',this.value)" /></div>' +
+                    '<div class="form-group"><label>Driver Notes</label><input type="text" value="' + (t.driverNotes || '') + '" onchange="window._updateTransferField(\'' + t.id + '\',\'driverNotes\',this.value)" /></div>' +
+                    '</div></div>';
+            }
+
             function renderHotels() {
-                var container = document.getElementById('hotelsContainer');
+                var container = document.getElementById('itineraryContainer');
+                if (!container) return; // safety
                 var hotels = STATE.currentQuote.hotels || [];
-                if (!hotels.length) {
-                    container.innerHTML = '<p class="text-muted text-sm">No hotels added yet.</p>';
+                var transfers = STATE.currentQuote.transfers || [];
+                if (!hotels.length && !transfers.length) {
+                    container.innerHTML = '<p class="text-muted text-sm">No hotels or transfers added yet. Click <b>Add Hotel</b> or <b>Add Transfer</b> to begin building the itinerary. Use the up/down arrows on any card to reorder — hotels and transfers can be freely interleaved.</p>';
                     return;
                 }
+                var order = ensureItineraryOrder();
                 var html = '';
-                hotels.forEach(function(h, idx) {
-                    if ((h.totalNights === undefined || h.totalNights === null || h.totalNights === '') && h.checkIn && h.checkOut) h.totalNights = calculateHotelNights(h);
-                    var imgHtml = (h.images || []).map(function(img) {
-                        return '<div class="img-thumb"><img src="' + img +
-                            '" /><button class="remove-img" onclick="window._removeHotelImg(\'' + h.id +
-                            '\',\'' + img + '\')">&times;</button></div>';
-                    }).join('');
-                    html +=
-                        '<div class="item-card"><div class="item-header"><h4><i class="fas fa-hotel" style="color:var(--primary);"></i> ' +
-                        (h.hotelName || 'Hotel') + ' <span class="item-index">#' + (idx + 1) +
-                        '</span></h4><div class="flex gap-4">' +
-                        '<button class="btn btn-sm btn-outline" onclick="window._moveHotel(\'' + h.id +
-                        '\',-1)"><i class="fas fa-arrow-up"></i></button>' +
-                        '<button class="btn btn-sm btn-outline" onclick="window._moveHotel(\'' + h.id +
-                        '\',1)"><i class="fas fa-arrow-down"></i></button>' +
-                        '<button class="btn btn-sm btn-outline" onclick="window._duplicateHotel(\'' + h.id +
-                        '\')"><i class="fas fa-copy"></i></button>' +
-                        '<button class="btn btn-sm btn-danger" onclick="window._removeHotel(\'' + h.id +
-                        '\')"><i class="fas fa-trash"></i></button>' +
-                        '</div></div>' +
-                        '<div class="form-row">' +
-                        '<div class="form-group"><label>Destination</label><input type="text" value="' + (h
-                        .destination || '') +
-                        '" onchange="window._updateHotelField(\'' + h.id + '\',\'destination\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Hotel Name</label><input type="text" value="' + (h
-                        .hotelName || '') +
-                        '" onchange="window._updateHotelField(\'' + h.id + '\',\'hotelName\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Category</label><input type="text" value="' + (h
-                        .hotelCategory || '') +
-                        '" onchange="window._updateHotelField(\'' + h.id + '\',\'hotelCategory\',this.value)" placeholder="5-star, Boutique..." /></div>' +
-                        '<div class="form-group"><label>Room Category</label><input type="text" value="' + (h
-                        .roomCategory || '') +
-                        '" onchange="window._updateHotelField(\'' + h.id + '\',\'roomCategory\',this.value)" placeholder="Deluxe, Suite..." /></div>' +
-                        '<div class="form-group"><label>Room Type</label><input type="text" value="' + (h
-                        .roomType || '') +
-                        '" onchange="window._updateHotelField(\'' + h.id + '\',\'roomType\',this.value)" placeholder="Single, Double, Suite..." /></div>' +
-                        '<div class="form-group"><label>Meal Plan</label><input type="text" value="' + (h
-                        .mealPlan || '') +
-                        '" onchange="window._updateHotelField(\'' + h.id + '\',\'mealPlan\',this.value)" placeholder="Room Only, Half Board, All Inclusive..." /></div>' +
-                        '<div class="form-group"><label>Adults</label><input type="number" min="0" value="' + (h
-                        .adults || 2) +
-                        '" onchange="window._updateHotelField(\'' + h.id + '\',\'adults\',parseInt(this.value)||0)" /></div>' +
-                        '<div class="form-group"><label>Children</label><input type="number" min="0" value="' + (h
-                        .children || 0) +
-                        '" onchange="window._updateHotelField(\'' + h.id + '\',\'children\',parseInt(this.value)||0)" /></div>' +
-                        '<div class="form-group"><label>Infants</label><input type="number" min="0" value="' + (h
-                        .infants || 0) +
-                        '" onchange="window._updateHotelField(\'' + h.id + '\',\'infants\',parseInt(this.value)||0)" /></div>' +
-                        '<div class="form-group"><label>Check-in</label><input type="date" value="' + (h.checkIn ||
-                            '') +
-                        '" onchange="window._updateHotelField(\'' + h.id + '\',\'checkIn\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Check-out</label><input type="date" value="' + (h
-                        .checkOut || '') +
-                        '" onchange="window._updateHotelField(\'' + h.id + '\',\'checkOut\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Nights</label><input type="number" min="0" value="' + (h
-                        .totalNights || 0) + '" onchange="window._updateHotelField(\'' + h.id + '\',\'totalNights\',parseInt(this.value)||0)" /></div>' +
-                        '<div class="form-group"><label>Special Requests</label><input type="text" value="' + (h
-                        .specialRequests || '') +
-                        '" onchange="window._updateHotelField(\'' + h.id + '\',\'specialRequests\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Notes</label><input type="text" value="' + (h.notes || '') +
-                        '" onchange="window._updateHotelField(\'' + h.id + '\',\'notes\',this.value)" /></div>' +
-                        '</div>' +
-                        '<div class="hotel-images-wrap">' + imgHtml + '</div>' +
-                        '<div class="item-actions">' +
-                        '<button class="btn btn-sm btn-outline" onclick="window._uploadHotelImgFor(\'' + h.id +
-                        '\')"><i class="fas fa-upload"></i> Add Image</button>' +
-                        '<button class="btn btn-sm btn-primary" onclick="window._autoSearchPexels(\'' + h.id +
-                        '\')"><i class="fas fa-search"></i> Search Pexels</button>' +
-                        '</div></div>';
+                var hotelCounter = 0, transferCounter = 0;
+                order.forEach(function(x, i) {
+                    if (x.type === 'hotel') {
+                        var h = hotels.find(function(hh) { return hh.id === x.id; });
+                        if (!h) return;
+                        hotelCounter++;
+                        html += _buildHotelCardHtml(h, i, order.length, hotelCounter);
+                    } else if (x.type === 'transfer') {
+                        var t = transfers.find(function(tt) { return tt.id === x.id; });
+                        if (!t) return;
+                        transferCounter++;
+                        html += _buildTransferCardHtml(t, i, order.length, transferCounter);
+                    }
                 });
                 container.innerHTML = html;
                 window._removeHotel = removeHotel;
@@ -4505,8 +4631,13 @@
                 window._uploadHotelImgFor = uploadHotelImgFor;
                 window._autoSearchPexels = autoSearchPexels;
                 window._searchPexelsForHotel = searchPexelsForHotel;
+                window._removeTransfer = removeTransfer;
+                window._duplicateTransfer = duplicateTransfer;
+                window._moveTransfer = moveTransfer;
+                window._updateTransferField = updateTransferField;
 
-                // Nights are calculated before rendering and remain editable by the agent.
+                // Wire up smart-date inputs for smooth manual typing
+                _wireSmartDateInputs(container);
             }
 
             function updateHotelField(id, field, value) {
@@ -4554,14 +4685,18 @@
                 var entry = { id: genId(), ...transferData };
                 transfers.push(entry);
                 STATE.currentQuote.transfers = transfers;
-                renderTransfers();
+                STATE.currentQuote.itineraryOrder = (STATE.currentQuote.itineraryOrder || []);
+                STATE.currentQuote.itineraryOrder.push({ type: 'transfer', id: entry.id });
+                renderHotels();
                 return entry;
             }
 
             function removeTransfer(id) {
-                STATE.currentQuote.transfers = (STATE.currentQuote.transfers || []).filter(function(t) { return t.id !==
-                    id; });
-                renderTransfers();
+                STATE.currentQuote.transfers = (STATE.currentQuote.transfers || []).filter(function(t) { return t.id !== id; });
+                if (Array.isArray(STATE.currentQuote.itineraryOrder)) {
+                    STATE.currentQuote.itineraryOrder = STATE.currentQuote.itineraryOrder.filter(function(x) { return !(x.type === 'transfer' && x.id === id); });
+                }
+                renderHotels();
             }
 
             function duplicateTransfer(id) {
@@ -4571,65 +4706,200 @@
                 var copy = { ...transfers[idx], id: genId() };
                 transfers.splice(idx + 1, 0, copy);
                 STATE.currentQuote.transfers = transfers;
-                renderTransfers();
+                var order = ensureItineraryOrder();
+                var oIdx = order.findIndex(function(x) { return x.type === 'transfer' && x.id === id; });
+                if (oIdx === -1) order.push({ type: 'transfer', id: copy.id });
+                else order.splice(oIdx + 1, 0, { type: 'transfer', id: copy.id });
+                STATE.currentQuote.itineraryOrder = order;
+                renderHotels();
             }
 
-            function renderTransfers() {
-                var container = document.getElementById('transfersContainer');
-                var transfers = STATE.currentQuote.transfers || [];
-                if (!transfers.length) {
-                    container.innerHTML = '<p class="text-muted text-sm">No transfers added.</p>';
-                    return;
-                }
-                var html = '';
-                transfers.forEach(function(t, idx) {
-                    html +=
-                        '<div class="item-card"><div class="item-header"><h4><i class="fas fa-car" style="color:var(--primary);"></i> Transfer #' +
-                        (idx + 1) +
-                        '</h4><div class="flex gap-4"><button class="btn btn-sm btn-outline" onclick="window._duplicateTransfer(\'' +
-                        t.id + '\')"><i class="fas fa-copy"></i></button><button class="btn btn-sm btn-danger" onclick="window._removeTransfer(\'' +
-                        t.id + '\')"><i class="fas fa-trash"></i></button></div></div>' +
-                        '<div class="form-row">' +
-                        '<div class="form-group"><label>Pickup Point</label><input type="text" value="' + (t
-                        .pickupPoint || '') +
-                        '" onchange="window._updateTransferField(\'' + t.id +
-                        '\',\'pickupPoint\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Drop-off Point</label><input type="text" value="' + (t
-                        .dropoffPoint || '') +
-                        '" onchange="window._updateTransferField(\'' + t.id +
-                        '\',\'dropoffPoint\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Transfer Type</label><input type="text" value="' + (t
-                        .transferType || '') +
-                        '" onchange="window._updateTransferField(\'' + t.id +
-                        '\',\'transferType\',this.value)" placeholder="Private, Shared, Luxury, Minibus..." /></div>' +
-                        '<div class="form-group"><label>Vehicle</label><input type="text" value="' + (t.vehicle ||
-                            '') +
-                        '" onchange="window._updateTransferField(\'' + t.id +
-                        '\',\'vehicle\',this.value)" placeholder="e.g. Mercedes E-Class" /></div>' +
-                        '<div class="form-group"><label>Pickup Date</label><input type="date" value="' + (t
-                        .pickupDate || '') +
-                        '" onchange="window._updateTransferField(\'' + t.id +
-                        '\',\'pickupDate\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Pickup Time</label><input type="text" placeholder="e.g. 14:30 or TBC" value="' + (t
-                        .pickupTime || '') +
-                        '" onchange="window._updateTransferField(\'' + t.id +
-                        '\',\'pickupTime\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Driver Notes</label><input type="text" value="' + (t
-                        .driverNotes || '') +
-                        '" onchange="window._updateTransferField(\'' + t.id +
-                        '\',\'driverNotes\',this.value)" /></div>' +
-                        '</div></div>';
-                });
-                container.innerHTML = html;
-                window._removeTransfer = removeTransfer;
-                window._duplicateTransfer = duplicateTransfer;
-                window._updateTransferField = updateTransferField;
+            function moveTransfer(id, dir) {
+                moveItineraryItem('transfer', id, dir);
             }
+
+            // Kept as a no-op alias so callers throughout the app still work; unified render is renderHotels()
+            function renderTransfers() { renderHotels(); }
 
             function updateTransferField(id, field, value) {
                 var transfers = STATE.currentQuote.transfers || [];
                 var t = transfers.find(function(t) { return t.id === id; });
-                if (t) t[field] = value;
+                if (t) {
+                    if (field === 'pickupDate' || field === 'dropoffDate') {
+                        t[field] = _parseDateSmart(value) || value;
+                    } else {
+                        t[field] = value;
+                    }
+                }
+            }
+
+            // -----------------------------------------------------------------
+            // SMART DATE INPUTS — fast, keyboard-friendly manual date editing
+            // -----------------------------------------------------------------
+            // Users typed dates on the native <input type="date"> and the browser
+            // kept fighting keystrokes (partial dates got wiped, cursor jumped,
+            // pasting DD/MM/YYYY failed). We replace those with a plain text
+            // input that:
+            //   • auto-inserts dashes as they type (2024 -> 2024- -> 2024-01- -> 2024-01-15)
+            //   • accepts DD/MM/YYYY, DD-MM-YYYY, YYYY/MM/DD, YYYYMMDD, 15 Jan 2024, etc.
+            //   • never blocks a keystroke while typing; only normalises on blur
+            //   • only commits to state when the value is a valid ISO date
+            function _parseDateSmart(raw) {
+                if (!raw) return '';
+                var s = String(raw).trim();
+                if (!s) return '';
+                // Already ISO?
+                var iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+                if (iso) return _isoDate(+iso[1], +iso[2], +iso[3]);
+                // YYYYMMDD
+                var compact = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+                if (compact) return _isoDate(+compact[1], +compact[2], +compact[3]);
+                // YYYY/MM/DD or YYYY.MM.DD
+                var yFirst = s.match(/^(\d{4})[\/.](\d{1,2})[\/.](\d{1,2})$/);
+                if (yFirst) return _isoDate(+yFirst[1], +yFirst[2], +yFirst[3]);
+                // DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+                var dFirst = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
+                if (dFirst) {
+                    var yr = +dFirst[3]; if (yr < 100) yr += 2000;
+                    return _isoDate(yr, +dFirst[2], +dFirst[1]);
+                }
+                // 15 Jan 2024 / Jan 15 2024 / 15-Jan-2024
+                var months = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12 };
+                var t = s.toLowerCase().replace(/[,]/g,' ').replace(/[\-\/.]/g,' ').split(/\s+/).filter(Boolean);
+                if (t.length === 3) {
+                    var y, m, d;
+                    for (var k = 0; k < 3; k++) {
+                        var v = t[k];
+                        if (months[v.slice(0,3)]) m = months[v.slice(0,3)];
+                        else if (/^\d{4}$/.test(v)) y = +v;
+                        else if (/^\d{1,2}$/.test(v)) d = (d === undefined) ? +v : d;
+                    }
+                    if (y && m && d) return _isoDate(y, m, d);
+                }
+                // Fallback: let Date try
+                var dt = new Date(s);
+                if (!isNaN(dt.getTime())) return _isoDate(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+                return null; // invalid
+            }
+            function _isoDate(y, m, d) {
+                if (!y || !m || !d) return null;
+                if (m < 1 || m > 12) return null;
+                if (d < 1 || d > 31) return null;
+                var mm = m < 10 ? '0' + m : '' + m;
+                var dd = d < 10 ? '0' + d : '' + d;
+                return y + '-' + mm + '-' + dd;
+            }
+            // As-you-type: allow only digits + dashes; auto-insert dashes after YYYY and MM
+            function _formatIsoWhileTyping(raw) {
+                var digits = String(raw || '').replace(/[^\d]/g, '').slice(0, 8);
+                var out = digits;
+                if (digits.length > 4) out = digits.slice(0,4) + '-' + digits.slice(4);
+                if (digits.length > 6) out = digits.slice(0,4) + '-' + digits.slice(4,6) + '-' + digits.slice(6);
+                return out;
+            }
+            // Format digits as DD-MM-YYYY while typing
+            function _formatDDMMYYYYWhileTyping(raw) {
+                var digits = String(raw || '').replace(/[^\d]/g, '').slice(0, 8);
+                var out = digits;
+                if (digits.length > 2) out = digits.slice(0,2) + '-' + digits.slice(2);
+                if (digits.length > 4) out = digits.slice(0,2) + '-' + digits.slice(2,4) + '-' + digits.slice(4);
+                return out;
+            }
+            function _wireSmartDateInputs(root) {
+                var inputs = root.querySelectorAll('input.smart-date');
+                inputs.forEach(function(inp) {
+                    if (inp._smartWired) return;
+                    inp._smartWired = true;
+                    // As-you-type auto-formatting in DD-MM-YYYY
+                    inp.addEventListener('input', function() {
+                        var v = inp.value;
+                        if (/^[\d\-]*$/.test(v) && v.replace(/-/g,'').length <= 8) {
+                            var formatted = _formatDDMMYYYYWhileTyping(v);
+                            if (formatted !== v) {
+                                inp.value = formatted;
+                                try { inp.setSelectionRange(formatted.length, formatted.length); } catch (_) {}
+                            }
+                        }
+                    });
+                    inp.addEventListener('blur', function() {
+                        var raw = inp.value.trim();
+                        if (!raw) { _commitSmartDate(inp, ''); return; }
+                        var iso = _parseDateSmart(raw);
+                        if (iso) {
+                            inp.classList.remove('date-invalid');
+                            _commitSmartDate(inp, iso); // _commitSmartDate now also sets display value
+                        } else {
+                            inp.classList.add('date-invalid');
+                        }
+                    });
+                    inp.addEventListener('keydown', function(e) {
+                        if (e.key === 'Enter') { inp.blur(); }
+                    });
+                });
+            }
+            // Wire standalone smart-date inputs anywhere in the document (quoteDate, expiryDate etc.)
+            function _wireAllSmartDates() {
+                _wireSmartDateInputs(document);
+            }
+            function _commitSmartDate(inp, iso) {
+                // Always show in DD-MM-YYYY in the input after parsing
+                if (iso) {
+                    var dispParts = iso.split('-');
+                    if (dispParts.length === 3) {
+                        inp.value = dispParts[2] + '-' + dispParts[1] + '-' + dispParts[0];
+                    }
+                }
+                var hId = inp.getAttribute('data-hotel-id');
+                var hField = inp.getAttribute('data-hotel-field');
+                var tId = inp.getAttribute('data-transfer-id');
+                var tField = inp.getAttribute('data-transfer-field');
+                var fId = inp.getAttribute('data-flight-id');
+                var fField = inp.getAttribute('data-flight-field');
+                var aId = inp.getAttribute('data-activity-id');
+                var aField = inp.getAttribute('data-activity-field');
+                var instIdx = inp.getAttribute('data-instalment-idx');
+                if (hId && hField) {
+                    var hotels = STATE.currentQuote.hotels || [];
+                    var h = hotels.find(function(hh) { return hh.id === hId; });
+                    if (h) {
+                        h[hField] = iso;
+                        if ((hField === 'checkIn' || hField === 'checkOut') && h.checkIn && h.checkOut) {
+                            h.totalNights = calculateHotelNights(h);
+                            var card = inp.closest('.item-card');
+                            if (card) {
+                                var labels = card.querySelectorAll('.form-group label');
+                                labels.forEach(function(lb) {
+                                    if (lb.textContent.trim() === 'Nights') {
+                                        var i2 = lb.parentElement.querySelector('input');
+                                        if (i2) i2.value = h.totalNights || 0;
+                                    }
+                                });
+                            }
+                        }
+                    }
+                } else if (tId && tField) {
+                    var transfers = STATE.currentQuote.transfers || [];
+                    var t = transfers.find(function(tt) { return tt.id === tId; });
+                    if (t) t[tField] = iso;
+                } else if (fId && fField) {
+                    var flights = STATE.currentQuote.flights || [];
+                    var fl = flights.find(function(ff) { return ff.id === fId; });
+                    if (fl) fl[fField] = iso;
+                } else if (aId && aField) {
+                    var activities = STATE.currentQuote.activities || [];
+                    var act = activities.find(function(aa) { return aa.id === aId; });
+                    if (act) act[aField] = iso;
+                } else if (instIdx !== null && instIdx !== undefined && instIdx !== '') {
+                    var idx = parseInt(instIdx);
+                    if (STATE.currentQuote.instalments && STATE.currentQuote.instalments[idx]) {
+                        STATE.currentQuote.instalments[idx].dueDate = iso;
+                    }
+                } else {
+                    // Standalone inputs (quoteDate, expiryDate)
+                    var standaloneId = inp.id;
+                    if (standaloneId === 'quoteDate' && STATE.currentQuote) STATE.currentQuote.quoteDate = iso;
+                    if (standaloneId === 'expiryDate' && STATE.currentQuote) STATE.currentQuote.expiryDate = iso;
+                }
             }
 
             // --------------------------------------------------------------
@@ -4671,9 +4941,7 @@
                 schedule.forEach(function(s) {
                     html +=
                         '<tr><td>' + s.instalment +
-                        '</td><td><input type="date" value="' + s.dueDate +
-                        '" onchange="window._updateInstalmentDate(' + (s.instalment - 1) +
-                        ', this.value)" /></td><td>' +
+                        '</td><td><div class="date-input-wrap"><i class="fas fa-calendar-alt date-icon"></i><input type="text" class="smart-date smart-date-instalment" placeholder="DD-MM-YYYY" maxlength="10" value="' + (s.dueDate ? formatDateDisplay(s.dueDate) : '') + '" data-instalment-idx="' + (s.instalment - 1) + '" /></div></td><td>' +
                         formatCurrency(s.amount, document.getElementById('currencySelect').value) +
                         '</td><td><select onchange="window._updateInstalmentStatus(' + (s.instalment - 1) +
                         ', this.value)"><option value="Pending" ' + (s.status === 'Pending' ? 'selected' :
@@ -4684,7 +4952,7 @@
                 tbody.innerHTML = html;
                 window._updateInstalmentDate = function(idx, val) {
                     if (STATE.currentQuote.instalments && STATE.currentQuote.instalments[idx]) {
-                        STATE.currentQuote.instalments[idx].dueDate = val;
+                        STATE.currentQuote.instalments[idx].dueDate = _parseDateSmart(val) || val;
                     }
                 };
                 window._updateInstalmentStatus = function(idx, val) {
@@ -5264,14 +5532,57 @@
                     var pdfContainer = document.getElementById('pdfContent');
                     pdfContainer.innerHTML = html;
                     pdfContainer.style.display = 'block';
+                    // Full-bleed (zero margin) when a per-agent quote background is applied so
+                    // the background image covers the entire A4 page, on every page.
+                    var quoteProBg = (!isInvoice && typeof getAgentQuoteBg === 'function') ? getAgentQuoteBg() : '';
+                    // When a per-agent quote background image is used, force the outer
+                    // wrapper's total height to be an exact multiple of the A4 page
+                    // (297mm) so the last page's background image is fully covered
+                    // instead of leaving a white gap at the bottom.
+                    if (quoteProBg) {
+                        try {
+                            var _wrap = pdfContainer.firstElementChild;
+                            if (_wrap) {
+                                // Force layout so we can read the actual rendered height.
+                                var _mmToPx = function(mm){ var d=document.createElement('div'); d.style.width=mm+'mm'; d.style.position='absolute'; d.style.visibility='hidden'; document.body.appendChild(d); var px=d.getBoundingClientRect().width; document.body.removeChild(d); return px; };
+                                var pagePx = _mmToPx(297);
+                                var contentPx = _wrap.getBoundingClientRect().height;
+                                // Use a tolerance (~2% of a page) so tiny sub-pixel
+                                // overflow doesn't force an extra blank page.
+                                var tolerance = pagePx * 0.02;
+                                var pages = Math.max(1, Math.ceil((contentPx - tolerance) / pagePx));
+                                // Size the wrapper in PIXELS (not mm) using Math.floor so
+                                // the rasterised canvas is guaranteed to be exactly N page
+                                // heights — never a fraction over (which would cause an
+                                // extra blank page) and never a fraction under (which
+                                // would leave a white strip at the footer).
+                                var _totalPx = Math.floor(pages * pagePx);
+                                _wrap.style.minHeight = _totalPx + 'px';
+                                _wrap.style.height = _totalPx + 'px';
+                                _wrap.style.overflow = 'hidden';
+                            }
+                        } catch (_padErr) { /* non-fatal; wrapper still has min-height:297mm */ }
+                    }
+                    // Compute an exact 210mm pixel width so html2canvas rasterises the
+                    // full-bleed wrapper edge-to-edge (no white sliver on the left/right).
+                    var _mmToPxOpt = function(mm){ var d=document.createElement('div'); d.style.width=mm+'mm'; d.style.position='absolute'; d.style.visibility='hidden'; document.body.appendChild(d); var px=d.getBoundingClientRect().width; document.body.removeChild(d); return px; };
+                    var _a4WidthPx = Math.round(_mmToPxOpt(210));
                     var opt = {
-                        margin: [10, 10, 10, 10],
+                        margin: quoteProBg ? [0, 0, 0, 0] : [10, 10, 10, 10],
                         filename: (isInvoice ? 'Invoice' : 'Quote') + '_' + (quoteData.quoteNumber || quoteData
                             .invoiceNumber || 'draft') + '.pdf',
                         image: { type: 'jpeg', quality: 0.98 },
-                        html2canvas: { scale: 2, useCORS: true },
+                        html2canvas: quoteProBg
+                            ? { scale: 2, useCORS: true, width: _a4WidthPx, windowWidth: _a4WidthPx, backgroundColor: null, x: 0, y: 0, scrollX: 0, scrollY: 0 }
+                            : { scale: 2, useCORS: true },
                         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                        pagebreak: { mode: ['css', 'legacy'], before: '.pdf-page-break' }
+                        // When a full-bleed background is used the wrapper is already sized
+                        // to an exact multiple of the A4 page, so we disable the legacy
+                        // overflow-based splitter (which would otherwise add a blank
+                        // trailing page from sub-pixel rounding).
+                        pagebreak: quoteProBg
+                            ? { mode: ['css'], before: '.pdf-page-break' }
+                            : { mode: ['css', 'legacy'], before: '.pdf-page-break' }
                     };
                     if (action === 'download') {
                         await html2pdf().set(opt).from(pdfContainer).save();
@@ -5379,6 +5690,57 @@
                     imgHtml + '</div>';
             }
 
+            // Resolve the interleaved hotel/transfer order for ANY quote object
+            // (works for the live quote and for saved quotes being reprinted).
+            function getItineraryOrderForQuote(q) {
+                var hotels = (q && q.hotels) || [];
+                var transfers = (q && q.transfers) || [];
+                var order = (q && Array.isArray(q.itineraryOrder)) ? q.itineraryOrder.slice() : [];
+                // Keep only valid entries that still map to an existing item
+                order = order.filter(function(x) {
+                    if (!x || !x.id || !x.type) return false;
+                    if (x.type === 'hotel') return hotels.some(function(h) { return h.id === x.id; });
+                    if (x.type === 'transfer') return transfers.some(function(t) { return t.id === x.id; });
+                    return false;
+                });
+                // Append any items not yet represented (e.g. older saved quotes)
+                hotels.forEach(function(h) {
+                    if (h && h.id && !order.some(function(x) { return x.type === 'hotel' && x.id === h.id; })) {
+                        order.push({ type: 'hotel', id: h.id });
+                    }
+                });
+                transfers.forEach(function(t) {
+                    if (t && t.id && !order.some(function(x) { return x.type === 'transfer' && x.id === t.id; })) {
+                        order.push({ type: 'transfer', id: t.id });
+                    }
+                });
+                return order;
+            }
+
+            // Build interleaved itinerary HTML (hotel/transfer in the exact order added on the portal).
+            // Falls back to "all hotels then all transfers" for legacy quotes without ids/order.
+            function buildInterleavedItineraryHTML(quote, hotelFn, transferFn) {
+                var hotels = quote.hotels || [];
+                var transfers = quote.transfers || [];
+                var order = getItineraryOrderForQuote(quote);
+                var hasIds = order.length && (hotels.every(function(h){return h.id;}) || !hotels.length) && (transfers.every(function(t){return t.id;}) || !transfers.length);
+                if (hasIds && order.length) {
+                    return order.map(function(x) {
+                        if (x.type === 'hotel') {
+                            var h = hotels.find(function(hh) { return hh.id === x.id; });
+                            return h ? hotelFn(h) : '';
+                        }
+                        if (x.type === 'transfer') {
+                            var t = transfers.find(function(tt) { return tt.id === x.id; });
+                            return t ? transferFn(t) : '';
+                        }
+                        return '';
+                    }).join('');
+                }
+                // Legacy fallback: hotels first, then transfers
+                return hotels.map(hotelFn).join('') + transfers.map(transferFn).join('');
+            }
+
             // Quote PDF — larger logo (120px) and beautiful borders
             function buildQuotePDFHTML(quote, branding, conditions) {
                 var logoHtml = branding && branding.logo ?
@@ -5390,7 +5752,7 @@
                     return buildFlightPDFCard(f);
                 }).join('');
 
-                var hotelsHtml = (quote.hotels || []).map(function(h) {
+                function _quoteHotelCard(h) {
                     var imgs = (h.images || []).map(function(img) {
                         return '<img src="' + img +
                             '" style="width:31.5%;max-width:31.5%;height:112px;object-fit:cover;border-radius:8px;border:1px solid #dbe5ec;box-sizing:border-box;" />';
@@ -5418,9 +5780,9 @@
                         (imgs ? '<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">' + imgs + '</div>' : '') +
                         (h.specialRequests ? '<div style="font-size:0.8rem;color:#888;margin-top:6px;"><strong>Requests:</strong> ' + h.specialRequests + '</div>' : '') +
                         '</div>';
-                }).join('');
+                }
 
-                var transfersHtml = (quote.transfers || []).map(function(t) {
+                function _quoteTransferCard(t) {
                     var pdStr = t.pickupDate ? formatDateDisplay(t.pickupDate) : '';
                     var rows = '';
                     if (t.pickupPoint) rows += '<div><strong>Pickup Location:</strong> ' + t.pickupPoint + '</div>';
@@ -5432,7 +5794,12 @@
                     if (t.driverNotes) rows += '<div><strong>Notes:</strong> ' + t.driverNotes + '</div>';
                     if (!rows) return '';
                     return '<div style="padding:7px 10px;border:1px solid #dbe5ec;border-radius:8px;margin:3px 0;background:#f8fafc;font-size:0.84rem;line-height:1.45;">' + rows + '</div>';
-                }).join('');
+                }
+
+                var hotelsHtml = (quote.hotels || []).map(_quoteHotelCard).join('');
+                var transfersHtml = (quote.transfers || []).map(_quoteTransferCard).join('');
+                // Interleaved itinerary in the exact order items were added on the portal
+                var itineraryHtml = buildInterleavedItineraryHTML(quote, _quoteHotelCard, _quoteTransferCard);
 
                 var activitiesHtml = buildActivitiesPDFHTML(quote);
 
@@ -5466,8 +5833,7 @@
                 if (quote.referenceNumber) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Ref:</td><td style="padding:4px 8px;">' + quote.referenceNumber + '</td></tr>';
 
                 var flightsSection = flightsHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">✈️ Flights</h4>' + flightsHtml + '</div>' : '';
-                var hotelsSection = hotelsHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">🏨 Hotels</h4>' + hotelsHtml + '</div>' : '';
-                var transfersSection = transfersHtml ? '<div class="pdf-compact-section" style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">Transfers</h4>' + transfersHtml + '</div>' : '';
+                var itinerarySection = itineraryHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">🏨 Hotels &amp; Transfers</h4>' + itineraryHtml + '</div>' : '';
                 var activitiesSection = activitiesHtml ? '<div class="pdf-compact-section" style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">Other Activities</h4>' + activitiesHtml + '</div>' : '';
 
                 var paymentBits = '';
@@ -5482,30 +5848,56 @@
                     (scheduleHtml ? '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;border:1px solid #dbe5ec;"><thead><tr style="background:#eaf1f6;"><th style="padding:5px 8px;border:1px solid #dbe5ec;">#</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Due Date</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Amount</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Status</th></tr></thead><tbody>' + scheduleHtml + '</tbody></table>' : '') +
                     '</div>' : '';
 
-                return '<div style="font-family:Inter,sans-serif;width:190mm;max-width:190mm;margin:0 auto;padding:8mm;background:#fff;color:#1f2933;font-size:11.5px;line-height:1.42;border:1px solid #d7e0e8;border-radius:12px;box-shadow:none;box-sizing:border-box;overflow:hidden;">' +
-                    '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #12324a;padding-bottom:8px;margin-bottom:8px;">' +
+                // Professional, colourful quote palette (readable dark text on light panels)
+                var ACC2 = '#12324a', ACC = '#0f766e', GOLD = '#b8860b';
+                var proBg = (typeof getAgentQuoteBg === 'function') ? getAgentQuoteBg() : '';
+
+                var headerHtml = '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid ' + ACC2 + ';padding-bottom:8px;margin-bottom:8px;">' +
                     '<div>' + logoHtml + '</div>' +
-                    '<div style="text-align:right;"><div style="font-size:1.6rem;font-weight:700;font-family:\'Playfair Display\',serif;color:#12324a;">' +
+                    '<div style="text-align:right;"><div style="font-size:1.6rem;font-weight:700;font-family:\'Playfair Display\',serif;color:#000000;">' +
                     (branding && branding.companyName || 'Plan Holidays') +
-                    '</div><div style="font-size:0.9rem;color:#666;">' + (branding && branding.tagline ||
+                    '</div><div style="font-size:0.9rem;color:#000000;">' + (branding && branding.tagline ||
                         'Luxury Travel Redefined') +
-                    '</div><div style="font-size:0.8rem;color:#888;margin-top:2px;">' + (branding && branding
+                    '</div><div style="font-size:0.8rem;color:#000000;margin-top:2px;">' + (branding && branding
                         .telephone || '') + ' · ' + (branding && branding.email || '') +
-                    '</div></div></div>' +
-                    '<div style="text-align:center;margin:4px 0 8px;"><h2 style="font-family:\'Playfair Display\',serif;font-size:2rem;color:#12324a;margin:0;letter-spacing:1px;">Holiday Quotation</h2><div style="font-size:0.9rem;color:#666;">Quote #' +
-                    (quote.quoteNumber || 'N/A') + (quote.quoteDate ? ' · ' + formatDateDisplay(quote.quoteDate) : '') + '</div></div>' +
-                    (custRows ? '<div style="background:#f8fafc;padding:9px 12px;border-radius:10px;margin-bottom:6px;border-left:4px solid #12324a;"><table style="width:100%;border-collapse:collapse;font-size:0.9rem;">' + custRows + '</table></div>' : '') +
-                    flightsSection +
-                    hotelsSection +
-                    transfersSection +
-                    activitiesSection +
-                    paymentSection +
-                    (conditions ? '<div class="pdf-compact-section" style="margin-top:5px;padding:9px 12px;background:#f8fafc;border-radius:10px;font-size:0.85rem;color:#333;border:1px solid #dbe5ec;"><h5 style="margin:0 0 5px;font-size:1rem;color:#12324a;">Booking Conditions</h5><div style="white-space:pre-wrap;line-height:1.38;word-break:break-word;">' + conditions + '</div></div>' : '') +
-                    '<div style="margin-top:6px;border-top:1px solid #dbe5ec;padding-top:6px;text-align:center;font-size:0.75rem;color:#999;">' +
+                    '</div></div></div>';
+
+                var titleHtml = '<div style="text-align:center;margin:4px 0 10px;background:linear-gradient(135deg,' + ACC2 + ',' + ACC + ');border-radius:12px;padding:11px 8px;box-shadow:0 6px 18px rgba(15,118,110,0.22);">' +
+                    '<h2 style="font-family:\'Playfair Display\',serif;font-size:2rem;color:#ffffff;margin:0;letter-spacing:1px;">Holiday Quotation</h2>' +
+                    '<div style="font-size:0.9rem;color:rgba(255,255,255,0.92);">Quote #' +
+                    (quote.quoteNumber || 'N/A') + (quote.quoteDate ? ' · ' + formatDateDisplay(quote.quoteDate) : '') + '</div></div>';
+
+                var custBlock = (custRows ? '<div style="background:#eef7f5;padding:9px 12px;border-radius:10px;margin-bottom:6px;border-left:4px solid ' + ACC + ';"><table style="width:100%;border-collapse:collapse;font-size:0.9rem;">' + custRows + '</table></div>' : '');
+
+                var conditionsBlock = (conditions ? '<div class="pdf-compact-section" style="margin-top:5px;padding:9px 12px;background:#fbf7ec;border-radius:10px;font-size:0.85rem;color:#333;border:1px solid #ecdcb4;border-left:4px solid ' + GOLD + ';"><h5 style="margin:0 0 5px;font-size:1rem;color:' + ACC2 + ';">Booking Conditions</h5><div style="white-space:pre-wrap;line-height:1.38;word-break:break-word;">' + conditions + '</div></div>' : '');
+
+                var footerHtml = '<div style="margin-top:6px;border-top:2px solid ' + GOLD + ';padding-top:6px;text-align:center;font-size:0.8rem;color:#000000;font-weight:600;">' +
                     (branding && branding.footer || '&copy; 2026 Plan Holidays UK. All rights reserved.') +
-                    '<span style="display:block;margin-top:2px;">' + (branding && branding.website || '') + ' · ' +
+                    '<span style="display:block;margin-top:2px;color:#000000;font-weight:600;">' + (branding && branding.website || '') + ' · ' +
                     (branding && branding.telephone || '') + ' · ' + (branding && branding.email || '') +
-                    '</span></div></div>';
+                    '</span></div>';
+
+                var bodyHtml = headerHtml + titleHtml + custBlock +
+                    flightsSection + itinerarySection + activitiesSection + paymentSection +
+                    conditionsBlock + footerHtml;
+
+                if (proBg) {
+                    // Full-bleed A4 background repeated on every page. The wrapper is
+                    // sized in exact mm to match the A4 page (210 x 297mm) with zero
+                    // margin/border so html2canvas rasterises edge-to-edge — no white
+                    // sliver on the left border and no white gap in the footer.
+                    // Using background-size:210mm 297mm (absolute units instead of 100%)
+                    // avoids sub-pixel rounding at the horizontal edges.
+                    return '<div style="width:210mm;min-height:297mm;margin:0;padding:0;border:0;box-sizing:border-box;background-color:#e9eef2;background-image:url(' + proBg + ');background-repeat:repeat-y;background-size:210mm 297mm;background-position:top left;background-origin:border-box;background-clip:border-box;">' +
+                        '<div style="width:210mm;min-height:297mm;margin:0;padding:11mm 10mm;box-sizing:border-box;">' +
+                        '<div style="background:rgba(255,255,255,0.9);border:1.5px solid rgba(255,255,255,0.85);border-radius:16px;padding:8mm;font-family:Inter,sans-serif;color:#1f2933;font-size:11.5px;line-height:1.42;box-shadow:0 10px 34px rgba(0,0,0,0.20);box-sizing:border-box;">' +
+                        bodyHtml +
+                        '</div></div></div>';
+                }
+
+                var quoteBgStyle = (branding && branding.bgImage) ? 'background:#fff url(' + branding.bgImage + ') center/cover no-repeat;' : 'background:#fff;';
+                return '<div style="font-family:Inter,sans-serif;width:190mm;max-width:190mm;margin:0 auto;padding:8mm;' + quoteBgStyle + 'color:#1f2933;font-size:11.5px;line-height:1.42;border:1px solid #d7e0e8;border-radius:12px;box-shadow:none;box-sizing:border-box;overflow:hidden;">' +
+                    bodyHtml + '</div>';
             }
 
             // Invoice PDF — larger logo and borders
@@ -5519,7 +5911,7 @@
                     return buildFlightPDFCard(f);
                 }).join('');
 
-                var hotelsHtml = (quote.hotels || []).map(function(h) {
+                function _invHotelCard(h) {
                     var imgs = (h.images || []).map(function(img) {
                         return '<img src="' + img +
                             '" style="width:31.5%;max-width:31.5%;height:112px;object-fit:cover;border-radius:8px;border:1px solid #dbe5ec;box-sizing:border-box;" />';
@@ -5545,9 +5937,9 @@
                         (imgs ? '<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">' + imgs + '</div>' : '') +
                         (h.specialRequests ? '<div style="font-size:0.8rem;color:#888;margin-top:6px;font-style:italic;">Requests: ' + h.specialRequests + '</div>' : '') +
                         '</div>';
-                }).join('');
+                }
 
-                var transfersHtml = (quote.transfers || []).map(function(t) {
+                function _invTransferCard(t) {
                     var rows = '';
                     if (t.pickupPoint) rows += '<div><strong>Pickup Location:</strong> ' + t.pickupPoint + '</div>';
                     if (t.dropoffPoint) rows += '<div><strong>Drop-off Location:</strong> ' + t.dropoffPoint + '</div>';
@@ -5559,7 +5951,12 @@
                     if (!rows) return '';
                     return '<div style="padding:7px 10px;border:1px solid #dbe5ec;border-radius:8px;margin:3px 0;background:#f8fafc;font-size:0.84rem;line-height:1.45;">' +
                         rows + '</div>';
-                }).join('');
+                }
+
+                var hotelsHtml = (quote.hotels || []).map(_invHotelCard).join('');
+                var transfersHtml = (quote.transfers || []).map(_invTransferCard).join('');
+                // Interleaved itinerary in the exact order items were added on the portal
+                var itineraryHtml = buildInterleavedItineraryHTML(quote, _invHotelCard, _invTransferCard);
 
                 var totalSell = parseFloat(quote.totalSell || quote.totalPrice || 0);
                 // Compute confirmed payments (status === 'Approved')
@@ -5613,7 +6010,8 @@
                 if (quote.assignedTo || quote.agentName) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Assigned To:</td><td style="padding:4px 8px;">' + (quote.assignedTo || quote.agentName) + '</td></tr>';
                 if (deadline) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Balance Deadline:</td><td style="padding:4px 8px;color:#c33;font-weight:600;">' + (typeof formatDateDisplay === 'function' ? formatDateDisplay(deadline) : deadline) + '</td></tr>';
 
-                return '<div style="font-family:Inter,sans-serif;width:190mm;max-width:190mm;margin:0 auto;padding:8mm;background:#fff;color:#1f2933;font-size:11.5px;line-height:1.42;border:1.5px solid #12324a;border-radius:12px;box-shadow:none;position:relative;box-sizing:border-box;overflow:hidden;">' +
+                var invBgStyle = (branding && branding.bgImage) ? 'background:#fff url(' + branding.bgImage + ') center/cover no-repeat;' : 'background:#fff;';
+                return '<div style="font-family:Inter,sans-serif;width:190mm;max-width:190mm;margin:0 auto;padding:8mm;' + invBgStyle + 'color:#1f2933;font-size:11.5px;line-height:1.42;border:1.5px solid #12324a;border-radius:12px;box-shadow:none;position:relative;box-sizing:border-box;overflow:hidden;">' +
                     // Decorative top ribbon
                     '<div style="position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,#12324a,#2a6f84,#12324a);border-radius:14px 14px 0 0;"></div>' +
                     '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px double #12324a;padding:8px 0 8px;margin-bottom:7px;">' +
@@ -5632,8 +6030,7 @@
                     '</div>' +
                     (custRows ? '<div style="background:linear-gradient(135deg,#f8fafc,#eef4f8);padding:9px 12px;border-radius:10px;margin-bottom:7px;border-left:4px solid #12324a;box-shadow:0 1px 3px rgba(0,0,0,0.03);"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;">' + custRows + '</table></div>' : '') +
                     (flightsHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;font-family:\'Playfair Display\',serif;">✈️ Flights</h4>' + flightsHtml + '</div>' : '') +
-                    (hotelsHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;font-family:\'Playfair Display\',serif;">🏨 Hotels</h4>' + hotelsHtml + '</div>' : '') +
-                    (transfersHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;font-family:\'Playfair Display\',serif;">🚗 Transfers</h4>' + transfersHtml + '</div>' : '') +
+                    (itineraryHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;font-family:\'Playfair Display\',serif;">🏨 Hotels &amp; Transfers</h4>' + itineraryHtml + '</div>' : '') +
                     // Payment Summary Grid
                     '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;font-family:\'Playfair Display\',serif;">💳 Payment Summary</h4>' +
                     '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:3px 0 6px;">' +
@@ -5981,6 +6378,85 @@
             }
 
             // --------------------------------------------------------------
+            // 18B. PROFESSIONAL BACKGROUND (per-agent quote PDF background)
+            // --------------------------------------------------------------
+            function proBgKeyFor(username) { return 'ph_pro_bg_' + username; }
+
+            function getAgentQuoteBg() {
+                try {
+                    var u = STATE.currentUser && STATE.currentUser.username;
+                    if (!u) return '';
+                    return (STATE.proBackgrounds && STATE.proBackgrounds[u]) || '';
+                } catch (_) { return ''; }
+            }
+
+            async function loadProBackground() {
+                try {
+                    var u = STATE.currentUser && STATE.currentUser.username;
+                    if (!u) return;
+                    var data = await readData('proBackgrounds/' + u, proBgKeyFor(u), true);
+                    STATE.proBackgrounds[u] = (typeof data === 'string' ? data : '') || '';
+                } catch (_) {}
+            }
+
+            async function saveProBackground(imgData) {
+                var u = STATE.currentUser && STATE.currentUser.username;
+                if (!u) { showToast('No active user.', 'error'); return false; }
+                STATE.proBackgrounds[u] = imgData || '';
+                await writeData('proBackgrounds/' + u, imgData || '', proBgKeyFor(u));
+                return true;
+            }
+
+            function showProBackgroundEditor() {
+                var current = getAgentQuoteBg();
+                var html = '<h3><i class="fas fa-image" style="color:var(--primary);"></i> Professional Background</h3>' +
+                    '<p class="text-muted text-sm">Upload a background image for <strong>your</strong> quote PDFs only. Once saved, it is applied across every A4 page of the quote, with the quote shown inside a professional semi-transparent white panel so the background stays softly visible behind and around the content.</p>' +
+                    '<div class="form-group"><label>Upload Quote Background Image</label><input type="file" id="proBgInput" accept="image/*" /><div class="input-hint">Recommended: a high-resolution portrait (A4) image. Applies only to your quote PDFs.</div></div>' +
+                    '<div id="proBgPreview" style="margin-top:6px;"></div>' +
+                    '<div class="modal-actions"><button class="btn btn-success" id="btnSaveProBg"><i class="fas fa-save"></i> Save Background</button><button class="btn btn-danger" id="btnRemoveProBg"><i class="fas fa-trash"></i> Remove</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
+                showModal(html);
+                var pending = current;
+                function renderPreview(img, note) {
+                    var p = document.getElementById('proBgPreview');
+                    if (!p) return;
+                    if (img) {
+                        p.innerHTML = '<div style="border:1px solid var(--card-border);border-radius:12px;overflow:hidden;max-width:260px;"><img src="' + img + '" style="width:100%;display:block;" /></div><div class="text-sm text-muted mt-8">' + (note || 'Current background.') + '</div>';
+                    } else {
+                        p.innerHTML = '<div class="text-sm text-muted">No background set. Your quotes use the standard white layout.</div>';
+                    }
+                }
+                renderPreview(current, current ? 'Current saved background.' : '');
+                var input = document.getElementById('proBgInput');
+                if (input) {
+                    input.addEventListener('change', function(e) {
+                        var file = e.target.files[0];
+                        if (!file) return;
+                        var reader = new FileReader();
+                        reader.onload = function(ev) {
+                            pending = ev.target.result;
+                            renderPreview(pending, 'Preview — click Save Background to apply.');
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                }
+                document.getElementById('btnSaveProBg').addEventListener('click', async function() {
+                    if (!pending) { showToast('Please upload an image first.', 'warning'); return; }
+                    showLoading(true);
+                    await saveProBackground(pending);
+                    showLoading(false);
+                    showToast('Professional background saved for your quotes.', 'success');
+                    window.closeModal();
+                });
+                document.getElementById('btnRemoveProBg').addEventListener('click', async function() {
+                    showLoading(true);
+                    await saveProBackground('');
+                    showLoading(false);
+                    showToast('Professional background removed.', 'success');
+                    window.closeModal();
+                });
+            }
+
+            // --------------------------------------------------------------
             // 19. UI NAVIGATION
             // --------------------------------------------------------------
 
@@ -6025,6 +6501,7 @@
                     loadAgentTimes();
                     loadInquiries();
                     loadHotelVouchers();
+                    loadProBackground();
                 }
                 updateQuoteCount();
                 updateInvoiceCount();
@@ -6170,6 +6647,13 @@
                         break;
                     case 'theme':
                         showThemeEditor();
+                        break;
+                    case 'proBackground':
+                        if (!isAdmin() && !hasPermission('canManageProBackground')) {
+                            showToast('You do not have permission to manage the professional background.', 'error');
+                            return;
+                        }
+                        showProBackgroundEditor();
                         break;
                     case 'backup':
                         showBackupRestore();
@@ -7038,6 +7522,9 @@
                             'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2250%22 viewBox=%220 0 80 50%22%3E%3Crect width=%2280%22 height=%2250%22 rx=%228%22 fill=%22%23b8860b%22/%3E%3Ctext x=%2218%22 y=%2235%22 font-family=%22serif%22 font-size=%2228%22 fill=%22%23fff%22 font-weight=%22bold%22%3EPH%3C/text%3E%3C/svg%3E'
                             ) +
                         '" style="height:60px;width:auto;border-radius:8px;object-fit:contain;" /></div></div>' +
+                        '<div class="form-group"><label>Quote / Invoice Background Image</label><input type="file" id="brandBgInput" accept=".jpg,.jpeg,.png,.webp,.gif" /><div class="input-hint">Uploaded image will be applied as background on all quotes and invoices (old &amp; new).</div><div id="brandBgPreview" style="margin-top:6px;">' +
+                        (data.bgImage ? '<div style="position:relative;display:inline-block;"><img src="' + data.bgImage + '" style="max-height:80px;max-width:200px;border-radius:8px;object-fit:cover;border:1px solid var(--card-border);" /><button onclick="window._clearBrandBg()" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:.7rem;cursor:pointer;" title="Remove background">&times;</button></div>' : '<span class="text-muted text-sm">No background image set.</span>') +
+                        '</div></div>' +
                         '</div><div class="branding-preview mt-16"><strong>Preview:</strong> <span id="brandPreviewText">' +
                         (data.header || data.companyName || 'Plan Holidays') +
                         '</span><div style="margin-top:4px;"><img id="brandPreviewLogo" src="' + (data.logo ||
@@ -7047,6 +7534,7 @@
                         '<div style="margin-top:16px;"><button class="btn btn-outline" onclick="window._showThemeEditor()"><i class="fas fa-image"></i> Custom Theme</button></div>' +
                         '<div class="modal-actions"><button class="btn btn-primary" id="btnSaveBrandingModal"><i class="fas fa-save"></i> Save Branding</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
                     showModal(html);
+                    window._pendingBrandBg = undefined; // reset on modal open
 
                     document.getElementById('btnSaveBrandingModal').addEventListener('click', async function() {
                         var data2 = {
@@ -7060,11 +7548,13 @@
                             header: document.getElementById('brandHeader').value,
                             footer: document.getElementById('brandFooter').value,
                             currency: document.getElementById('brandCurrency').value,
-                            logo: document.getElementById('brandLogoImg').src
+                            logo: document.getElementById('brandLogoImg').src,
+                            bgImage: window._pendingBrandBg !== undefined ? window._pendingBrandBg : (STATE.branding && STATE.branding.bgImage) || null
                         };
                         await saveBranding(data2);
+                        window._pendingBrandBg = undefined;
                         window.closeModal();
-                        showToast('Branding updated.', 'success');
+                        showToast('Branding updated. Background image applied to all quotes.', 'success');
                     });
 
                     document.getElementById('brandLogoInput').addEventListener('change', function(e) {
@@ -7079,6 +7569,27 @@
                         reader.readAsDataURL(file);
                         this.value = '';
                     });
+
+                    document.getElementById('brandBgInput').addEventListener('change', function(e) {
+                        var file = e.target.files[0];
+                        if (!file) return;
+                        var reader = new FileReader();
+                        reader.onload = function(ev) {
+                            window._pendingBrandBg = ev.target.result;
+                            var preview = document.getElementById('brandBgPreview');
+                            if (preview) preview.innerHTML = '<div style="position:relative;display:inline-block;"><img src="' + ev.target.result + '" style="max-height:80px;max-width:200px;border-radius:8px;object-fit:cover;border:1px solid var(--card-border);" /><button onclick="window._clearBrandBg()" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:.7rem;cursor:pointer;" title="Remove background">&times;</button></div>';
+                            showToast('Background image ready. Click Save to apply.', 'success');
+                        };
+                        reader.readAsDataURL(file);
+                        this.value = '';
+                    });
+
+                    window._clearBrandBg = function() {
+                        window._pendingBrandBg = null;
+                        var preview = document.getElementById('brandBgPreview');
+                        if (preview) preview.innerHTML = '<span class="text-muted text-sm">No background image set.</span>';
+                        showToast('Background image removed. Click Save to confirm.', 'info');
+                    };
 
                     window._showThemeEditor = function() {
                         window.closeModal();
@@ -7151,8 +7662,9 @@
                 document.getElementById('agentName').value = q.agentName || (STATE.currentUser ? STATE.currentUser
                     .name || '' : '');
                 document.getElementById('quoteNumber').value = q.quoteNumber || generateQuoteNumber();
-                document.getElementById('quoteDate').value = q.quoteDate || getToday();
-                document.getElementById('expiryDate').value = q.expiryDate || getDefaultExpiry();
+                document.getElementById('quoteDate').value = formatDateDisplay(q.quoteDate || getToday());
+                document.getElementById('expiryDate').value = formatDateDisplay(q.expiryDate || getDefaultExpiry());
+                setTimeout(function(){ _wireAllSmartDates(); }, 0);
                 document.getElementById('refNumber').value = q.referenceNumber || '';
                 document.getElementById('custNotes').value = q.notes || '';
                 document.getElementById('totalPrice').value = q.totalPrice || 0;
@@ -8586,6 +9098,9 @@
                     { key: 'canDeleteQuotes', label: 'Delete Quotes' },
                     { key: 'canEditQuotes', label: 'Edit Quotes' },
                     { key: 'canViewQuoteHistory', label: 'Quote History (Own Quotes)' }
+                ] },
+                { group: 'Quote Appearance', items: [
+                    { key: 'canManageProBackground', label: 'Professional Background (Quote PDF)' }
                 ] }
             ];
 
@@ -9553,8 +10068,8 @@
                 q.pricePerPerson = parseFloat(document.getElementById('pricePerPerson').value) || 0;
                 q.agentName = document.getElementById('agentName').value;
                 q.quoteNumber = document.getElementById('quoteNumber').value;
-                q.quoteDate = document.getElementById('quoteDate').value;
-                q.expiryDate = document.getElementById('expiryDate').value;
+                q.quoteDate = _parseDateSmart(document.getElementById('quoteDate').value) || document.getElementById('quoteDate').value;
+                q.expiryDate = _parseDateSmart(document.getElementById('expiryDate').value) || document.getElementById('expiryDate').value;
                 q.referenceNumber = document.getElementById('refNumber').value;
                 q.notes = document.getElementById('custNotes').value;
                 q.totalPrice = parseFloat(document.getElementById('totalPrice').value) || 0;
@@ -9631,7 +10146,7 @@
                 list.push(entry); STATE.currentQuote.activities = list; renderActivities(); return entry;
             }
             function removeActivity(id) { STATE.currentQuote.activities = (STATE.currentQuote.activities || []).filter(function(a){ return a.id !== id; }); renderActivities(); }
-            function updateActivityField(id, field, value) { var a = (STATE.currentQuote.activities || []).find(function(x){ return x.id === id; }); if (a) a[field] = value; }
+            function updateActivityField(id, field, value) { var a = (STATE.currentQuote.activities || []).find(function(x){ return x.id === id; }); if (a) { if (field === 'activityDate') { a[field] = _parseDateSmart(value) || value; } else { a[field] = value; } } }
             function removeActivityImg(id, img) { var a = (STATE.currentQuote.activities || []).find(function(x){ return x.id === id; }); if (a) a.images = (a.images || []).filter(function(v){ return v !== img; }); renderActivities(); }
             function uploadActivityImgFor(id) {
                 var input = document.getElementById('activityImageInput'); if (!input) return;
@@ -9659,7 +10174,7 @@
                     var imgs = (a.images || []).map(function(img){ return '<div class="img-thumb"><img src="' + img + '"/><button class="remove-img" onclick="window._removeActivityImg(\'' + a.id + '\',\'' + img + '\')">&times;</button></div>'; }).join('');
                     return '<div class="item-card"><div class="item-header"><h4><i class="fas fa-person-hiking" style="color:var(--primary);"></i> Activity #' + (idx+1) + ' <span class="item-index">' + escapeHTML(a.activityName || 'New') + '</span></h4><button class="btn btn-sm btn-danger" onclick="window._removeActivity(\'' + a.id + '\')"><i class="fas fa-trash"></i></button></div>' +
                         '<div class="form-row"><div class="form-group"><label>Activity Name</label><input type="text" value="' + escapeHTML(a.activityName || '') + '" oninput="window._updateActivityField(\'' + a.id + '\',\'activityName\',this.value)" /></div>' +
-                        '<div class="form-group"><label>Activity Date</label><input type="date" value="' + escapeHTML(a.activityDate || '') + '" onchange="window._updateActivityField(\'' + a.id + '\',\'activityDate\',this.value)" /></div>' +
+                        '<div class="form-group"><label>Activity Date</label><div class="date-input-wrap"><i class="fas fa-calendar-alt date-icon"></i><input type="text" class="smart-date smart-date-activity" placeholder="DD-MM-YYYY" maxlength="10" value="' + escapeHTML(a.activityDate ? formatDateDisplay(a.activityDate) : '') + '" data-activity-id="' + a.id + '" data-activity-field="activityDate" /></div></div>' +
                         '<div class="form-group"><label>Adult</label><input type="number" min="0" value="' + (a.adults || 0) + '" oninput="window._updateActivityField(\'' + a.id + '\',\'adults\',parseInt(this.value)||0)" /></div>' +
                         '<div class="form-group"><label>Child</label><input type="number" min="0" value="' + (a.children || 0) + '" oninput="window._updateActivityField(\'' + a.id + '\',\'children\',parseInt(this.value)||0)" /></div>' +
                         '<div class="form-group"><label>Young Adult</label><input type="number" min="0" value="' + (a.youngAdults || 0) + '" oninput="window._updateActivityField(\'' + a.id + '\',\'youngAdults\',parseInt(this.value)||0)" /></div>' +
@@ -10428,11 +10943,97 @@
             async function updateTaskStatus(id,status){var t=(await loadTasks()).find(function(x){return x.id===id});if(!t)return;t.status=status;if(status==='completed')t.completedAt=getNowISO();await saveTask(t);showToast('Task marked '+status+'.','success');var p=document.getElementById('taskReminderPopup');if(p)p.remove();showTaskManager()}
             async function deleteTasks(ids){var all=await readData('tasks','ph_tasks',true)||{};ids.forEach(function(id){if(all[id])all[id].deleted=true});await writeData('tasks',all,'ph_tasks');showToast('Deleted '+ids.length+' task(s).','success');showTaskManager()}
             function taskRows(list){return list.map(function(t){return'<tr><td class="checkbox-cell">'+(_mrCanDeleteTask()?'<input type="checkbox" class="task-check" value="'+t.id+'" />':'')+'</td><td>'+escapeHTML(t.assignedTo||t.agentName||'')+'</td><td><strong>'+escapeHTML(t.taskName||'Task')+'</strong></td><td>'+escapeHTML(t.folderInvoiceNo||'')+'</td><td>'+escapeHTML(t.customerName||'')+'</td><td>'+escapeHTML((t.taskDetails||'').slice(0,90))+((t.taskDetails||'').length>90?'…':'')+'</td><td>'+safeDateDisplay(t.createdAt||'')+'</td><td>'+safeDateDisplay(t.scheduledDate||'')+' '+escapeHTML(t.scheduledTime||'')+'</td><td><span class="task-status '+escapeHTML(t.status||'pending')+'">'+escapeHTML(t.status||'pending')+'</span></td><td><div class="actions-cell"><button class="btn btn-sm btn-primary" onclick="window._viewTask(\''+t.id+'\')"><i class="fas fa-eye"></i></button>'+(_mrCanEditTask(t)?'<button class="btn btn-sm btn-outline" onclick="window._editTask(\''+t.id+'\')"><i class="fas fa-pen"></i></button>':'')+(t.status!=='completed'&&_mrCanEditTask(t)?'<button class="btn btn-sm btn-success" onclick="window._completeTask(\''+t.id+'\')"><i class="fas fa-check"></i></button>':'')+(_mrCanDeleteTask()?'<button class="btn btn-sm btn-danger" onclick="window._deleteOneTask(\''+t.id+'\')"><i class="fas fa-trash"></i></button>':'')+'</div></td></tr>'}).join('')||'<tr><td colspan="10" class="text-center text-muted">No matching tasks.</td></tr>'}
-            async function showTaskManager(){if(!isAdmin()&&!hasPermission('canViewTaskHistory')&&!hasPermission('canCreateTasks'))return showToast('Permission denied.','error');var tasks=await loadTasks(),u=STATE.currentUser||{};if(!isAdmin())tasks=tasks.filter(function(t){return(t.assignedTo===u.username||t.agentName===u.username||t.createdBy===u.username)&&t.status!=='completed'});tasks.sort(function(a,b){return(a.status==='completed')-(b.status==='completed')||new Date(b.createdAt||0)-new Date(a.createdAt||0)});var opts=Object.keys(STATE.users||{}).map(function(k){return'<option value="'+k+'">'+escapeHTML((STATE.users[k].name||k)+' (@'+k+')')+'</option>'}).join('');showModal('<h3><i class="fas fa-list-check"></i> Task Manager '+(isAdmin()?'(All Agents)':'(Your Pending Tasks)')+'</h3><p class="text-muted text-sm">Completed tasks disappear from agent history but stay in admin history.</p><div class="task-toolbar">'+(_mrCanCreateTask()?'<button class="btn btn-primary" onclick="window._newTask()"><i class="fas fa-plus"></i> New Task</button>':'')+(_mrCanDeleteTask()?'<button class="btn btn-danger" onclick="window._deleteSelectedTasks()"><i class="fas fa-trash"></i> Delete Selected</button>':'')+'<input id="taskSearchInput" placeholder="Search task, customer, folder/invoice..." oninput="window._filterTasks()" style="flex:1;min-width:220px;" /><select id="taskStatusFilter" onchange="window._filterTasks()"><option value="">All Status</option><option value="pending">Pending</option><option value="completed">Completed</option></select><select id="taskAgentFilter" onchange="window._filterTasks()"><option value="">All Agents</option>'+opts+'</select><input type="date" id="taskDateFilter" onchange="window._filterTasks()" /></div><div class="history-table-wrap"><table><thead><tr><th class="checkbox-cell"></th><th>Agent</th><th>Task</th><th>Folder/Invoice</th><th>Customer</th><th>Details</th><th>Created</th><th>Scheduled</th><th>Status</th><th>Actions</th></tr></thead><tbody id="taskTableBody">'+taskRows(tasks)+'</tbody></table></div><div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>');window._allTasks=tasks;window._filterTasks=function(){var q=(document.getElementById('taskSearchInput').value||'').toLowerCase(),st=document.getElementById('taskStatusFilter').value,ag=document.getElementById('taskAgentFilter').value,dt=document.getElementById('taskDateFilter').value,f=window._allTasks.filter(function(t){if(st&&t.status!==st)return false;if(ag&&(t.assignedTo!==ag&&t.agentName!==ag&&t.createdBy!==ag))return false;if(dt&&t.scheduledDate!==dt)return false;return!q||[t.taskName,t.folderInvoiceNo,t.customerName,t.taskDetails,t.assignedTo,t.agentName,t.createdBy].join(' ').toLowerCase().indexOf(q)!==-1});document.getElementById('taskTableBody').innerHTML=taskRows(f)};window._newTask=function(){showTaskForm(null)};window._editTask=function(id){showTaskForm(id)};window._viewTask=function(id){showTaskForm(id,true)};window._completeTask=function(id){updateTaskStatus(id,'completed')};window._deleteOneTask=function(id){if(confirm('Delete this task?'))deleteTasks([id])};window._deleteSelectedTasks=function(){var ids=Array.from(document.querySelectorAll('.task-check:checked')).map(function(c){return c.value});if(!ids.length)return showToast('No tasks selected.','warning');if(confirm('Delete '+ids.length+' selected task(s)?'))deleteTasks(ids)}}
-            async function showTaskForm(id,readOnly){var tasks=await loadTasks(),t=id?tasks.find(function(x){return x.id===id}):null;t=t||{status:'pending',scheduledDate:_mrToday(),scheduledTime:'09:00',assignedTo:(STATE.currentUser&&STATE.currentUser.username)||'',agentName:(STATE.currentUser&&STATE.currentUser.username)||''};var ro=readOnly||(!_mrCanEditTask(t)&&!!id),dis=ro?'disabled':'',opts=Object.keys(STATE.users||{}).map(function(k){return'<option value="'+k+'" '+(t.assignedTo===k?'selected':'')+'>'+escapeHTML((STATE.users[k].name||k)+' (@'+k+')')+'</option>'}).join('');showModal('<h3>'+(id?(ro?'View Task':'Edit Task'):'New Task')+'</h3><div class="form-row"><div class="form-group"><label>Agent Name</label><select id="taskAssignedTo" '+dis+'>'+opts+'</select></div><div class="form-group"><label>Task Name *</label><input id="taskName" value="'+escapeHTML(t.taskName||'')+'" '+dis+' /></div><div class="form-group"><label>Folder / Invoice No</label><input id="taskFolder" value="'+escapeHTML(t.folderInvoiceNo||'')+'" '+dis+' /></div><div class="form-group"><label>Customer Name</label><input id="taskCustomer" value="'+escapeHTML(t.customerName||'')+'" '+dis+' /></div><div class="form-group"><label>Creation Date</label><input value="'+escapeHTML(t.createdAt?formatDateTime(t.createdAt):'New')+'" disabled /></div><div class="form-group"><label>Scheduled Date</label><input type="date" id="taskScheduledDate" value="'+escapeHTML(t.scheduledDate||'')+'" '+dis+' /></div><div class="form-group"><label>Scheduled Time</label><input type="time" id="taskScheduledTime" value="'+escapeHTML(t.scheduledTime||'')+'" '+dis+' /></div><div class="form-group"><label>Status</label><select id="taskStatus" '+dis+'><option value="pending" '+(t.status!=='completed'?'selected':'')+'>Pending</option><option value="completed" '+(t.status==='completed'?'selected':'')+'>Completed</option></select></div></div><div class="form-group"><label>Task Details</label><textarea id="taskDetails" rows="9" style="min-height:180px;" '+dis+'>'+escapeHTML(t.taskDetails||'')+'</textarea><div class="input-hint">Unlimited details can be added here.</div></div><div class="modal-actions">'+(!ro?'<button class="btn btn-primary" id="btnSaveTask"><i class="fas fa-save"></i> Save Task</button>':'')+(id&&t.status!=='completed'&&!ro?'<button class="btn btn-success" onclick="window._completeTaskFromForm(\''+id+'\')"><i class="fas fa-check"></i> Complete</button>':'')+'<button class="btn btn-outline" onclick="showTaskManager()">Back</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');var b=document.getElementById('btnSaveTask');if(b)b.onclick=async function(){var a=document.getElementById('taskAssignedTo').value,p=Object.assign({},t,{assignedTo:a,agentName:a,taskName:document.getElementById('taskName').value.trim(),folderInvoiceNo:document.getElementById('taskFolder').value.trim(),customerName:document.getElementById('taskCustomer').value.trim(),taskDetails:document.getElementById('taskDetails').value,scheduledDate:document.getElementById('taskScheduledDate').value,scheduledTime:document.getElementById('taskScheduledTime').value,status:document.getElementById('taskStatus').value});if(!p.taskName)return showToast('Task name is required.','error');await saveTask(p);showToast('Task saved and added to calendar.','success');showTaskManager()};window._completeTaskFromForm=function(x){updateTaskStatus(x,'completed')}}
+            async function showTaskManager(){if(!isAdmin()&&!hasPermission('canViewTaskHistory')&&!hasPermission('canCreateTasks'))return showToast('Permission denied.','error');var tasks=await loadTasks(),u=STATE.currentUser||{};if(!isAdmin())tasks=tasks.filter(function(t){return(t.assignedTo===u.username||t.agentName===u.username||t.createdBy===u.username)&&t.status!=='completed'});tasks.sort(function(a,b){return(a.status==='completed')-(b.status==='completed')||new Date(b.createdAt||0)-new Date(a.createdAt||0)});var opts=Object.keys(STATE.users||{}).map(function(k){return'<option value="'+k+'">'+escapeHTML((STATE.users[k].name||k)+' (@'+k+')')+'</option>'}).join('');showModal('<h3><i class="fas fa-list-check"></i> Task Manager '+(isAdmin()?'(All Agents)':'(Your Pending Tasks)')+'</h3><p class="text-muted text-sm">Completed tasks disappear from agent history but stay in admin history.</p><div class="task-toolbar">'+(_mrCanCreateTask()?'<button class="btn btn-primary" onclick="window._newTask()"><i class="fas fa-plus"></i> New Task</button>':'')+(_mrCanDeleteTask()?'<button class="btn btn-danger" onclick="window._deleteSelectedTasks()"><i class="fas fa-trash"></i> Delete Selected</button>':'')+'<input id="taskSearchInput" placeholder="Search task, customer, folder/invoice..." oninput="window._filterTasks()" style="flex:1;min-width:220px;" /><select id="taskStatusFilter" onchange="window._filterTasks()"><option value="">All Status</option><option value="pending">Pending</option><option value="completed">Completed</option></select><select id="taskAgentFilter" onchange="window._filterTasks()"><option value="">All Agents</option>'+opts+'</select><div class="date-input-wrap" style="min-width:160px;"><i class="fas fa-calendar-alt date-icon"></i><input type="text" class="smart-date smart-date-filter" id="taskDateFilter" placeholder="DD-MM-YYYY" maxlength="10" oninput="window._filterTasks()" /></div></div><div class="history-table-wrap"><table><thead><tr><th class="checkbox-cell"></th><th>Agent</th><th>Task</th><th>Folder/Invoice</th><th>Customer</th><th>Details</th><th>Created</th><th>Scheduled</th><th>Status</th><th>Actions</th></tr></thead><tbody id="taskTableBody">'+taskRows(tasks)+'</tbody></table></div><div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>');setTimeout(function(){_wireSmartDateInputs(document);},30);window._allTasks=tasks;window._filterTasks=function(){var q=(document.getElementById('taskSearchInput').value||'').toLowerCase(),st=document.getElementById('taskStatusFilter').value,ag=document.getElementById('taskAgentFilter').value,dt=document.getElementById('taskDateFilter').value,f=window._allTasks.filter(function(t){if(st&&t.status!==st)return false;if(ag&&(t.assignedTo!==ag&&t.agentName!==ag&&t.createdBy!==ag))return false;if(dt){var dtISO=_parseDateSmart(dt)||dt;if(t.scheduledDate!==dtISO)return false;}return!q||[t.taskName,t.folderInvoiceNo,t.customerName,t.taskDetails,t.assignedTo,t.agentName,t.createdBy].join(' ').toLowerCase().indexOf(q)!==-1});document.getElementById('taskTableBody').innerHTML=taskRows(f)};window._newTask=function(){showTaskForm(null)};window._editTask=function(id){showTaskForm(id)};window._viewTask=function(id){showTaskForm(id,true)};window._completeTask=function(id){updateTaskStatus(id,'completed')};window._deleteOneTask=function(id){if(!id)return;if(!window.confirm('Delete this task? This cannot be undone.'))return;deleteTasks([id]).catch(function(e){showToast('Delete failed: '+(e&&e.message||e),'error');})};window._deleteSelectedTasks=function(){var ids=Array.from(document.querySelectorAll('.task-check:checked')).map(function(c){return c.value});if(!ids.length)return showToast('No tasks selected.','warning');if(!window.confirm('Delete '+ids.length+' selected task(s)? This cannot be undone.'))return;deleteTasks(ids).catch(function(e){showToast('Delete failed: '+(e&&e.message||e),'error');});}}
+            async function showTaskForm(id,readOnly){var tasks=await loadTasks(),t=id?tasks.find(function(x){return x.id===id}):null;t=t||{status:'pending',scheduledDate:_mrToday(),scheduledTime:'09:00',assignedTo:(STATE.currentUser&&STATE.currentUser.username)||'',agentName:(STATE.currentUser&&STATE.currentUser.username)||''};var ro=readOnly||(!_mrCanEditTask(t)&&!!id),dis=ro?'disabled':'',opts=Object.keys(STATE.users||{}).map(function(k){return'<option value="'+k+'" '+(t.assignedTo===k?'selected':'')+'>'+escapeHTML((STATE.users[k].name||k)+' (@'+k+')')+'</option>'}).join('');showModal('<h3>'+(id?(ro?'View Task':'Edit Task'):'New Task')+'</h3><div class="form-row"><div class="form-group"><label>Agent Name</label><select id="taskAssignedTo" '+dis+'>'+opts+'</select></div><div class="form-group"><label>Task Name *</label><input id="taskName" value="'+escapeHTML(t.taskName||'')+'" '+dis+' /></div><div class="form-group"><label>Folder / Invoice No</label><input id="taskFolder" value="'+escapeHTML(t.folderInvoiceNo||'')+'" '+dis+' /></div><div class="form-group"><label>Customer Name</label><input id="taskCustomer" value="'+escapeHTML(t.customerName||'')+'" '+dis+' /></div><div class="form-group"><label>Creation Date</label><input value="'+escapeHTML(t.createdAt?formatDateTime(t.createdAt):'New')+'" disabled /></div><div class="form-group"><label>Scheduled Date</label><div class="date-input-wrap"><i class="fas fa-calendar-alt date-icon"></i><input type="text" class="smart-date smart-date-task" id="taskScheduledDate" placeholder="DD-MM-YYYY" maxlength="10" value="'+escapeHTML(t.scheduledDate ? formatDateDisplay(t.scheduledDate) : '')+'" '+dis+' /></div></div><div class="form-group"><label>Scheduled Time</label><input type="time" id="taskScheduledTime" value="'+escapeHTML(t.scheduledTime||'')+'" '+dis+' /></div><div class="form-group"><label>Status</label><select id="taskStatus" '+dis+'><option value="pending" '+(t.status!=='completed'?'selected':'')+'>Pending</option><option value="completed" '+(t.status==='completed'?'selected':'')+'>Completed</option></select></div></div><div class="form-group"><label>Task Details</label><textarea id="taskDetails" rows="9" style="min-height:180px;" '+dis+'>'+escapeHTML(t.taskDetails||'')+'</textarea><div class="input-hint">Unlimited details can be added here.</div></div><div class="modal-actions">'+(!ro?'<button class="btn btn-primary" id="btnSaveTask"><i class="fas fa-save"></i> Save Task</button>':'')+(id&&t.status!=='completed'&&!ro?'<button class="btn btn-success" onclick="window._completeTaskFromForm(\''+id+'\')"><i class="fas fa-check"></i> Complete</button>':'')+'<button class="btn btn-outline" onclick="showTaskManager()">Back</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');setTimeout(function(){_wireSmartDateInputs(document);},30);var b=document.getElementById('btnSaveTask');if(b)b.onclick=async function(){var a=document.getElementById('taskAssignedTo').value,p=Object.assign({},t,{assignedTo:a,agentName:a,taskName:document.getElementById('taskName').value.trim(),folderInvoiceNo:document.getElementById('taskFolder').value.trim(),customerName:document.getElementById('taskCustomer').value.trim(),taskDetails:document.getElementById('taskDetails').value,scheduledDate:(_parseDateSmart(document.getElementById('taskScheduledDate').value)||document.getElementById('taskScheduledDate').value),scheduledTime:document.getElementById('taskScheduledTime').value,status:document.getElementById('taskStatus').value});if(!p.taskName)return showToast('Task name is required.','error');await saveTask(p);showToast('Task saved and added to calendar.','success');showTaskManager()};window._completeTaskFromForm=function(x){updateTaskStatus(x,'completed')}}
             showCalendar=async function(offset){if(!isAdmin()&&!hasPermission('canViewCalendar'))return showToast('Permission denied.','error');if(_mrCalMonth===null)_mrCalMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);if(typeof offset==='number')_mrCalMonth=new Date(_mrCalMonth.getFullYear(),_mrCalMonth.getMonth()+offset,1);var y=_mrCalMonth.getFullYear(),m=_mrCalMonth.getMonth(),first=new Date(y,m,1),days=new Date(y,m+1,0).getDate(),cal=await readData('calendarTasks','ph_calendar_tasks')||{},tasks=await loadTasks(),html='<h3><i class="fas fa-calendar-days"></i> Calendar</h3><p class="text-muted text-sm">Click a date to add daily tasks, view scheduled tasks and portal activity logs.</p><div class="calendar-nav"><button class="btn btn-outline" onclick="window.showCalendar(-1)"><i class="fas fa-chevron-left"></i></button><h4>'+first.toLocaleString('en-GB',{month:'long',year:'numeric'})+'</h4><button class="btn btn-outline" onclick="window.showCalendar(1)"><i class="fas fa-chevron-right"></i></button></div><div class="calendar-grid">';['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(function(d){html+='<div class="text-muted text-sm text-center fw-700">'+d+'</div>'});for(var b=0;b<(first.getDay()+6)%7;b++)html+='<div></div>';for(var d=1;d<=days;d++){var date=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'),items=(cal[date]||[]).concat(tasks.filter(function(t){return t.scheduledDate===date}).map(function(t){return{text:(t.status==='completed'?'✓ ':'')+(t.taskName||'Task')+' — '+(t.assignedTo||'')}}));html+='<div class="calendar-day '+(date===_mrToday()?'today ':'')+(items.length?'has-task':'')+'" onclick="window.showCalendarDay(\''+date+'\')"><strong>'+d+'</strong>'+items.slice(0,4).map(function(t){return'<span class="calendar-pill">'+escapeHTML(t.text||'Task')+'</span>'}).join('')+(items.length>4?'<span class="calendar-pill">+'+(items.length-4)+' more</span>':'')+'</div>'}html+='</div><div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>';showModal(html)};
             showCalendarDay=async function(date){var cal=await readData('calendarTasks','ph_calendar_tasks')||{},day=cal[date]||[],tasks=(await loadTasks()).filter(function(t){return t.scheduledDate===date}),logs=_mrVals(await readData('activityLogs/'+date,'ph_activity_logs_'+date,true)||[]).sort(function(a,b){return new Date(b.timestamp||0)-new Date(a.timestamp||0)}),can=isAdmin()||hasPermission('canAddCalendarTasks');showModal('<h3>Calendar — '+safeDateDisplay(date)+'</h3>'+(can?'<div class="form-group"><label>Add Daily Task</label><textarea id="calTaskText" rows="3" placeholder="Daily task details..."></textarea></div><button class="btn btn-primary" onclick="window._saveCalTask(\''+date+'\')"><i class="fas fa-plus"></i> Add Daily Task</button>':'')+'<h4 class="mt-16">Daily Calendar Tasks</h4>'+(day.map(function(t){return'<div class="item-card"><strong>'+escapeHTML(t.text||'Task')+'</strong><div class="text-muted text-xs">'+(t.createdAt?formatDateTime(t.createdAt):'')+' by '+escapeHTML(t.user||'')+'</div></div>'}).join('')||'<p class="text-muted text-sm">No daily tasks.</p>')+'<h4 class="mt-16">Scheduled Agent Tasks</h4>'+(tasks.map(function(t){return'<div class="item-card"><div class="flex" style="justify-content:space-between;"><strong>'+escapeHTML(t.taskName||'Task')+'</strong><span class="task-status '+escapeHTML(t.status||'pending')+'">'+escapeHTML(t.status||'pending')+'</span></div><div class="text-sm">Agent: '+escapeHTML(t.assignedTo||t.agentName||'')+' · Folder/Invoice: '+escapeHTML(t.folderInvoiceNo||'')+' · Customer: '+escapeHTML(t.customerName||'')+'</div><div class="text-muted text-sm">'+escapeHTML((t.taskDetails||'').slice(0,220))+((t.taskDetails||'').length>220?'…':'')+'</div></div>'}).join('')||'<p class="text-muted text-sm">No scheduled agent tasks.</p>')+'<h4 class="mt-16">Portal Activity Log</h4>'+(logs.map(function(l){return'<div class="calendar-log"><strong>'+escapeHTML(l.name||l.user||'User')+'</strong> '+escapeHTML(l.action||'updated')+' <code>'+escapeHTML(l.path||'')+'</code> <span class="text-muted">'+formatTime(l.timestamp||'')+'</span></div>'}).join('')||'<p class="text-muted text-sm">No recorded portal activity for this date.</p>')+'<div class="modal-actions"><button class="btn btn-outline" onclick="window.showCalendar()">Back</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');window._saveCalTask=async function(dt){var text=(document.getElementById('calTaskText').value||'').trim();if(!text)return showToast('Enter a task.','warning');var all=await readData('calendarTasks','ph_calendar_tasks')||{};all[dt]=all[dt]||[];all[dt].push({id:genId(),text:text,user:(STATE.currentUser&&STATE.currentUser.username)||'',createdAt:getNowISO()});await writeData('calendarTasks',all,'ph_calendar_tasks');showToast('Calendar task saved.','success');showCalendarDay(dt)}};
             window.showCalendar=showCalendar;window.showCalendarDay=showCalendarDay;window.showTaskManager=showTaskManager;
+
+            // ----- Task delete / calendar delete / deleted-tasks view (patch) -----
+            // Mark tasks as deleted (moves them out of active tasks) AND strip their
+            // mirror entries from every calendar date so they disappear from the calendar.
+            async function _calMarkTaskDeleted(ids){
+                var all=await readData('tasks','ph_tasks',true)||{};
+                var cal=await readData('calendarTasks','ph_calendar_tasks')||{};
+                var now=getNowISO(), by=(STATE.currentUser&&STATE.currentUser.username)||'';
+                ids.forEach(function(id){
+                    if(all[id]){ all[id].deleted=true; all[id].deletedAt=now; all[id].deletedBy=by; }
+                    Object.keys(cal).forEach(function(d){
+                        if(Array.isArray(cal[d])) cal[d]=cal[d].filter(function(x){ return x && x.taskId!==id && x.id!==('task_'+id); });
+                    });
+                });
+                await writeData('tasks',all,'ph_tasks');
+                await writeData('calendarTasks',cal,'ph_calendar_tasks');
+            }
+
+            // Override deleteTasks so deletions also clear the task from calendar dates.
+            deleteTasks=async function(ids){
+                await _calMarkTaskDeleted(ids);
+                showToast('Deleted '+ids.length+' task(s). Moved to Deleted Tasks.','success');
+                showTaskManager();
+            };
+
+            async function loadDeletedTasks(){ return _mrVals(await readData('tasks','ph_tasks',true)||{}).filter(function(t){ return t&&t.deleted; }); }
+
+            async function showDeletedTasks(){
+                if(!isAdmin()&&!hasPermission('canDeleteTasks')&&!hasPermission('canViewTaskHistory')) return showToast('Permission denied.','error');
+                var list=await loadDeletedTasks(), u=STATE.currentUser||{};
+                if(!isAdmin()) list=list.filter(function(t){ return t.assignedTo===u.username||t.agentName===u.username||t.createdBy===u.username; });
+                list.sort(function(a,b){ return new Date(b.deletedAt||0)-new Date(a.deletedAt||0); });
+                var rows=list.map(function(t){
+                    return '<tr><td>'+escapeHTML(t.assignedTo||t.agentName||'')+'</td><td><strong>'+escapeHTML(t.taskName||'Task')+'</strong></td><td>'+escapeHTML(t.customerName||'')+'</td><td>'+safeDateDisplay(t.scheduledDate||'')+' '+escapeHTML(t.scheduledTime||'')+'</td><td>'+(t.deletedAt?formatDateTime(t.deletedAt):'')+'</td><td><div class="actions-cell"><button class="btn btn-sm btn-primary" onclick="window._viewDeletedTask(\''+t.id+'\')"><i class="fas fa-eye"></i></button>'+((isAdmin()||_mrCanDeleteTask())?'<button class="btn btn-sm btn-success" onclick="window._restoreTask(\''+t.id+'\')"><i class="fas fa-rotate-left"></i> Restore</button>':'')+'</div></td></tr>';
+                }).join('')||'<tr><td colspan="6" class="text-center text-muted">No deleted tasks.</td></tr>';
+                showModal('<h3><i class="fas fa-trash"></i> Deleted Tasks</h3><p class="text-muted text-sm">These tasks are hidden from active tasks and removed from their calendar dates. Restore to make them active again.</p><div class="history-table-wrap"><table><thead><tr><th>Agent</th><th>Task</th><th>Customer</th><th>Scheduled</th><th>Deleted</th><th>Actions</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="modal-actions"><button class="btn btn-outline" onclick="showTaskManager()">Back to Active Tasks</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');
+                window._viewDeletedTask=function(id){ showTaskForm(id,true); };
+                window._restoreTask=async function(id){
+                    var all=await readData('tasks','ph_tasks',true)||{};
+                    if(all[id]){ delete all[id].deleted; delete all[id].deletedAt; delete all[id].deletedBy; await writeData('tasks',all,'ph_tasks'); if(all[id].scheduledDate){ try{ await addTaskToCalendar(all[id]); }catch(_){} } }
+                    showToast('Task restored to active.','success');
+                    showDeletedTasks();
+                };
+            }
+            window.showDeletedTasks=showDeletedTasks;
+
+            // Add a "View Deleted" button to the Task Manager toolbar after it renders.
+            var _origShowTaskManagerForDeleted=showTaskManager;
+            showTaskManager=async function(){
+                await _origShowTaskManagerForDeleted.apply(this,arguments);
+                try{
+                    var tb=document.querySelector('.task-toolbar');
+                    if(tb&&(isAdmin()||_mrCanDeleteTask()||hasPermission('canViewTaskHistory'))&&!document.getElementById('btnViewDeletedTasks')){
+                        var b=document.createElement('button');
+                        b.id='btnViewDeletedTasks'; b.className='btn btn-outline';
+                        b.innerHTML='<i class="fas fa-trash"></i> View Deleted';
+                        b.onclick=function(){ showDeletedTasks(); };
+                        tb.appendChild(b);
+                    }
+                }catch(_){ }
+            };
+            window.showTaskManager=showTaskManager;
+
+            // Override calendar day view to include working delete buttons on each task.
+            showCalendarDay=async function(date){
+                var cal=await readData('calendarTasks','ph_calendar_tasks')||{};
+                var day=cal[date]||[];
+                var tasks=(await loadTasks()).filter(function(t){ return t.scheduledDate===date; });
+                var logs=_mrVals(await readData('activityLogs/'+date,'ph_activity_logs_'+date,true)||[]).sort(function(a,b){ return new Date(b.timestamp||0)-new Date(a.timestamp||0); });
+                var can=isAdmin()||hasPermission('canAddCalendarTasks');
+                var canDel=_mrCanDeleteTask();
+                var dailyHtml=day.map(function(t){
+                    var delBtn=canDel?'<button class="btn btn-sm btn-danger" title="Delete" onclick="window._deleteCalDailyTask(\''+date+'\',\''+t.id+'\')"><i class="fas fa-trash"></i></button>':'';
+                    return '<div class="item-card"><div class="flex" style="justify-content:space-between;align-items:flex-start;gap:8px;"><div><strong>'+escapeHTML(t.text||'Task')+'</strong><div class="text-muted text-xs">'+(t.createdAt?formatDateTime(t.createdAt):'')+' by '+escapeHTML(t.user||'')+'</div></div>'+delBtn+'</div></div>';
+                }).join('')||'<p class="text-muted text-sm">No daily tasks.</p>';
+                var schedHtml=tasks.map(function(t){
+                    var delBtn=canDel?'<button class="btn btn-sm btn-danger" title="Delete" onclick="window._deleteCalAgentTask(\''+date+'\',\''+t.id+'\')"><i class="fas fa-trash"></i> Delete</button>':'';
+                    return '<div class="item-card"><div class="flex" style="justify-content:space-between;"><strong>'+escapeHTML(t.taskName||'Task')+'</strong><span class="task-status '+escapeHTML(t.status||'pending')+'">'+escapeHTML(t.status||'pending')+'</span></div><div class="text-sm">Agent: '+escapeHTML(t.assignedTo||t.agentName||'')+' · Folder/Invoice: '+escapeHTML(t.folderInvoiceNo||'')+' · Customer: '+escapeHTML(t.customerName||'')+'</div><div class="text-muted text-sm">'+escapeHTML((t.taskDetails||'').slice(0,220))+((t.taskDetails||'').length>220?'…':'')+'</div>'+(delBtn?'<div class="item-actions">'+delBtn+'</div>':'')+'</div>';
+                }).join('')||'<p class="text-muted text-sm">No scheduled agent tasks.</p>';
+                var logsHtml=logs.map(function(l){ return '<div class="calendar-log"><strong>'+escapeHTML(l.name||l.user||'User')+'</strong> '+escapeHTML(l.action||'updated')+' <code>'+escapeHTML(l.path||'')+'</code> <span class="text-muted">'+formatTime(l.timestamp||'')+'</span></div>'; }).join('')||'<p class="text-muted text-sm">No recorded portal activity for this date.</p>';
+                showModal('<h3>Calendar — '+safeDateDisplay(date)+'</h3>'+(can?'<div class="form-group"><label>Add Daily Task</label><textarea id="calTaskText" rows="3" placeholder="Daily task details..."></textarea></div><button class="btn btn-primary" onclick="window._saveCalTask(\''+date+'\')"><i class="fas fa-plus"></i> Add Daily Task</button>':'')+'<h4 class="mt-16">Daily Calendar Tasks</h4>'+dailyHtml+'<h4 class="mt-16">Scheduled Agent Tasks</h4>'+schedHtml+'<h4 class="mt-16">Portal Activity Log</h4>'+logsHtml+'<div class="modal-actions"><button class="btn btn-outline" onclick="window.showCalendar()">Back</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');
+                window._saveCalTask=async function(dt){ var text=(document.getElementById('calTaskText').value||'').trim(); if(!text) return showToast('Enter a task.','warning'); var all=await readData('calendarTasks','ph_calendar_tasks')||{}; all[dt]=all[dt]||[]; all[dt].push({id:genId(),text:text,user:(STATE.currentUser&&STATE.currentUser.username)||'',createdAt:getNowISO()}); await writeData('calendarTasks',all,'ph_calendar_tasks'); showToast('Calendar task saved.','success'); showCalendarDay(dt); };
+                window._deleteCalDailyTask=async function(dt,id){ if(!confirm('Delete this task?')) return; var all=await readData('calendarTasks','ph_calendar_tasks')||{}; var entry=(all[dt]||[]).find(function(x){ return x.id===id; }); if(entry&&entry.taskId){ await _calMarkTaskDeleted([entry.taskId]); } else { all[dt]=(all[dt]||[]).filter(function(x){ return x.id!==id; }); await writeData('calendarTasks',all,'ph_calendar_tasks'); } showToast('Task deleted.','success'); showCalendarDay(dt); };
+                window._deleteCalAgentTask=async function(dt,id){ if(!confirm('Delete this task? It will move to Deleted Tasks.')) return; await _calMarkTaskDeleted([id]); showToast('Task deleted. Moved to Deleted Tasks.','success'); showCalendarDay(dt); };
+            };
+            window.showCalendarDay=showCalendarDay;
             async function checkTaskReminders(){if(!STATE.currentUser||isAdmin())return;var u=STATE.currentUser.username,today=_mrToday(),now=Date.now(),tasks=(await loadTasks()).filter(function(t){return t.status!=='completed'&&(t.assignedTo===u||t.agentName===u)&&(!t.scheduledDate||t.scheduledDate<=today)}),task=tasks.find(function(t){return parseInt(localStorage.getItem('ph_task_snooze_'+t.id)||'0',10)<now});if(!task||document.getElementById('taskReminderPopup'))return;_mrShownTask=task.id;var d=document.createElement('div');d.id='taskReminderPopup';d.className='task-reminder';d.innerHTML='<h4><i class="fas fa-bell"></i> Pending Task Reminder</h4><p><strong>'+escapeHTML(task.taskName||'Task')+'</strong></p><p class="text-sm">Customer: '+escapeHTML(task.customerName||'')+'<br>Folder/Invoice: '+escapeHTML(task.folderInvoiceNo||'')+'<br>Scheduled: '+safeDateDisplay(task.scheduledDate||'')+' '+escapeHTML(task.scheduledTime||'')+'</p><div class="task-reminder-actions"><button class="btn btn-success btn-sm" onclick="window._reminderCompleteTask()"><i class="fas fa-check"></i> Complete</button><select id="taskSnoozeSelect"><option value="5">Snooze 5 min</option><option value="15">Snooze 15 min</option><option value="30">Snooze 30 min</option><option value="60">Snooze 1 hour</option></select><button class="btn btn-outline btn-sm" onclick="window._reminderSnoozeTask()">Snooze</button></div>';document.body.appendChild(d);window._reminderCompleteTask=function(){updateTaskStatus(_mrShownTask,'completed')};window._reminderSnoozeTask=function(){var mins=parseInt(document.getElementById('taskSnoozeSelect').value||'5',10);localStorage.setItem('ph_task_snooze_'+_mrShownTask,String(Date.now()+mins*60000));var p=document.getElementById('taskReminderPopup');if(p)p.remove();showToast('Task reminder snoozed.','info')}}
             function startTaskReminderLoop(){if(_mrTaskPoll)clearInterval(_mrTaskPoll);_mrTaskPoll=setInterval(checkTaskReminders,60000);setTimeout(checkTaskReminders,2500)}
             function addTaskPerms(cls,checked,perms){return;}
@@ -15255,7 +15856,7 @@
                 }
                 function allFlags(){
                     var codes = words('AC AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CP CR CU CV CW CX CY CZ DE DG DJ DK DM DO DZ EA EC EE EG EH ER ES ET EU FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU IC ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TA TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM UN US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW');
-                    return codes.map(flagFromCode).concat(words('🏳️ 🏴 🏁 🚩 🏳️‍🌈 🏳️‍⚧️ 🏴‍☠️'));
+                    return codes.map(flagFromCode).concat(words('🏳️ 🏴 ��� 🚩 🏳️‍🌈 🏳️‍⚧️ 🏴‍☠️'));
                 }
                 function whatsappEmojiCategories(){
                     var handBases = words('👋 🤚 🖐️ ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 🖕 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 🫶 👐 🤲 🤝 🙏 ✍️ 💅 🤳 💪 🦾 🦿 🦵 🦶 👂 🦻 👃');
@@ -20265,7 +20866,8 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
                 newQuote:'canCreateQuotes', history:'canViewQuoteHistory', invoices:'canViewInvoices',
                 accountsMain:'canManageAccounts', inquiries:'canViewInquiries', users:'canManageUsers',
                 branding:'canManageBranding', conditions:'canManageConditions', invoiceConditions:'canManageConditions',
-                timeTable:'canManageUsers', calendar:'canViewCalendar', atol:'canCreateAtol'
+                timeTable:'canManageUsers', calendar:'canViewCalendar', atol:'canCreateAtol',
+                proBackground:'canManageProBackground'
             };
             var options = cards.filter(function(c){
                 if(isAdm) return true;
@@ -22370,6 +22972,10 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
 })();
 </script>
 <!-- ==== end PH-FIX v3 ==== -->
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 </body>
