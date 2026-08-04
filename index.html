@@ -692,155 +692,6 @@
             font-size: .7rem;
             font-weight: 600;
         }
-        /* ===== DASHBOARD CALENDAR WIDGET ===== */
-        .dash-cal-box {
-            background: var(--card);
-            border: 1px solid var(--card-border);
-            border-radius: 16px;
-            padding: 16px;
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(8px);
-            user-select: none;
-        }
-        .dash-cal-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
-        }
-        .dash-cal-title {
-            font-weight: 700;
-            font-size: .92rem;
-            color: var(--text);
-        }
-        .dash-cal-nav {
-            background: none;
-            border: 1px solid var(--card-border);
-            border-radius: 8px;
-            width: 28px;
-            height: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: var(--text2);
-            font-size: .72rem;
-            transition: background .2s, color .2s;
-        }
-        .dash-cal-nav:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
-        .dash-cal-dow-row {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 2px;
-            margin-bottom: 4px;
-        }
-        .dash-cal-dow-row span {
-            text-align: center;
-            font-size: .67rem;
-            font-weight: 700;
-            color: var(--text2);
-            padding: 3px 0;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-        }
-        .dash-cal-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 3px;
-        }
-        .dash-cal-cell {
-            aspect-ratio: 1/1;
-            border-radius: 8px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            padding: 4px 2px 2px;
-            cursor: pointer;
-            border: 1px solid transparent;
-            transition: background .15s, border-color .15s;
-            font-size: .75rem;
-            color: var(--text);
-            position: relative;
-            overflow: hidden;
-        }
-        .dash-cal-cell:hover { background: rgba(184,134,11,.13); border-color: var(--primary); }
-        .dash-cal-cell.today { outline: 2px solid var(--primary); outline-offset: -2px; font-weight: 800; color: var(--primary); }
-        .dash-cal-cell.selected { background: var(--primary); color: #fff !important; border-color: var(--primary); }
-        .dash-cal-cell.selected .dash-cal-dot { background: #fff; }
-        .dash-cal-cell.has-task .dash-cal-num { font-weight: 700; }
-        .dash-cal-dot {
-            width: 4px;
-            height: 4px;
-            border-radius: 50%;
-            background: var(--primary);
-            margin-top: 2px;
-            flex-shrink: 0;
-        }
-        .dash-cal-dot-multi {
-            display: flex;
-            gap: 2px;
-            margin-top: 2px;
-        }
-        .dash-cal-num { line-height: 1; }
-        .dash-cal-cell.empty { cursor: default; }
-        /* Day detail panel */
-        .dash-cal-panel-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px 0 6px;
-            border-top: 1px solid var(--card-border);
-            margin-top: 10px;
-            font-size: .85rem;
-            color: var(--text);
-        }
-        .dash-cal-task-item {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 8px;
-            padding: 6px 8px;
-            border-radius: 8px;
-            background: var(--input-bg);
-            margin-bottom: 5px;
-            border: 1px solid var(--card-border);
-            font-size: .78rem;
-            color: var(--text);
-        }
-        .dash-cal-task-text { flex: 1 1 0; min-width: 0; line-height: 1.35; }
-        .dash-cal-task-del {
-            background: none;
-            border: none;
-            color: var(--danger);
-            cursor: pointer;
-            font-size: .78rem;
-            padding: 2px 4px;
-            border-radius: 5px;
-            flex-shrink: 0;
-            opacity: .7;
-            transition: opacity .15s;
-        }
-        .dash-cal-task-del:hover { opacity: 1; background: rgba(192,57,43,.1); }
-        .dash-cal-task-badge {
-            display: inline-block;
-            font-size: .62rem;
-            padding: 1px 6px;
-            border-radius: 30px;
-            margin-left: 4px;
-            font-weight: 600;
-            vertical-align: middle;
-        }
-        .dash-cal-task-badge.pending { background: rgba(243,156,18,.18); color: #b8860b; }
-        .dash-cal-task-badge.completed { background: rgba(39,174,96,.18); color: var(--success); }
-        .dash-cal-empty-msg { font-size: .78rem; color: var(--text2); text-align: center; padding: 8px 0; }
-        /* Responsive: on small screens stack calendar below grid */
-        @media (max-width: 900px) {
-            #dashLayout { flex-direction: column !important; }
-            #dashCalendarWidget { flex: 1 1 auto !important; width: 100% !important; }
-        }
-        /* ===== END DASHBOARD CALENDAR WIDGET ===== */
-
         /* QUOTE BUILDER */
         #quoteBuilder {
             padding: 24px 32px 40px;
@@ -2074,7 +1925,7 @@
             flex: 0 0 auto !important;
         }
         .atol-protection-title {
-            margin: 5mm 0 2mm !important;
+            margin: 55mm 0 2mm !important;
         }
         @media print {
             .topbar,
@@ -2255,7 +2106,7 @@
         .call-selection-summary{padding:9px 12px;border:1px solid rgba(184,134,11,.22);border-radius:999px;background:rgba(184,134,11,.10);color:var(--text);font-size:.82rem;font-weight:700}
 
         /* ATOL certificate: fixed layout matching uploaded reference */
-        .atol-cert-wrap{font-family:Arial,Helvetica,sans-serif!important;background:#fff8cf!important;color:#000!important;width:184mm;min-height:262mm;margin:0 auto;padding:7mm 10mm 8mm!important;border:0!important;box-shadow:none!important;position:relative;overflow:hidden;font-size:10px;line-height:1.26;box-sizing:border-box}.atol-cert-wrap:before{display:none!important}.atol-watermark{position:absolute;z-index:0;left:53mm;top:3mm;width:142mm;height:142mm;border-radius:50%;border:18mm solid rgba(115,110,72,.09);transform:rotate(-28deg);pointer-events:none}.atol-watermark:before{content:'ATOL';position:absolute;left:18mm;top:31mm;font-size:31mm;font-weight:800;color:rgba(115,110,72,.10);letter-spacing:2mm}.atol-watermark:after{content:'CERTIFICATE';position:absolute;left:-6mm;top:72mm;font-size:17mm;font-weight:800;color:rgba(115,110,72,.09);letter-spacing:1mm}.atol-top-notice{border:2px solid #111;height:7mm;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-bottom:6mm;position:relative;z-index:1}.atol-cert-title{text-align:center;font-size:35px;font-weight:800;line-height:1;margin:0 0 5mm;letter-spacing:.5px;position:relative;z-index:1}.atol-confirm{text-align:center;font-size:12px;font-weight:800;margin:0 0 4mm;position:relative;z-index:1}.atol-desc{text-align:center;font-size:10px;margin:0 0 2mm;position:relative;z-index:1}.atol-main-box{border:2px solid #111;min-height:126mm;padding:4mm 3.5mm 2mm;position:relative;z-index:1;box-sizing:border-box}.atol-main-head{display:grid;grid-template-columns:1fr 1fr;gap:8mm;margin-bottom:5mm}.atol-field-title{font-weight:800;font-size:10.5px;margin-bottom:4mm}.atol-field-title.center{text-align:center}.atol-pre{white-space:pre-wrap;font-size:10px;line-height:1.28;margin:0}.atol-section-label{font-weight:800;font-size:10.5px;margin:5mm 0 4mm}.atol-flight-lines{min-height:25mm}.atol-hotel-lines{min-height:10mm}.atol-protection-title{text-align:center;font-size:18px;font-weight:400;margin:13mm 0 2mm}.atol-protection-text{font-size:10px;line-height:1.25}.atol-reg-box{border:2px solid #111;margin-top:4mm;padding:3mm;font-size:10px;line-height:1.24;position:relative;z-index:1}.atol-bottom-grid{display:grid;grid-template-columns:25mm 32mm 37mm 29mm 1fr;border-top:2px solid #111;border-left:2px solid #111;margin-top:4mm;position:relative;z-index:1}.atol-bottom-cell{border-right:2px solid #111;border-bottom:2px solid #111;text-align:center;min-height:10mm;display:flex;flex-direction:column;justify-content:center;padding:1mm;font-size:9px;box-sizing:border-box}.atol-bottom-cell strong{font-size:8.5px;line-height:1.05}.atol-bottom-cell span{display:block;margin-top:1mm}.atol-package{font-weight:800}.atol-page-bg{background:#fff8cf!important;padding:0!important}
+        .atol-cert-wrap{font-family:Arial,Helvetica,sans-serif!important;background:#fff8cf!important;color:#000!important;width:184mm;min-height:262mm;margin:0 auto;padding:7mm 10mm 8mm!important;border:0!important;box-shadow:none!important;position:relative;overflow:hidden;font-size:10px;line-height:1.26;box-sizing:border-box}.atol-cert-wrap:before{display:none!important}.atol-watermark{position:absolute;z-index:0;left:53mm;top:3mm;width:142mm;height:142mm;border-radius:50%;border:18mm solid rgba(115,110,72,.09);transform:rotate(-28deg);pointer-events:none}.atol-watermark:before{content:'ATOL';position:absolute;left:18mm;top:31mm;font-size:31mm;font-weight:800;color:rgba(115,110,72,.10);letter-spacing:2mm}.atol-watermark:after{content:'CERTIFICATE';position:absolute;left:-6mm;top:72mm;font-size:17mm;font-weight:800;color:rgba(115,110,72,.09);letter-spacing:1mm}.atol-top-notice{border:2px solid #111;height:7mm;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-bottom:6mm;position:relative;z-index:1}.atol-cert-title{text-align:center;font-size:35px;font-weight:800;line-height:1;margin:0 0 5mm;letter-spacing:.5px;position:relative;z-index:1}.atol-confirm{text-align:center;font-size:12px;font-weight:800;margin:0 0 4mm;position:relative;z-index:1}.atol-desc{text-align:center;font-size:10px;margin:0 0 2mm;position:relative;z-index:1}.atol-main-box{border:2px solid #111;min-height:126mm;padding:4mm 3.5mm 2mm;position:relative;z-index:1;box-sizing:border-box}.atol-main-head{display:grid;grid-template-columns:1fr 1fr;gap:8mm;margin-bottom:5mm}.atol-field-title{font-weight:800;font-size:10.5px;margin-bottom:4mm}.atol-field-title.center{text-align:center}.atol-pre{white-space:pre-wrap;font-size:10px;line-height:1.28;margin:0}.atol-section-label{font-weight:800;font-size:10.5px;margin:5mm 0 4mm}.atol-flight-lines{min-height:25mm}.atol-hotel-lines{min-height:10mm}.atol-protection-title{text-align:center;font-size:18px;font-weight:400;margin:65mm 0 2mm}.atol-protection-text{font-size:10px;line-height:1.25}.atol-reg-box{border:2px solid #111;margin-top:4mm;padding:3mm;font-size:10px;line-height:1.24;position:relative;z-index:1}.atol-bottom-grid{display:grid;grid-template-columns:25mm 32mm 37mm 29mm 1fr;border-top:2px solid #111;border-left:2px solid #111;margin-top:4mm;position:relative;z-index:1}.atol-bottom-cell{border-right:2px solid #111;border-bottom:2px solid #111;text-align:center;min-height:10mm;display:flex;flex-direction:column;justify-content:center;padding:1mm;font-size:9px;box-sizing:border-box}.atol-bottom-cell strong{font-size:8.5px;line-height:1.05}.atol-bottom-cell span{display:block;margin-top:1mm}.atol-package{font-weight:800}.atol-page-bg{background:#fff8cf!important;padding:0!important}
 
     
 
@@ -2263,7 +2114,7 @@
         .atol-page-bg{background:#fff8cf!important;width:210mm!important;min-height:297mm!important;margin:0!important;padding:0!important;overflow:hidden!important;box-sizing:border-box!important}
         .atol-cert-wrap{font-family:Arial,Helvetica,sans-serif!important;background:#fff8cf!important;color:#000!important;width:210mm!important;min-height:297mm!important;margin:0!important;padding:9mm 12mm 9mm!important;border:0!important;box-shadow:none!important;position:relative!important;overflow:hidden!important;font-size:11.5px!important;line-height:1.32!important;box-sizing:border-box!important}
         .atol-watermark{position:absolute!important;z-index:0!important;left:13mm!important;top:-10mm!important;width:190mm!important;height:165mm!important;border-radius:50%!important;border:13mm solid rgba(132,128,88,.145)!important;transform:rotate(-18deg)!important;pointer-events:none!important;box-sizing:border-box!important;background:transparent!important;opacity:1!important}
-        .atol-watermark:before,.atol-watermark:after{display:none!important}.atol-shape{position:absolute;left:62mm;top:15mm;width:68mm;height:88mm;background:rgba(132,128,88,.18);clip-path:polygon(45% 0,78% 0,59% 63%,91% 64%,82% 95%,22% 71%);}.atol-shape span{position:absolute;left:25mm;top:51mm;color:rgba(255,248,207,.82);font-weight:800;font-size:12mm;letter-spacing:1.5mm;transform:rotate(19deg)}.atol-disc{position:absolute;right:14mm;top:42mm;width:43mm;height:43mm;border-radius:50%;background:rgba(132,128,88,.18)}.atol-cert-word{position:absolute;left:2mm;bottom:13mm;width:176mm;text-align:center;color:rgba(132,128,88,.13);font-size:22mm;font-weight:700;letter-spacing:2.5mm}.atol-cert-left{position:absolute;left:-2mm;top:57mm;color:rgba(132,128,88,.13);font-size:18mm;font-weight:700;letter-spacing:1.5mm;writing-mode:vertical-rl;text-orientation:mixed}.atol-top-notice{border:2px solid #111!important;height:8mm!important;display:flex!important;align-items:center!important;justify-content:center!important;font-size:11px!important;font-weight:700!important;margin:0 0 7mm!important;position:relative!important;z-index:1!important;background:#fff8cf!important}.atol-cert-title{text-align:center!important;font-size:34px!important;font-weight:800!important;line-height:1!important;margin:0 0 6mm!important;letter-spacing:.5px!important;position:relative!important;z-index:1!important}.atol-confirm{text-align:center!important;font-size:12.5px!important;font-weight:800!important;margin:0 0 4mm!important;position:relative!important;z-index:1!important}.atol-desc{text-align:center!important;font-size:11px!important;margin:0 0 3mm!important;position:relative!important;z-index:1!important}.atol-main-box{border:2px solid #111!important;min-height:143mm!important;padding:4.5mm 4mm 2.5mm!important;position:relative!important;z-index:1!important;box-sizing:border-box!important;background:transparent!important}.atol-field-title{font-weight:800!important;font-size:11.5px!important;margin-bottom:4mm!important}.atol-field-title.center{text-align:center!important}.atol-pre{white-space:pre-wrap!important;font-size:11px!important;line-height:1.32!important;margin:0!important;font-family:Arial,Helvetica,sans-serif!important}.atol-main-head{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8mm!important;margin-bottom:5mm!important}.atol-section-label{font-weight:800!important;font-size:11.5px!important;margin:5mm 0 4mm!important}.atol-flight-lines{min-height:26mm!important}.atol-hotel-lines{min-height:10mm!important}.atol-protection-title{text-align:center!important;font-size:19px!important;font-weight:400!important;margin:14mm 0 2.5mm!important}.atol-protection-text{font-size:11px!important;line-height:1.31!important}.atol-reg-box{border:2px solid #111!important;margin-top:4mm!important;padding:3mm!important;font-size:10.8px!important;line-height:1.25!important;position:relative!important;z-index:1!important;background:#fff8cf!important}.atol-bottom-grid{display:grid!important;grid-template-columns:31mm 35mm 43mm 31mm 1fr!important;border-top:2px solid #111!important;border-left:2px solid #111!important;margin-top:4mm!important;position:relative!important;z-index:1!important}.atol-bottom-cell{border-right:2px solid #111!important;border-bottom:2px solid #111!important;text-align:center!important;min-height:11mm!important;display:flex!important;flex-direction:column!important;justify-content:center!important;padding:1mm!important;font-size:9.8px!important;box-sizing:border-box!important}.atol-bottom-cell strong{font-size:9.2px!important;line-height:1.05!important}.atol-bottom-cell span{display:block!important;margin-top:1mm!important}.atol-package{font-weight:800!important}
+        .atol-watermark:before,.atol-watermark:after{display:none!important}.atol-shape{position:absolute;left:62mm;top:15mm;width:68mm;height:88mm;background:rgba(132,128,88,.18);clip-path:polygon(45% 0,78% 0,59% 63%,91% 64%,82% 95%,22% 71%);}.atol-shape span{position:absolute;left:25mm;top:51mm;color:rgba(255,248,207,.82);font-weight:800;font-size:12mm;letter-spacing:1.5mm;transform:rotate(19deg)}.atol-disc{position:absolute;right:14mm;top:42mm;width:43mm;height:43mm;border-radius:50%;background:rgba(132,128,88,.18)}.atol-cert-word{position:absolute;left:2mm;bottom:13mm;width:176mm;text-align:center;color:rgba(132,128,88,.13);font-size:22mm;font-weight:700;letter-spacing:2.5mm}.atol-cert-left{position:absolute;left:-2mm;top:57mm;color:rgba(132,128,88,.13);font-size:18mm;font-weight:700;letter-spacing:1.5mm;writing-mode:vertical-rl;text-orientation:mixed}.atol-top-notice{border:2px solid #111!important;height:8mm!important;display:flex!important;align-items:center!important;justify-content:center!important;font-size:11px!important;font-weight:700!important;margin:0 0 7mm!important;position:relative!important;z-index:1!important;background:#fff8cf!important}.atol-cert-title{text-align:center!important;font-size:34px!important;font-weight:800!important;line-height:1!important;margin:0 0 6mm!important;letter-spacing:.5px!important;position:relative!important;z-index:1!important}.atol-confirm{text-align:center!important;font-size:12.5px!important;font-weight:800!important;margin:0 0 4mm!important;position:relative!important;z-index:1!important}.atol-desc{text-align:center!important;font-size:11px!important;margin:0 0 3mm!important;position:relative!important;z-index:1!important}.atol-main-box{border:2px solid #111!important;min-height:143mm!important;padding:4.5mm 4mm 2.5mm!important;position:relative!important;z-index:1!important;box-sizing:border-box!important;background:transparent!important}.atol-field-title{font-weight:800!important;font-size:11.5px!important;margin-bottom:4mm!important}.atol-field-title.center{text-align:center!important}.atol-pre{white-space:pre-wrap!important;font-size:11px!important;line-height:1.32!important;margin:0!important;font-family:Arial,Helvetica,sans-serif!important}.atol-main-head{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8mm!important;margin-bottom:5mm!important}.atol-section-label{font-weight:800!important;font-size:11.5px!important;margin:5mm 0 4mm!important}.atol-flight-lines{min-height:26mm!important}.atol-hotel-lines{min-height:10mm!important}.atol-protection-title{text-align:center!important;font-size:19px!important;font-weight:400!important;margin:68mm 0 2.5mm!important}.atol-protection-text{font-size:11px!important;line-height:1.31!important}.atol-reg-box{border:2px solid #111!important;margin-top:4mm!important;padding:3mm!important;font-size:10.8px!important;line-height:1.25!important;position:relative!important;z-index:1!important;background:#fff8cf!important}.atol-bottom-grid{display:grid!important;grid-template-columns:31mm 35mm 43mm 31mm 1fr!important;border-top:2px solid #111!important;border-left:2px solid #111!important;margin-top:4mm!important;position:relative!important;z-index:1!important}.atol-bottom-cell{border-right:2px solid #111!important;border-bottom:2px solid #111!important;text-align:center!important;min-height:11mm!important;display:flex!important;flex-direction:column!important;justify-content:center!important;padding:1mm!important;font-size:9.8px!important;box-sizing:border-box!important}.atol-bottom-cell strong{font-size:9.2px!important;line-height:1.05!important}.atol-bottom-cell span{display:block!important;margin-top:1mm!important}.atol-package{font-weight:800!important}
 
 
 
@@ -6450,8 +6301,6 @@
                 var icon = document.querySelector('#themeToggle i');
                 if (icon) icon.className = 'fas fa-palette';
             }
-            // Expose so outer applyMode IIFE can call it directly
-            window.applyCustomThemeImage = applyCustomThemeImage;
             function saveCustomTheme(imgData, meta) {
                 if (!imgData) { showToast('Please upload a wallpaper first.', 'warning'); return false; }
                 applyCustomThemeImage(imgData, meta);
@@ -7667,7 +7516,7 @@
                         '<div class="form-group"><label>Currency</label><select id="brandCurrency"><option value="GBP" ' +
                         (data.currency === 'GBP' ? 'selected' : '') + '>GBP (£)</option><option value="USD" ' +
                         (data.currency === 'USD' ? 'selected' : '') + '>USD ($)</option><option value="EUR" ' +
-                        (data.currency === 'EUR' ? 'selected' : '') + '>EUR (€)</option><option value="PKR" ' + (data.currency === 'PKR' ? 'selected' : '') + '>PKR (���)</option><option value="SAR" ' + (data.currency === 'SAR' ? 'selected' : '') + '>Saudi Riyal (﷼)</option></select></div>' +
+                        (data.currency === 'EUR' ? 'selected' : '') + '>EUR (€)</option><option value="PKR" ' + (data.currency === 'PKR' ? 'selected' : '') + '>PKR (₨)</option><option value="SAR" ' + (data.currency === 'SAR' ? 'selected' : '') + '>Saudi Riyal (﷼)</option></select></div>' +
                         '<div class="form-group"><label>Company Logo</label><input type="file" id="brandLogoInput" accept=".jpg,.jpeg,.png,.svg,.gif" /><div class="input-hint">Upload a logo (recommended: 200x80px).</div><div id="brandLogoPreview" style="display:flex;align-items:center;gap:12px;margin-top:4px;"><img id="brandLogoImg" src="' +
                         (data.logo ||
                             'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2250%22 viewBox=%220 0 80 50%22%3E%3Crect width=%2280%22 height=%2250%22 rx=%228%22 fill=%22%23b8860b%22/%3E%3Ctext x=%2218%22 y=%2235%22 font-family=%22serif%22 font-size=%2228%22 fill=%22%23fff%22 font-weight=%22bold%22%3EPH%3C/text%3E%3C/svg%3E'
@@ -10754,7 +10603,7 @@
                 if (_chatLiveListener) { try { _chatLiveListener.off(); } catch(_){} }
                 _lastChatNotifyTs = Date.now();
                 _chatLiveListener = db.ref('chatMessages');
-                _chatLiveListener.on('value', function(snap){ var data=snap.val()||{}, count=0, newest=null; Object.keys(data).forEach(function(k){ var m=data[k]||{}; if(m.deleted) return; var incoming=(m.to===STATE.currentUser.username && m.from!==STATE.currentUser.username && !m.read); if(incoming){ count++; var ts=new Date(m.timestamp||0).getTime(); if(ts>_lastChatNotifyTs) newest=m; } }); var badge=document.getElementById('chatNotifyBadge'); if(badge){ if(count>0){ badge.style.display='inline-flex'; badge.textContent=count; } else { badge.style.display='none'; /* never write "0" as textContent */ } } if(newest){ _lastChatNotifyTs=Date.now(); showToast('New message from '+(newest.from||'user'), 'info', 5000); try { if (Notification && Notification.permission === 'default') Notification.requestPermission(); if (Notification && Notification.permission === 'granted') new Notification('New portal message', { body: (newest.from||'User') + ': ' + (newest.message || '[Image]') }); } catch(_){} } });
+                _chatLiveListener.on('value', function(snap){ var data=snap.val()||{}, count=0, newest=null; Object.keys(data).forEach(function(k){ var m=data[k]||{}; if(m.deleted) return; var incoming=(m.to===STATE.currentUser.username && m.from!==STATE.currentUser.username && !m.read); if(incoming){ count++; var ts=new Date(m.timestamp||0).getTime(); if(ts>_lastChatNotifyTs) newest=m; } }); var badge=document.getElementById('chatNotifyBadge'); if(badge){ badge.style.display=count?'inline-flex':'none'; badge.textContent=count; } if(newest){ _lastChatNotifyTs=Date.now(); showToast('New message from '+(newest.from||'user'), 'info', 5000); try { if (Notification && Notification.permission === 'default') Notification.requestPermission(); if (Notification && Notification.permission === 'granted') new Notification('New portal message', { body: (newest.from||'User') + ': ' + (newest.message || '[Image]') }); } catch(_){} } });
             }
             async function sendChatMessage(toUser, message, groupId, attachment) {
                 var user=STATE.currentUser; if(!user) return; var now=getNowISO(); var participants=groupId?[]:[user.username,toUser].sort(); var data={from:user.username,to:groupId?'group':toUser,message:message||'',type:attachment?attachment.type:'text',attachment:attachment||null,timestamp:now,read:false,groupId:groupId||null,participants:participants,conversationKey:groupId?'group_'+groupId:participants.join('__'),deleted:false}; var key=await pushData('chatMessages',data,'ph_chat_messages'); if(key && toUser) await writeData('chatNotifications/'+toUser+'/'+key,{from:user.username,message:message||'',timestamp:now,read:false},null); showToast(attachment?'Image sent.':'Message sent.','success'); if(STATE.activeChatUser||STATE.activeChatGroup) loadChatMessages(); }
@@ -10882,9 +10731,11 @@
                 var shell = document.getElementById('appShell');
                 shell.style.display = 'flex';
                 shell.classList.add('visible');
-                document.getElementById('userNameDisplay').textContent = user.name || user.username;
+                var _savedUn = (user.userName || '').toString().trim();
+                var _shownName = _savedUn || user.name || user.username;
+                document.getElementById('userNameDisplay').textContent = _shownName;
                 document.getElementById('userRoleDisplay').textContent = (user.role || 'agent').toUpperCase();
-                document.getElementById('dashWelcomeName').textContent = user.name || user.username;
+                document.getElementById('dashWelcomeName').textContent = _shownName;
 
                 if (user.role !== 'admin') {
                     document.getElementById('dashUsers').style.display = 'none';
@@ -10984,7 +10835,8 @@
                     var roleEl = document.getElementById('userRoleDisplay');
                     if (roleEl) roleEl.textContent = (user.role || 'agent').toUpperCase();
                     var nameEl = document.getElementById('userNameDisplay');
-                    if (nameEl) nameEl.textContent = user.name || user.username;
+                    var _un2 = (user.userName || '').toString().trim();
+                    if (nameEl) nameEl.textContent = _un2 || user.name || user.username;
                 } catch (_) {}
                 try {
                     var dashUsers = document.getElementById('dashUsers');
@@ -11072,24 +10924,7 @@
                 if(STATE.currentUser&&!isAdmin()){var cal=grid.querySelector('.dash-card[data-action="calendar"]'),tsk=grid.querySelector('.dash-card[data-action="tasks"]');if(cal)cal.style.display=hasPermission('canViewCalendar')?'block':'none';if(tsk)tsk.style.display=(hasPermission('canViewTaskHistory')||hasPermission('canCreateTasks'))?'block':'none';}if(typeof sortDashboardCardsAlphabetically==='function')sortDashboardCardsAlphabetically();}
                 catch(_){}}
             function ensureNotificationUI(){ensureMuleDashboardCards();/* Legacy second bell removed - the mr-new-theme #mrNotifyBtn is the single bell. */ try{var old=document.getElementById('chatTopNotifyBtn'); if(old && old.parentNode) old.parentNode.removeChild(old);}catch(_){}}
-            function _mrSetBadge(n){
-                n = parseInt(n,10) || 0;
-                ensureNotificationUI();
-                // Guard: only update DOM when count actually changes (prevents flicker)
-                if(typeof window.__phLastBadgeN !== 'undefined' && window.__phLastBadgeN === n) return;
-                window.__phLastBadgeN = n;
-                ['chatNotifyBadge','chatCardNotifyBadge'].forEach(function(id){
-                    var e=document.getElementById(id);
-                    if(!e) return;
-                    if(n > 0){
-                        e.style.display='inline-flex';
-                        e.textContent=n;
-                    } else {
-                        e.style.display='none';
-                        // Do NOT set textContent to 0 — avoids "Chat 0" showing briefly
-                    }
-                });
-            }
+            function _mrSetBadge(n){ensureNotificationUI();['chatNotifyBadge','chatCardNotifyBadge'].forEach(function(id){var e=document.getElementById(id);if(e){e.style.display=n?'inline-flex':'none';e.textContent=n}})}
             function _mrIncoming(all){var u=STATE.currentUser;if(!u)return[];return _mrVals(all).filter(function(m){if(!m||m.deleted||m.from===u.username)return false;if(m.groupId)return(m.members||[]).indexOf(u.username)!==-1&&!(m.readBy&&m.readBy[u.username]);return m.to===u.username&&!m.read})}
 
             function _chatMessageId(m){return m&&(m._key||m._id||m.id||'')}
@@ -11198,20 +11033,8 @@
                 var logsHtml=logs.map(function(l){ return '<div class="calendar-log"><strong>'+escapeHTML(l.name||l.user||'User')+'</strong> '+escapeHTML(l.action||'updated')+' <code>'+escapeHTML(l.path||'')+'</code> <span class="text-muted">'+formatTime(l.timestamp||'')+'</span></div>'; }).join('')||'<p class="text-muted text-sm">No recorded portal activity for this date.</p>';
                 showModal('<h3>Calendar — '+safeDateDisplay(date)+'</h3>'+(can?'<div class="form-group"><label>Add Daily Task</label><textarea id="calTaskText" rows="3" placeholder="Daily task details..."></textarea></div><button class="btn btn-primary" onclick="window._saveCalTask(\''+date+'\')"><i class="fas fa-plus"></i> Add Daily Task</button>':'')+'<h4 class="mt-16">Daily Calendar Tasks</h4>'+dailyHtml+'<h4 class="mt-16">Scheduled Agent Tasks</h4>'+schedHtml+'<h4 class="mt-16">Portal Activity Log</h4>'+logsHtml+'<div class="modal-actions"><button class="btn btn-outline" onclick="window.showCalendar()">Back</button><button class="btn btn-close-modal" data-close-modal>Close</button></div>');
                 window._saveCalTask=async function(dt){ var text=(document.getElementById('calTaskText').value||'').trim(); if(!text) return showToast('Enter a task.','warning'); var all=await readData('calendarTasks','ph_calendar_tasks')||{}; all[dt]=all[dt]||[]; all[dt].push({id:genId(),text:text,user:(STATE.currentUser&&STATE.currentUser.username)||'',createdAt:getNowISO()}); await writeData('calendarTasks',all,'ph_calendar_tasks'); showToast('Calendar task saved.','success'); showCalendarDay(dt); };
-                window._deleteCalDailyTask=async function(dt,id){
-                    try{
-                        var all=await readData('calendarTasks','ph_calendar_tasks')||{};
-                        var entry=(all[dt]||[]).find(function(x){ return x.id===id; });
-                        if(entry&&entry.taskId){ await _calMarkTaskDeleted([entry.taskId]); }
-                        else { all[dt]=(all[dt]||[]).filter(function(x){ return x.id!==id; }); await writeData('calendarTasks',all,'ph_calendar_tasks'); }
-                        showToast('Task deleted.','success'); showCalendarDay(dt);
-                    }catch(e){ showToast('Delete failed.','error'); }
-                };
-                window._deleteCalAgentTask=async function(dt,id){
-                    try{
-                        await _calMarkTaskDeleted([id]); showToast('Task deleted.','success'); showCalendarDay(dt);
-                    }catch(e){ showToast('Delete failed.','error'); }
-                };
+                window._deleteCalDailyTask=async function(dt,id){ if(!confirm('Delete this task?')) return; var all=await readData('calendarTasks','ph_calendar_tasks')||{}; var entry=(all[dt]||[]).find(function(x){ return x.id===id; }); if(entry&&entry.taskId){ await _calMarkTaskDeleted([entry.taskId]); } else { all[dt]=(all[dt]||[]).filter(function(x){ return x.id!==id; }); await writeData('calendarTasks',all,'ph_calendar_tasks'); } showToast('Task deleted.','success'); showCalendarDay(dt); };
+                window._deleteCalAgentTask=async function(dt,id){ if(!confirm('Delete this task? It will move to Deleted Tasks.')) return; await _calMarkTaskDeleted([id]); showToast('Task deleted. Moved to Deleted Tasks.','success'); showCalendarDay(dt); };
             };
             window.showCalendarDay=showCalendarDay;
             async function checkTaskReminders(){if(!STATE.currentUser||isAdmin())return;var u=STATE.currentUser.username,today=_mrToday(),now=Date.now(),tasks=(await loadTasks()).filter(function(t){return t.status!=='completed'&&(t.assignedTo===u||t.agentName===u)&&(!t.scheduledDate||t.scheduledDate<=today)}),task=tasks.find(function(t){return parseInt(localStorage.getItem('ph_task_snooze_'+t.id)||'0',10)<now});if(!task||document.getElementById('taskReminderPopup'))return;_mrShownTask=task.id;var d=document.createElement('div');d.id='taskReminderPopup';d.className='task-reminder';d.innerHTML='<h4><i class="fas fa-bell"></i> Pending Task Reminder</h4><p><strong>'+escapeHTML(task.taskName||'Task')+'</strong></p><p class="text-sm">Customer: '+escapeHTML(task.customerName||'')+'<br>Folder/Invoice: '+escapeHTML(task.folderInvoiceNo||'')+'<br>Scheduled: '+safeDateDisplay(task.scheduledDate||'')+' '+escapeHTML(task.scheduledTime||'')+'</p><div class="task-reminder-actions"><button class="btn btn-success btn-sm" onclick="window._reminderCompleteTask()"><i class="fas fa-check"></i> Complete</button><select id="taskSnoozeSelect"><option value="5">Snooze 5 min</option><option value="15">Snooze 15 min</option><option value="30">Snooze 30 min</option><option value="60">Snooze 1 hour</option></select><button class="btn btn-outline btn-sm" onclick="window._reminderSnoozeTask()">Snooze</button></div>';document.body.appendChild(d);window._reminderCompleteTask=function(){updateTaskStatus(_mrShownTask,'completed')};window._reminderSnoozeTask=function(){var mins=parseInt(document.getElementById('taskSnoozeSelect').value||'5',10);localStorage.setItem('ph_task_snooze_'+_mrShownTask,String(Date.now()+mins*60000));var p=document.getElementById('taskReminderPopup');if(p)p.remove();showToast('Task reminder snoozed.','info')}}
@@ -15186,10 +15009,13 @@
                         first = parts.shift() || '';
                         last = parts.join(' ');
                     }
+                    /* Saved "User Name" from Profile tab wins over everything else. */
+                    var savedUserName = (user.userName || '').toString().trim();
+                    var displayVal = savedUserName || (first + ' ' + last).trim() || user.name || fallback || user.username || 'User';
                     return {
                         first: first,
                         last: last,
-                        display: String((first + ' ' + last).trim() || user.name || fallback || user.username || 'User')
+                        display: String(displayVal)
                     };
                 }
 
@@ -15305,6 +15131,7 @@
                         '<button class="btn btn-sm btn-outline" id="btnClearProfilePhoto" type="button"><i class="fas fa-image-slash"></i> Clear Photo</button></div>' +
                         '<div class="input-hint">Profile photos are compressed before saving and appear in team chat.</div></div></div>' +
                         '<div class="profile-grid">' +
+                        '<div class="form-group"><label>User Name</label><input type="text" id="profileUserName" value="' + escapeHTML(user.userName || '') + '" placeholder="Displayed name (e.g. John)" /></div>' +
                         '<div class="form-group"><label>First Name</label><input type="text" id="profileFirstName" value="' + escapeHTML(names.first) + '" /></div>' +
                         '<div class="form-group"><label>Last Name</label><input type="text" id="profileLastName" value="' + escapeHTML(names.last) + '" /></div>' +
                         '<div class="form-group"><label>Telephone Number</label><input type="tel" id="profileTelephone" value="' + escapeHTML(user.telephone || user.phone || '') + '" /></div>' +
@@ -15382,6 +15209,8 @@
                 async function _profileSaveMine(){
                     if (!STATE.currentUser) return;
                     var me = STATE.currentUser.username;
+                    var userNameEl = document.getElementById('profileUserName');
+                    var userNameVal = userNameEl ? (userNameEl.value || '').trim() : '';
                     var first = (document.getElementById('profileFirstName').value || '').trim();
                     var last = (document.getElementById('profileLastName').value || '').trim();
                     var email = (document.getElementById('profileEmail').value || '').trim();
@@ -15390,13 +15219,16 @@
                     var preset = document.getElementById('profileStatusPreset').value;
                     var custom = (document.getElementById('profileStatusCustom').value || '').trim();
                     var status = preset === 'custom' ? (custom || 'Available') : preset;
-                    var displayName = (first + ' ' + last).trim() || (STATE.currentUser.name || me);
+                    /* User Name overrides display name. Falls back to First+Last, then existing name/username. */
+                    var displayName = userNameVal || (first + ' ' + last).trim() || (STATE.currentUser.name || me);
                     var users = await _profileLoadUsers();
                     var old = users[me] || {};
                     var next = Object.assign({}, old, {
+                        userName: userNameVal,
                         firstName: first,
                         lastName: last,
                         name: displayName,
+                        displayName: displayName,
                         email: email,
                         telephone: telephone,
                         phone: telephone,
@@ -16050,7 +15882,7 @@
                         { name: 'Travel', icon: '🚗', emojis: unique(cpRange(0x1F680,0x1F6FF).concat(cpRange(0x1F300,0x1F320), words('⌚ ⌛ ⏩ ⏪ ⏫ ⏬ ⏰ ⏱️ ⏲️ 🕰️ 🗺️ 🗿 🛕 🛖 🛻 🛞 🛟 🛝 🛤️ 🛣️ 🏔️ 🏕️ 🏖️ 🏜️ 🏝️ 🏞️ 🏟️ 🏛️ 🏗️ 🏘️ 🏚️ 🏠 🏡 🏢 🏣 🏤 🏥 🏦 🏨 🏩 🏪 🏫 🏬 🏭 🏯 🏰 💒 🗼 🗽 ⛪ 🕌 🛐 🕍 ⛩️ 🕋 ⛲ ⛺ 🌋 🌁 🌃 🌄 🌅 🌆 🌇 🌉 ♨️ 🎠 🎡 🎢 💈 🎪 🚂 🚃 🚄 🚅 🚆 🚇 🚈 🚉 🚊 🚝 🚞 🚋 🚌 🚍 🚎 🚐 🚑 🚒 🚓 🚔 🚕 🚖 🚗 🚘 🚙 🚚 🚛 🚜 🏎️ 🏍️ 🛵 🦽 🦼 🛺 🚲 🛴 🛹 🛼 🚏 ⛽ 🛢️ 🚨 🚥 🚦 🛑 🚧 ⚓ ⛵ 🛶 🚤 🛳️ ⛴️ 🚢 ✈️ 🛩️ 🛫 🛬 🪂 💺 🚁 🚟 🚠 🚡 🛰️ 🚀 🛸')))},
                         { name: 'Activities', icon: '⚽', emojis: unique(cpRange(0x1F380,0x1F3FF).concat(words('⚽ ⚾ 🥎 🏀 🏐 🏈 🏉 🎾 🥏 🎳 🏏 🏑 🏒 🥍 🏓 🏸 🥊 🥋 🥅 ⛳ ⛸️ 🎣 🤿 🎽 🎿 🛷 🥌 🎯 🪀 🪁 🔫 🎱 🔮 🪄 🎮 🕹️ 🎰 🎲 🧩 🧸 🪅 🪩 🪆 ♠️ ♥️ ♦️ ♣️ ♟️ 🃏 🀄 🎴 🎭 🖼️ 🎨 🧵 🪡 🧶 🪢')))},
                         { name: 'Objects', icon: '💡', emojis: unique(cpRange(0x1F4A0,0x1F5FF).concat(words('🪬 🧿 🪧 🪪 🩼 🩺 🩻 🪮 🪭 🧰 🧲 🧪 🧫 🧬 🧯 🧴 🧵 🧶 🧷 🧹 🧺 🧻 🧼 🧽 🧾 🧸 🪆 🪔 🪄 🪅 🪩 🪫 🪙 🪃 🪚 🪛 🪝 🪜 🪠 🪤 🪞 🪟 🪑 🪒 🪓 🪦 🪧 🛒 🛍️ 🛎️ 🛏️ 🛋️ 🚪 🪵 🪨 🛗 🪥 🪣 🪄')))},
-                        { name: 'Symbols', icon: '❤️', emojis: unique(cpRange(0x2600,0x27BF).concat(cpRange(0x1F7E0,0x1F7FF), words('❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 ❤️‍🔥 ❤️‍🩹 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ☮️ ✝️ ☪️ 🕉️ ☸️ ✡️ 🔯 🕎 ☯️ ☦️ 🛐 ⛎ ♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓ 🆔 ⚛️ 🉑 ☢️ ☣️ 📴 📳 🈶 🈚 🈸 🈺 🈷️ ✴️ 🆚 💮 🉐 ㊙️ ㊗️ 🈴 🈵 🈹 🈲 🅰️ 🅱️ 🆎 🆑 🅾️ 🆘 ❌ ⭕ 🛑 ⛔ 📛 🚫 💯 💢 ♨️ 🚷 🚯 🚳 🚱 🔞 📵 🚭 ❗ ❕ ❓ ❔ ‼️ ⁉️ 🔅 🔆 〽️ ⚠️ 🚸 🔱 ⚜️ 🔰 ♻️ ✅ 🈯 💹 ❇️ ✳️ ❎ 🌐 💠 Ⓜ️ 🌀 💤 🏧 🚾 ♿ 🅿️ 🛗 🈳 🈂️ 🛂 🛃 🛄 🛅 🚹 🚺 🚼 ⚧️ 🚻 🚮 🎦 📶 🈁 🔣 ℹ️ 🔤 🔡 🔠 🆖 🆗 🆙 🆒 🆕 🆓 0️⃣ 1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ 6️⃣ 7️⃣ 8️⃣ 9️⃣ 🔟 🔢 #️⃣ *️⃣ ▶️ ⏸️ ⏯️ ⏹️ ⏺️ ⏭️ ⏮️ ⏩ ⏪ 🔀 🔁 🔂 ◀️ 🔼 🔽 ⏫ ⏬ ➡️ ⬅️ ⬆️ ⬇️ ↗️ ↘️ ↙️ ↖️ ↕️ ↔️ ↪️ ↩️ ⤴️ ⤵️ 🔃 🔄 🔙 🔚 🔛 🔜 🔝 🛐 ⚕️ ♾️ ✔️ ➕ ➖ ➗ ✖️ 🟰 💲 💱 ™️ ©️ ®️ 〰️ ➰ ➿ 🔘 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ 🟤 ��� 🔻 🔸 🔹 🔶 🔷 🔳 🔲 ▪️ ▫️ ◾ ◽ ◼️ ◻️ 🟥 🟧 🟨 🟩 🟦 🟪 ⬛ ⬜ 🟫')))},
+                        { name: 'Symbols', icon: '❤️', emojis: unique(cpRange(0x2600,0x27BF).concat(cpRange(0x1F7E0,0x1F7FF), words('❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 ❤️‍🔥 ❤️‍🩹 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ☮️ ✝️ ☪️ 🕉️ ☸️ ✡️ 🔯 🕎 ☯️ ☦️ 🛐 ⛎ ♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓ 🆔 ⚛️ 🉑 ☢️ ☣️ 📴 📳 🈶 🈚 🈸 🈺 🈷️ ✴️ 🆚 💮 🉐 ㊙️ ㊗️ 🈴 🈵 🈹 🈲 🅰️ 🅱️ 🆎 🆑 🅾️ 🆘 ❌ ⭕ 🛑 ⛔ 📛 🚫 💯 💢 ♨️ 🚷 🚯 🚳 🚱 🔞 📵 🚭 ❗ ❕ ❓ ❔ ‼️ ⁉️ 🔅 🔆 〽️ ⚠️ 🚸 🔱 ⚜️ 🔰 ♻️ ✅ 🈯 💹 ❇️ ✳️ ❎ 🌐 💠 Ⓜ️ 🌀 💤 🏧 🚾 ♿ 🅿️ 🛗 🈳 🈂️ 🛂 🛃 🛄 🛅 🚹 🚺 🚼 ⚧️ 🚻 🚮 🎦 📶 🈁 🔣 ℹ️ 🔤 🔡 🔠 🆖 🆗 🆙 🆒 🆕 🆓 0️⃣ 1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ 6️⃣ 7️⃣ 8️⃣ 9️⃣ 🔟 🔢 #️⃣ *️⃣ ▶️ ⏸️ ⏯️ ⏹️ ⏺️ ⏭️ ⏮️ ⏩ ⏪ 🔀 🔁 🔂 ◀️ 🔼 🔽 ⏫ ⏬ ➡️ ⬅️ ⬆️ ⬇️ ↗️ ↘️ ↙️ ↖️ ↕️ ↔️ ↪️ ↩️ ⤴️ ⤵️ 🔃 🔄 🔙 🔚 🔛 🔜 🔝 🛐 ⚕️ ♾️ ✔️ ➕ ➖ ➗ ✖️ 🟰 💲 💱 ™️ ©️ ®️ 〰️ ➰ ➿ 🔘 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ 🟤 🔺 🔻 🔸 🔹 🔶 🔷 🔳 🔲 ▪️ ▫️ ◾ ◽ ◼️ ◻️ 🟥 🟧 🟨 🟩 🟦 🟪 ⬛ ⬜ 🟫')))},
                         { name: 'Flags', icon: '🏳️', emojis: unique(allFlags())}
                     ];
                     return categories;
@@ -19370,7 +19202,9 @@
 
         function profileButtonHTML(){
             var user=(window.STATE&&window.STATE.currentUser)||{};
-            var name=user.name||user.username||'User';
+            var full = (window.STATE && window.STATE.users && window.STATE.users[user.username]) || {};
+            var savedUn = (full.userName || user.userName || '').toString().trim();
+            var name = savedUn || user.name || user.username || 'User';
             var img=user.photoURL||user.profileImage||'';
             var av=img?'<img alt="" src="'+esc(img)+'">':esc(initials(name));
             return '<button class="mr-profile-btn" id="mrProfileBtn" type="button" aria-label="Profile"><span class="mr-avatar">'+av+'</span><span class="mr-profile-name">'+esc(name)+'</span><i class="fas fa-chevron-down mr-profile-caret"></i></button>';
@@ -20365,6 +20199,9 @@ body:not(.mr-new-theme) .ph-quote-acts button{ background:var(--input-bg,#eee); 
     (function fixProfile(){
         function displayName(){
             var u = (window.STATE && window.STATE.currentUser) || {};
+            var full = (window.STATE && window.STATE.users && window.STATE.users[u.username]) || {};
+            var un = (full.userName || u.userName || '').toString().trim();
+            if (un) return un;
             return u.name || u.username || (u.role==='admin' ? 'Admin' : 'User');
         }
         function refresh(){
@@ -20680,7 +20517,8 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
                 var wrap = document.getElementById('mrProfileWrap');
                 if(!wrap) return;
                 var me = getMe();
-                var name = me.name || me.username || 'User';
+                var savedUn = (me.userName || '').toString().trim();
+                var name = savedUn || me.name || me.username || 'User';
                 var photo = findPhoto(me);
                 var nEl = wrap.querySelector('.mr-profile-name');
                 if(nEl) nEl.textContent = name;
@@ -20895,6 +20733,7 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
         setInterval(wrapSave, 1000);
         // Delete/edit helpers exposed globally
         window._phDeleteCalTask = async function(dt, id){
+            if(!confirm('Delete this task?')) return;
             try{
                 if(typeof window.readData!=='function' || typeof window.writeData!=='function') return;
                 var all = await window.readData('calendarTasks','ph_calendar_tasks',true) || {};
@@ -20902,9 +20741,10 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
                 all[dt] = list.filter(function(t){return t.id !== id;});
                 await window.writeData('calendarTasks', all, 'ph_calendar_tasks');
                 if(window.STATE) window.STATE.calendarTasks = all;
-                if(typeof window.showToast==='function') window.showToast('Task deleted.','success');
+                toast('Task deleted.','success');
+                try{ if(typeof window.refreshAll==='function') window.refreshAll(); }catch(_){}
                 try{ if(typeof window.showCalendarDay==='function') window.showCalendarDay(dt); }catch(_){}
-            }catch(e){ if(typeof window.showToast==='function') window.showToast('Delete failed.','error'); }
+            }catch(e){ toast('Delete failed.','error'); }
         };
         window._phEditCalTask = async function(dt, id){
             try{
@@ -21204,6 +21044,9 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
         if(!u.username) return '';
         var full = (s.users && s.users[u.username])||{};
         var merged = Object.assign({}, full, u);
+        /* Saved "User Name" from the Profile tab always wins. */
+        var un = (merged.userName || '').toString().trim();
+        if (un) return un;
         return merged.name || merged.fullName || merged.displayName || merged.agentName || merged.username || '';
     }
     function role(){ return ((window.STATE&&window.STATE.currentUser&&window.STATE.currentUser.role)||'agent'); }
@@ -21551,27 +21394,8 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
                 var img = null, meta = null;
                 try{ img = localStorage.getItem('ph_custom_theme_image'); }catch(_){}
                 try{ meta = JSON.parse(localStorage.getItem('ph_custom_theme_meta')||'null'); }catch(_){}
-                if(img){
-                    // Apply custom wallpaper — try multiple function references
-                    var fn = window.applyCustomThemeImage || (window.STATE && window.STATE._applyCustomThemeImage);
-                    if(typeof fn === 'function'){
-                        fn(img, meta);
-                    } else {
-                        // Fallback: apply directly without the function
-                        body.classList.add('theme-custom');
-                        body.classList.toggle('dark', meta ? !!meta.isDark : true);
-                        body.style.setProperty('--bg-image', 'url("'+img+'")');
-                        body.style.backgroundImage = 'url("'+img+'")';
-                        body.style.backgroundSize = 'cover';
-                        body.style.backgroundPosition = 'center';
-                        body.style.backgroundAttachment = 'fixed';
-                        var isDk = meta ? !!meta.isDark : true;
-                        body.style.setProperty('--custom-readable', isDk ? '#ffffff' : '#171717');
-                        body.style.setProperty('--custom-readable-soft', isDk ? 'rgba(255,255,255,.85)' : 'rgba(20,20,24,.78)');
-                        body.style.setProperty('--custom-panel-bg', isDk ? 'rgba(16,18,26,.60)' : 'rgba(255,255,255,.68)');
-                        body.style.setProperty('--custom-border', isDk ? 'rgba(255,255,255,.22)' : 'rgba(20,20,24,.16)');
-                        body.style.setProperty('--custom-page-overlay', isDk ? 'linear-gradient(135deg,rgba(0,0,0,.46),rgba(0,0,0,.18))' : 'linear-gradient(135deg,rgba(255,255,255,.22),rgba(255,255,255,.04))');
-                    }
+                if(img && typeof window.applyCustomThemeImage === 'function'){
+                    window.applyCustomThemeImage(img, meta);
                 } else if(typeof window.showThemeEditor === 'function'){
                     window.showThemeEditor();
                     return;
@@ -21744,15 +21568,14 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
                             bt.addEventListener('click', async function(){
                                 var tid = bt.getAttribute('data-caldel');
                                 if(!tid) return;
-                                try{
-                                    var all = (await readData('calendarTasks','ph_calendar_tasks'))||{};
-                                    all[date] = (all[date]||[]).filter(function(x){ return x && x.id !== tid; });
-                                    if(!all[date].length) delete all[date];
-                                    await writeData('calendarTasks', all, 'ph_calendar_tasks');
-                                    try{ state().calendarTasks = all; }catch(_){}
-                                    if(window.showToast) window.showToast('Task removed.','success');
-                                    window.showCalendarDay(date);
-                                }catch(e){ if(window.showToast) window.showToast('Delete failed.','error'); }
+                                if(!confirm('Delete this task?')) return;
+                                var all = (await readData('calendarTasks','ph_calendar_tasks'))||{};
+                                all[date] = (all[date]||[]).filter(function(x){ return x && x.id !== tid; });
+                                if(!all[date].length) delete all[date];
+                                await writeData('calendarTasks', all, 'ph_calendar_tasks');
+                                state().calendarTasks = all;
+                                if(window.showToast) window.showToast('Task removed.','success');
+                                window.showCalendarDay(date);
                             });
                         });
                         var back = document.getElementById('calBackBtn');
@@ -21825,6 +21648,9 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
             var u = (window.STATE&&window.STATE.currentUser)||{};
             if(!u || !u.username) return null;
             var full = (window.STATE&&window.STATE.users&&window.STATE.users[u.username])||{};
+            /* Saved "User Name" from Profile tab wins. */
+            var un = (full.userName || u.userName || '').toString().trim();
+            if (un) return un;
             return full.name || u.name || u.username;
         }catch(_){ return null; }
     }
@@ -22314,6 +22140,7 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
                 }
                 if(delBtn){
                     delBtn.addEventListener('click', async function(){
+                        if(!confirm('Delete this task?')) return;
                         var latest = await _readCal() || {};
                         var arr = latest[date] || [];
                         var next = arr.filter(function(x){
@@ -22325,6 +22152,7 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
                         await _writeCal(latest);
                         _toast('Task deleted.','success');
                         phShowCalendarDay(date);
+                    });
                 }
             });
         }catch(e){ try{ console.error(e); }catch(_){} }
@@ -22348,7 +22176,9 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
         try{
             var u = (window.STATE&&window.STATE.currentUser)||{};
             if(!u.username) return;
-            var display = u.name || u.username;
+            var full = (window.STATE && window.STATE.users && window.STATE.users[u.username]) || {};
+            var savedUn = (full.userName || u.userName || '').toString().trim();
+            var display = savedUn || u.name || u.username;
             var dw = document.getElementById('dashWelcomeName');
             if(dw && dw.textContent !== display) dw.textContent = display;
             var un = document.getElementById('userNameDisplay');
@@ -23101,17 +22931,20 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
                     btn.type = 'button';
                     btn.className = 'btn btn-sm btn-danger ph-final-del';
                     btn.innerHTML = '<i class="fas fa-trash"></i> Delete';
-                    btn.addEventListener('click', async function(e){
+                    btn.addEventListener('click', function(e){
                         e.preventDefault(); e.stopPropagation();
-                        try{
-                            var latest = (typeof window.readData==='function') ? (await window.readData('calendarTasks','ph_calendar_tasks',true) || {}) : {};
-                            var list = latest[date] || [];
-                            latest[date] = list.filter(function(x){ return String(x.id||'') !== String(tid); });
-                            if(typeof window.writeData==='function') await window.writeData('calendarTasks', latest, 'ph_calendar_tasks');
-                            if(window.STATE) window.STATE.calendarTasks = latest;
-                            toast('Task deleted.','success');
-                            if(typeof window.showCalendarDay==='function') window.showCalendarDay(date);
-                        }catch(err){ toast('Delete failed.','error'); }
+                        if(!confirm('Delete this task?')) return;
+                        (async function(){
+                            try{
+                                var latest = (typeof window.readData==='function') ? (await window.readData('calendarTasks','ph_calendar_tasks',true) || {}) : {};
+                                var list = latest[date] || [];
+                                latest[date] = list.filter(function(x){ return String(x.id||'') !== String(tid); });
+                                if(typeof window.writeData==='function') await window.writeData('calendarTasks', latest, 'ph_calendar_tasks');
+                                if(window.STATE) window.STATE.calendarTasks = latest;
+                                toast('Task deleted.','success');
+                                if(typeof window.showCalendarDay==='function') window.showCalendarDay(date);
+                            }catch(err){ toast('Delete failed.','error'); }
+                        })();
                     });
                     card.appendChild(btn);
                 }
@@ -23166,460 +22999,12 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
 </script>
 <!-- ==== end PH-FIX v3 ==== -->
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script>
-/* ====================================================================
-   PERFORMANCE BOOSTER — runs once after all scripts have loaded.
-   Throttles the most aggressive DOM-polling intervals that are safe
-   to slow down (they use guard flags so they're nearly free after
-   first run, but the timer overhead still adds up).
-   Also throttles the no-Firebase fallback chat poll (1000 → 3000 ms).
-   ==================================================================== */
-(function phPerf(){
-    'use strict';
-    /* 1. Override setInterval to intercept future high-frequency calls that
-          are DOM-patrol loops (they fire but do nothing after arming).
-          We leave data-fetch loops (Firebase, presence, task reminders) alone. */
-    var _native = window.setInterval;
-    var _fns = [
-        'forceNames','armScrollLock','armContactFreeze','wireCard',
-        'patchTaskForm','trackShowCalendarDay','wrapSave','wrapHDA',
-        'ensureSettingsCard','removeDuplicateBell','stripDashboardListPanel',
-        'rebindSearchInput','bindProfileMenu','ensureRefreshButtons',
-        'injectDayButtons','phDecorateContactCards','scan','patch','rewire',
-        'refresh','stabilize','highlight','ensureMuleDashboardCards'
-    ];
-    /* 2. Patch the no-Firebase fallback chat poll. Once the app is running,
-          any _poll that fired with interval=1000 (no Firebase) is extremely
-          aggressive. We find the timers by wrapping readData. */
-    var _rdOrig = window.readData;
-    if(typeof _rdOrig === 'function' && !_rdOrig.__phPerfThrottled){
-        var _rdLast = {};
-        window.readData = async function(path){
-            var key = String(path||'');
-            // Throttle identical reads to max once per 2.5 seconds to reduce Firebase/LS hammering
-            var now = Date.now();
-            if(_rdLast[key] && (now - _rdLast[key]) < 2500 && key !== 'users' && key !== 'settings'){
-                // Return cached STATE data if available
-                try{
-                    if(window.STATE){
-                        if(key==='calendarTasks' && window.STATE.calendarTasks) return window.STATE.calendarTasks;
-                        if(key==='tasks' && window.STATE.tasks) return window.STATE.tasks;
-                    }
-                }catch(_){}
-            }
-            _rdLast[key] = now;
-            return _rdOrig.apply(this, arguments);
-        };
-        window.readData.__phPerfThrottled = true;
-    }
-    /* 3. CSS will-change hint for animated elements to promote them to their
-          own GPU layer, reducing main-thread paint costs. */
-    try{
-        var style = document.createElement('style');
-        style.textContent = [
-            '.modal-overlay,.modal-box{will-change:opacity,transform;}',
-            '.topbar{will-change:background;}',
-            '.toast{will-change:opacity,transform;}',
-            '.spinner{will-change:transform;}',
-            /* Avoid unnecessary repaints on the body background */
-            'body.theme-custom{will-change:background-image;}'
-        ].join('');
-        document.head.appendChild(style);
-    }catch(_){}
-    /* 4. Passive event listeners for scroll/touch — prevents janky scroll */
-    try{
-        var _orig_addEL = EventTarget.prototype.addEventListener;
-        EventTarget.prototype.addEventListener = function(type, fn, opts){
-            if(type === 'scroll' || type === 'touchstart' || type === 'touchmove' || type === 'wheel'){
-                if(typeof opts === 'boolean' || opts === undefined || opts === null){
-                    opts = {capture: !!opts, passive: true};
-                } else if(typeof opts === 'object' && opts.passive === undefined){
-                    opts = Object.assign({}, opts, {passive: true});
-                }
-            }
-            return _orig_addEL.call(this, type, fn, opts);
-        };
-    }catch(_){}
-    console.log('[PH-PERF] performance booster applied');
-})();
-</script>
-
-<script>
-/* ==========================================================
-   PH DASHBOARD CALENDAR WIDGET — disabled (removed by user request)
-   ========================================================== */
-(function phDashCal(){
-    return; // widget removed
-    'use strict';
-    if(window.__PH_DASH_CAL_INSTALLED) return;
-    window.__PH_DASH_CAL_INSTALLED = true;
-
-    function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];}); }
-    function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
-    function monthLabel(y,m){ return ['January','February','March','April','May','June','July','August','September','October','November','December'][m]+' '+y; }
-    function fmtTime(iso){ try{ var d=new Date(iso); return d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }catch(_){ return ''; } }
-    function dayLabel(dateStr){ try{ var p=dateStr.split('-'); var d=new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2])); return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}); }catch(_){ return dateStr; } }
-    function vals(o){ if(!o)return[]; if(Array.isArray(o))return o.filter(Boolean); return Object.keys(o).map(function(k){ var v=o[k]; if(!v||typeof v!=='object')return null; if(!v._key)v._key=k; return v; }).filter(Boolean); }
-    function genId(){ return 'cal_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7); }
-    function me(){ return window.STATE&&window.STATE.currentUser&&window.STATE.currentUser.username; }
-    function isAdm(){ try{ return typeof isAdmin==='function'&&isAdmin(); }catch(_){ return false; } }
-    function canAdd(){ return !!(isAdm()||(typeof hasPermission==='function'&&hasPermission('canAddCalendarTasks'))||me()); }
-    function canDel(){ return !!(isAdm()||(typeof hasPermission==='function'&&(hasPermission('canDeleteTasks')||hasPermission('canAddCalendarTasks')))); }
-    function getNow(){ try{ return typeof getNowISO==='function'?getNowISO():new Date().toISOString(); }catch(_){ return new Date().toISOString(); } }
-    function toast(msg,type){ try{ if(typeof showToast==='function') showToast(msg,type||'info'); }catch(_){} }
-
-    var state = { year:new Date().getFullYear(), month:new Date().getMonth(), selected:null, calTasks:{}, agentTasks:[], refreshTimer:null, loading:false };
-
-    async function fetchCalTasks(){ try{ return await readData('calendarTasks','ph_calendar_tasks')||{}; }catch(_){ return {}; } }
-    async function fetchAgentTasks(){ try{ return vals(await readData('tasks','ph_tasks',true)||{}).filter(function(t){ return t&&!t.deleted; }); }catch(_){ return []; } }
-
-    /* ---- render grid ---- */
-    function renderGrid(){
-        var grid=document.getElementById('dashCalGrid');
-        var title=document.getElementById('dashCalTitle');
-        if(!grid||!title) return;
-        var y=state.year, m=state.month, t=todayStr();
-        title.textContent=monthLabel(y,m);
-        var first=new Date(y,m,1), days=new Date(y,m+1,0).getDate(), startDow=(first.getDay()+6)%7;
-        var html='';
-        for(var b=0;b<startDow;b++) html+='<div class="dash-cal-cell empty"></div>';
-        for(var d=1;d<=days;d++){
-            var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-            var cal=(state.calTasks[ds]||[]).length;
-            var agent=state.agentTasks.filter(function(t){ return t.scheduledDate===ds; }).length;
-            var total=cal+agent;
-            var cls='dash-cal-cell'+(ds===t?' today':'')+(ds===state.selected?' selected':'')+(total?' has-task':'');
-            var dots='';
-            if(total){ var n=Math.min(total,3); dots='<div class="dash-cal-dot-multi">'; for(var i=0;i<n;i++) dots+='<div class="dash-cal-dot"></div>'; dots+='</div>'; }
-            html+='<div class="'+cls+'" data-date="'+ds+'"><span class="dash-cal-num">'+d+'</span>'+dots+'</div>';
-        }
-        grid.innerHTML=html;
-        Array.prototype.forEach.call(grid.querySelectorAll('[data-date]'),function(cell){
-            cell.addEventListener('click',function(){
-                var ds=cell.getAttribute('data-date');
-                if(state.selected===ds){ state.selected=null; hideDayPanel(); } else { state.selected=ds; showDayPanel(ds); }
-                renderGrid();
-            });
-        });
-    }
-
-    function hideDayPanel(){ var p=document.getElementById('dashCalDayPanel'); if(p) p.style.display='none'; }
-
-    function showDayPanel(ds){
-        var panel=document.getElementById('dashCalDayPanel'); if(!panel) return;
-        var dlEl=document.getElementById('dashCalPanelDate'); if(dlEl) dlEl.textContent=dayLabel(ds);
-        var taskList=document.getElementById('dashCalTaskList');
-        var addSec=document.getElementById('dashCalAddSection');
-        var calItems=state.calTasks[ds]||[];
-        var agentItems=state.agentTasks.filter(function(t){ return t.scheduledDate===ds; });
-        var html='';
-        if(!calItems.length&&!agentItems.length){
-            html='<p class="dash-cal-empty-msg"><i class="fas fa-calendar-xmark" style="margin-right:5px;opacity:.5;"></i>No tasks for this day.</p>';
-        } else {
-            calItems.forEach(function(t){
-                var del=canDel()?'<button class="dash-cal-task-del" data-del-daily="'+esc(t.id)+'" data-del-date="'+esc(ds)+'"><i class="fas fa-trash"></i></button>':'';
-                html+='<div class="dash-cal-task-item"><div class="dash-cal-task-text"><i class="fas fa-clipboard-check" style="color:var(--primary);margin-right:4px;font-size:.7rem;"></i>'+esc(t.text||'Task')+'<span style="display:block;font-size:.67rem;color:var(--text2);margin-top:1px;">'+esc(t.user||'')+(t.createdAt?' · '+fmtTime(t.createdAt):'')+'</span></div>'+del+'</div>';
-            });
-            agentItems.forEach(function(t){
-                var badge='<span class="dash-cal-task-badge '+(t.status||'pending')+'">'+esc(t.status||'pending')+'</span>';
-                var del=canDel()?'<button class="dash-cal-task-del" data-del-agent="'+esc(t.id)+'" data-del-date="'+esc(ds)+'"><i class="fas fa-trash"></i></button>':'';
-                html+='<div class="dash-cal-task-item"><div class="dash-cal-task-text"><i class="fas fa-user-clock" style="color:var(--primary);margin-right:4px;font-size:.7rem;"></i>'+esc(t.taskName||'Task')+badge+'<span style="display:block;font-size:.67rem;color:var(--text2);margin-top:1px;">'+esc(t.assignedTo||t.agentName||'')+(t.scheduledTime?' · '+esc(t.scheduledTime):'')+'</span></div>'+del+'</div>';
-            });
-        }
-        if(taskList) taskList.innerHTML=html;
-        // bind delete buttons
-        Array.prototype.forEach.call(panel.querySelectorAll('[data-del-daily]'),function(btn){
-            btn.addEventListener('click',function(e){ e.stopPropagation(); deleteDaily(btn.getAttribute('data-del-date'),btn.getAttribute('data-del-daily')); });
-        });
-        Array.prototype.forEach.call(panel.querySelectorAll('[data-del-agent]'),function(btn){
-            btn.addEventListener('click',function(e){ e.stopPropagation(); deleteAgent(btn.getAttribute('data-del-date'),btn.getAttribute('data-del-agent')); });
-        });
-        if(addSec) addSec.style.display=canAdd()?'block':'none';
-        var ta=document.getElementById('dashCalNewTask'); if(ta&&!ta.value) ta.value='';
-        panel.style.display='block';
-    }
-    function refreshPanel(){ if(state.selected) showDayPanel(state.selected); }
-
-    /* ---- delete helpers ---- */
-    function deleteDaily(dt,tid){
-        var go=function(){
-            (async function(){
-                try{
-                    var all=await fetchCalTasks();
-                    all[dt]=(all[dt]||[]).filter(function(x){ return x&&x.id!==tid; });
-                    await writeData('calendarTasks',all,'ph_calendar_tasks');
-                    state.calTasks=all; toast('Task deleted.','success'); renderGrid(); refreshPanel();
-                }catch(e){ toast('Delete failed.','error'); }
-            })();
-        };
-        if(typeof showModal==='function'){
-            showModal('<h3><i class="fas fa-trash" style="color:var(--danger)"></i> Delete Task</h3><p style="margin:16px 0 8px;">Delete this daily task permanently?</p><div class="modal-actions"><button class="btn btn-danger" id="_phDcDel1"><i class="fas fa-trash"></i> Delete</button><button class="btn btn-outline" data-close-modal>Cancel</button></div>');
-            var b=document.getElementById('_phDcDel1'); if(b) b.onclick=function(){ if(typeof closeModal==='function')closeModal(); go(); };
-        } else { go(); }
-    }
-    function deleteAgent(dt,tid){
-        var go=function(){
-            (async function(){
-                try{
-                    var obj=await readData('tasks','ph_tasks',true)||{};
-                    if(!Array.isArray(obj)&&obj[tid]){ obj[tid].deleted=true; obj[tid].deletedAt=getNow(); obj[tid].deletedBy=me()||''; await writeData('tasks',obj,'ph_tasks'); }
-                    var cal=await fetchCalTasks();
-                    Object.keys(cal).forEach(function(d){ if(Array.isArray(cal[d])) cal[d]=cal[d].filter(function(x){ return x&&x.taskId!==tid&&x.id!==('task_'+tid); }); });
-                    await writeData('calendarTasks',cal,'ph_calendar_tasks');
-                    state.calTasks=cal; state.agentTasks=state.agentTasks.filter(function(t){ return t.id!==tid; });
-                    toast('Task deleted.','success'); renderGrid(); refreshPanel();
-                }catch(e){ toast('Delete failed.','error'); }
-            })();
-        };
-        if(typeof showModal==='function'){
-            showModal('<h3><i class="fas fa-trash" style="color:var(--danger)"></i> Delete Task</h3><p style="margin:16px 0 8px;">Delete this agent task? It will move to Deleted Tasks.</p><div class="modal-actions"><button class="btn btn-danger" id="_phDcDel2"><i class="fas fa-trash"></i> Delete</button><button class="btn btn-outline" data-close-modal>Cancel</button></div>');
-            var b=document.getElementById('_phDcDel2'); if(b) b.onclick=function(){ if(typeof closeModal==='function')closeModal(); go(); };
-        } else { go(); }
-    }
-
-    /* ---- add task ---- */
-    function bindSave(){
-        var btn=document.getElementById('dashCalSaveTask');
-        if(!btn||btn.__phBound) return;
-        btn.__phBound=true;
-        btn.addEventListener('click',async function(){
-            var ta=document.getElementById('dashCalNewTask');
-            var text=(ta&&ta.value||'').trim();
-            if(!text){ toast('Enter a task description.','warning'); return; }
-            if(!state.selected) return;
-            var dt=state.selected;
-            try{
-                var all=await fetchCalTasks();
-                all[dt]=all[dt]||[];
-                all[dt].push({id:genId(),text:text,user:me()||'',createdAt:getNow()});
-                await writeData('calendarTasks',all,'ph_calendar_tasks');
-                state.calTasks=all; if(ta) ta.value='';
-                toast('Task added.','success'); renderGrid(); refreshPanel();
-            }catch(e){ toast('Failed to save.','error'); }
-        });
-    }
-
-    /* ---- Enter key shortcut ---- */
-    function bindEnter(){
-        var ta=document.getElementById('dashCalNewTask');
-        if(!ta||ta.__phEnterBound) return;
-        ta.__phEnterBound=true;
-        ta.addEventListener('keydown',function(e){
-            if(e.key==='Enter'&&!e.shiftKey&&!(e.nativeEvent&&e.nativeEvent.isComposing)&&e.keyCode!==229){
-                e.preventDefault();
-                var b=document.getElementById('dashCalSaveTask'); if(b) b.click();
-            }
-        });
-    }
-
-    /* ---- nav buttons ---- */
-    function bindNav(){
-        var prev=document.getElementById('dashCalPrev'), next=document.getElementById('dashCalNext'), close=document.getElementById('dashCalPanelClose');
-        if(prev&&!prev.__phBound){ prev.__phBound=true; prev.addEventListener('click',function(){ state.month--; if(state.month<0){state.month=11;state.year--;} state.selected=null; hideDayPanel(); refresh(false); }); }
-        if(next&&!next.__phBound){ next.__phBound=true; next.addEventListener('click',function(){ state.month++; if(state.month>11){state.month=0;state.year++;} state.selected=null; hideDayPanel(); refresh(false); }); }
-        if(close&&!close.__phBound){ close.__phBound=true; close.addEventListener('click',function(){ state.selected=null; hideDayPanel(); renderGrid(); }); }
-    }
-
-    /* ---- full data refresh ---- */
-    async function refresh(schedNext){
-        if(state.loading) return; state.loading=true;
-        try{ state.calTasks=await fetchCalTasks(); state.agentTasks=await fetchAgentTasks(); }catch(_){}
-        state.loading=false;
-        renderGrid(); refreshPanel();
-        if(schedNext!==false){ if(state.refreshTimer) clearTimeout(state.refreshTimer); state.refreshTimer=setTimeout(function(){ refresh(true); },30000); }
-    }
-
-    /* ---- boot ---- */
-    function boot(){
-        if(!document.getElementById('dashCalGrid')){ setTimeout(boot,300); return; }
-        bindNav(); bindSave(); bindEnter(); refresh(true);
-        // patch afterLogin
-        if(typeof afterLogin==='function'&&!afterLogin.__phDashCalPatched){
-            var p=afterLogin; afterLogin=async function(){ var r=await p.apply(this,arguments); setTimeout(function(){ refresh(false); },800); return r; }; afterLogin.__phDashCalPatched=true;
-        }
-        // patch writeData to trigger refresh on calendar / tasks changes
-        if(typeof writeData==='function'&&!writeData.__phDashCalPatched){
-            var pw=writeData;
-            writeData=async function(path){ var r=await pw.apply(this,arguments); var s=String(path||''); if(s==='calendarTasks'||s==='tasks'||s.indexOf('tasks/')===0){ clearTimeout(state.refreshTimer); state.refreshTimer=setTimeout(function(){ refresh(true); },500); } return r; };
-            writeData.__phDashCalPatched=true;
-        }
-        // storage changes from other tabs
-        window.addEventListener('storage',function(e){ if(e&&(e.key==='ph_calendar_tasks'||e.key==='ph_tasks')) refresh(false); });
-    }
-
-    if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded',function(){ setTimeout(boot,700); }); }
-    else { setTimeout(boot,700); }
-
-})();
-</script>
-
-<script>
-/* ==========================================================
-   PH CHAT BADGE FIX
-   Problems:
-   1. Badge flickers between "0" and "49" on every Firebase
-      snapshot because _mrSetBadge runs on EVERY poll tick.
-   2. Badge shows "Chat 0" (visible zero) — should be hidden.
-   3. loadChatContacts re-renders the whole contacts list on
-      every poll, causing visible flicker in the chat panel.
-
-   Fixes:
-   1. Override _mrSetBadge to only touch the DOM when the
-      count actually CHANGES from the last known value.
-      Never render a visible badge for count === 0.
-   2. Suppress loadChatContacts full re-renders during idle
-      polling; only allow them on real user actions.
-   3. Throttle the non-Firebase fallback poll 1500→8000 ms.
-   ========================================================== */
-(function phChatFreeze(){
-    'use strict';
-    if(window.__PH_CHAT_FREEZE_INSTALLED) return;
-    window.__PH_CHAT_FREEZE_INSTALLED = true;
-
-    /* ---- Badge: only update DOM when count changes, never show 0 ---- */
-    var _lastBadgeCount = -1; // -1 = uninitialised
-
-    function _applyBadge(n){
-        n = n || 0;
-        if(n === _lastBadgeCount) return; // nothing changed — skip DOM write entirely
-        _lastBadgeCount = n;
-        var show = n > 0;
-        ['chatNotifyBadge','chatCardNotifyBadge'].forEach(function(id){
-            var el = document.getElementById(id);
-            if(!el) return;
-            el.style.display = show ? 'inline-flex' : 'none';
-            if(show) el.textContent = n;
-            // When hidden, leave textContent so it shows correct value when re-shown
-        });
-    }
-
-    /* Patch _mrSetBadge once it exists (it's defined at runtime) */
-    function _patchMrSetBadge(){
-        if(typeof window._mrSetBadge !== 'undefined' || window.__phBadgePatchDone) return;
-        /* The function is a local variable inside the IIFE, not on window.
-           Intercept via the ensureNotificationUI / attachRealtimeChatNotifications
-           chain that calls it. We override attachRealtimeChatNotifications instead. */
-        window.__phBadgePatchDone = true;
-    }
-
-    /* Override attachRealtimeChatNotifications to wrap its badge-setting logic */
-    function _patchAttachRealtime(){
-        if(typeof attachRealtimeChatNotifications !== 'function') return;
-        if(attachRealtimeChatNotifications.__phBadgePatched) return;
-        var _orig = attachRealtimeChatNotifications;
-        attachRealtimeChatNotifications = function(){
-            var result = _orig.apply(this, arguments);
-            /* After the original sets up the Firebase listener, also patch
-               _mrSetBadge via a global override that the listener calls */
-            return result;
-        };
-        attachRealtimeChatNotifications.__phBadgePatched = true;
-    }
-
-    /* The real fix: intercept every DOM write to chatNotifyBadge and
-       chatCardNotifyBadge via a MutationObserver so that:
-       - If new content is "0" → immediately hide the element
-       - If new count is the same as last → revert the write (no flicker) */
-    function _guardBadgeElements(){
-        var ids = ['chatNotifyBadge','chatCardNotifyBadge'];
-
-        function guardOne(el){
-            if(!el || el.__phBadgeGuarded) return;
-            el.__phBadgeGuarded = true;
-            var obs = new MutationObserver(function(mutations){
-                mutations.forEach(function(mut){
-                    var el2 = mut.target;
-                    var n = parseInt(el2.textContent, 10) || 0;
-                    if(n === 0){
-                        // Force hide — never show "0"
-                        if(el2.style.display !== 'none') el2.style.display = 'none';
-                        return;
-                    }
-                    if(n === _lastBadgeCount){
-                        // Same count — no visual change needed; just ensure visible
-                        return;
-                    }
-                    _lastBadgeCount = n;
-                    el2.style.display = 'inline-flex';
-                });
-            });
-            obs.observe(el, { characterData:true, childList:true, attributes:true, attributeFilter:['style'] });
-        }
-
-        ids.forEach(function(id){
-            var el = document.getElementById(id);
-            if(el){ guardOne(el); return; }
-            // Element may not exist yet — watch for it
-            var docObs = new MutationObserver(function(){
-                var found = document.getElementById(id);
-                if(found){ guardOne(found); docObs.disconnect(); }
-            });
-            docObs.observe(document.body, { childList:true, subtree:true });
-        });
-    }
-
-    /* ---- Contacts list freeze: only full-render on user actions ---- */
-    var _allowRenderUntil = 0;
-
-    function _isQuiet(){ return Date.now() > _allowRenderUntil; }
-    function _openWindow(ms){ _allowRenderUntil = Date.now() + (ms||4000); }
-
-    function _patchContacts(){
-        if(typeof loadChatContacts !== 'function' || loadChatContacts.__phFreezePatch) return;
-        var _orig = loadChatContacts;
-        loadChatContacts = async function(){
-            var list = document.getElementById('chatContactsList');
-            if(list && list.children.length > 0 && _isQuiet()) return; // skip re-render
-            return _orig.apply(this, arguments);
-        };
-        loadChatContacts.__phFreezePatch = true;
-    }
-    _patchContacts();
-
-    function _patchShowChatUI(){
-        if(typeof showChatUI !== 'function' || showChatUI.__phFreezePatched) return;
-        var p = showChatUI;
-        showChatUI = function(){ _openWindow(6000); return p.apply(this, arguments); };
-        showChatUI.__phFreezePatched = true;
-    }
-    _patchShowChatUI();
-
-    function _patchSend(){
-        if(typeof sendChatMessage !== 'function' || sendChatMessage.__phFreezePatched) return;
-        var p = sendChatMessage;
-        sendChatMessage = async function(){ _openWindow(4000); return p.apply(this, arguments); };
-        sendChatMessage.__phFreezePatched = true;
-    }
-    _patchSend();
-
-    /* ---- Throttle non-Firebase fallback poll 1500 → 8000 ms ---- */
-    var _siOrig = window.setInterval, _patched = false;
-    window.setInterval = function(fn, delay){
-        var args = Array.prototype.slice.call(arguments);
-        if(!_patched && typeof fn === 'function' && delay === 1500){
-            var s = ''; try{ s = fn.toString(); }catch(_){}
-            if(s.indexOf('_pollOnce') !== -1 || s.indexOf('chatMessages') !== -1 || s.indexOf('fetchLatest') !== -1){
-                _patched = true; args[1] = 8000;
-            }
-        }
-        return _siOrig.apply(window, args);
-    };
-    setTimeout(function(){ window.setInterval = _siOrig; }, 12000);
-
-    /* ---- Boot sequence ---- */
-    function boot(){
-        _guardBadgeElements();
-        _patchAttachRealtime();
-        _patchContacts();
-        _patchShowChatUI();
-        _patchSend();
-    }
-
-    // Run immediately and again after scripts finish initialising
-    boot();
-    setTimeout(function(){ boot(); _allowRenderUntil = 0; /* quiet from now */ }, 5000);
-
-})();
-</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 </body>
 </html>
