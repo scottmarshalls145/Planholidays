@@ -2531,6 +2531,18 @@
         body.mr-new-theme #btnLogout{display:none !important;}
         body.mr-new-theme #agentTimeBadge{background:rgba(255,255,255,.08);border:1px solid var(--mr-border);color:var(--mr-text);}
 
+        /* --- Topbar reduced to: user name + avatar, sign out (in the user menu),
+               and the notification bell. Everything else is hidden. --- */
+        .topbar #mrTopSearch,
+        .mr-topsearch,
+        body.mr-new-theme #mrThemeSel,
+        body.mr-new-theme .topbar-actions #agentTimeBadge,
+        body.mr-new-theme .topbar-actions > select,
+        body.mr-new-theme .topbar-actions > .user-badge{display:none !important;}
+        /* Title text on the left, controls pushed to the right */
+        body.mr-new-theme .topbar{justify-content:space-between !important;flex-wrap:nowrap !important;}
+        body.mr-new-theme .topbar-actions{margin-left:auto;}
+
         body.mr-new-theme #dashboard{padding:8px 22px 40px;}
         body.mr-new-theme #dashboard>h2:first-of-type,body.mr-new-theme #dashboard>p.text-muted{display:none;}
         .mr-dash{display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-top:4px;}
@@ -3051,6 +3063,11 @@
                 hotelVouchers: []
             };
 
+            // Export STATE. The later UI scripts (profile menu, avatar, theme
+            // sync) all read window.STATE; without this they saw undefined and
+            // fell back to the placeholder name "User" with no avatar.
+            try { window.STATE = STATE; } catch (_) {}
+
             // --------------------------------------------------------------
             // 3. UTILITY FUNCTIONS
             // --------------------------------------------------------------
@@ -3221,9 +3238,7 @@
                             // Update lastLogin
                             fresh.lastLogin = full.lastLogin; fresh.ip = ip;
                             fresh.pendingIps = (fresh.pendingIps || []).filter(function(x) { return x !== ip; });
-                            await writeData('users/' + username, fresh, 'ph_users');
-                            var allU = await readData('users', 'ph_users', true) || {};
-                            allU[username] = fresh; await writeData('users', allU, 'ph_users');
+                            await persistUserRecord(username, fresh);
                             await logLoginEvent(username, ip, 'success', 'Approved by admin');
                             STATE.currentUser = full;
                             saveSession(full);
@@ -3321,6 +3336,13 @@
                 return !!user.permissions[perm];
             }
 
+            // Exported for the sidebar/topbar scripts, which check these on window.
+            try {
+                window.isAdmin = isAdmin;
+                window.hasPermission = hasPermission;
+                window.showToast = showToast;
+            } catch (_) {}
+
             // Check if current user can edit invoice/accounts
             function canEditInvoice(invoice) {
                 if (isAdmin()) return true;
@@ -3370,6 +3392,7 @@
                     firebaseConnected = true;
                     db.ref('.info/connected').on('value', function(snap) {
                         firebaseConnected = snap.val() === true;
+                        if (firebaseConnected) window._fbEverConnected = true;
                     });
                     return true;
                 } catch (e) {
@@ -3552,58 +3575,135 @@
                 }
             };
 
-            async function initAuth() {
-                var defaultPwd = '2026plan';
-                var defaultHash = sha256(defaultPwd);
+            // --------------------------------------------------------------
+            // ADMIN CREDENTIAL BASELINE
+            // ADMIN_CRED_STAMP performs a ONE-TIME forced password reset. It is
+            // written onto the admin record after it runs, so a password the
+            // admin later sets from the UI is NOT reverted on the next load.
+            // Bump the stamp string if another forced reset is ever needed.
+            // --------------------------------------------------------------
+            var ADMIN_DEFAULT_PWD = 'a!#@$gf12@!@%^4';
+            var ADMIN_CRED_STAMP = 'reset-2026-08-05';
 
-                var users = await readData('users', 'ph_users', true);
+            // The primary admin account is never lockable.
+            function isProtectedAdmin(username, user) {
+                return username === 'Plan' || (user && user.role === 'admin');
+            }
+
+            // Repairs a users store that was corrupted into a single user object.
+            function sanitizeUsersMap(users) {
+                if (!users || typeof users !== 'object') return null;
+                if (users.username && !users.Plan) return null;
+                return users;
+            }
+
+            // Persists one user WITHOUT clobbering the whole user map.
+            // Writing a single record to 'users/<name>' must never use the
+            // 'ph_users' fallback key, or offline mode overwrites every user.
+            async function persistUserRecord(username, user) {
+                var allUsers = sanitizeUsersMap(await readData('users', 'ph_users', true)) || {};
+                allUsers[username] = user;
+                await writeData('users', allUsers, 'ph_users');
+                await writeData('users/' + username, user, 'ph_user_' + username);
+                STATE._cache['users_ph_users'] = allUsers;
+                return allUsers;
+            }
+
+            // Waits briefly for the realtime socket. Without this, initAuth can run
+            // while '.info/connected' is still false, so the admin repair lands only
+            // in localStorage and is then overwritten by the first remote read.
+            async function waitForFirebase(maxMs) {
+                if (!db) return false;
+                var waited = 0, step = 100;
+                while (!firebaseConnected && waited < (maxMs || 6000)) {
+                    await new Promise(function(r) { setTimeout(r, step); });
+                    waited += step;
+                }
+                return !!firebaseConnected;
+            }
+
+            async function initAuth() {
+                var defaultHash = sha256(ADMIN_DEFAULT_PWD);
+
+                await waitForFirebase(6000);
+
+                var users = sanitizeUsersMap(await readData('users', 'ph_users', true));
 
                 if (!users || !users.Plan) {
                     var admin = { ...DEFAULT_ADMIN };
                     admin.passwordHash = defaultHash;
-                    var newUsers = { Plan: admin };
+                    admin.locked = false;
+                    admin.failedAttempts = 0;
+                    admin.credStamp = ADMIN_CRED_STAMP;
+                    var newUsers = users ? { ...users } : {};
+                    newUsers.Plan = admin;
                     await writeData('users', newUsers, 'ph_users');
                     await writeData('users/Plan', admin, 'ph_users_Plan');
-                    console.log('Admin user created with default password.');
+                    console.log('Admin user created, unlocked, with the configured password.');
                 } else {
                     var plan = users.Plan;
+                    var dirty = false;
+
                     if (plan.role !== 'admin') {
                         plan.role = 'admin';
-                        await writeData('users', users, 'ph_users');
-                        await writeData('users/Plan', plan, 'ph_users_Plan');
+                        dirty = true;
                         console.log('Fixed admin role.');
                     }
                     var perms = DEFAULT_ADMIN.permissions;
                     if (!plan.permissions || Object.keys(plan.permissions).length < Object.keys(perms).length) {
                         plan.permissions = { ...perms };
-                        await writeData('users', users, 'ph_users');
-                        await writeData('users/Plan', plan, 'ph_users_Plan');
+                        dirty = true;
                         console.log('Updated admin permissions.');
                     }
-                    if (!plan.passwordHash) {
+
+                    // Self-heal: the admin can never remain locked.
+                    if (plan.locked || plan.failedAttempts) {
+                        plan.locked = false;
+                        plan.failedAttempts = 0;
+                        dirty = true;
+                        console.log('Admin account unlocked and attempt counter cleared.');
+                    }
+
+                    // One-time forced credential reset.
+                    if (plan.credStamp !== ADMIN_CRED_STAMP) {
                         plan.passwordHash = defaultHash;
+                        plan.credStamp = ADMIN_CRED_STAMP;
+                        dirty = true;
+                        console.log('Admin password reset to the configured credential.');
+                    } else if (!plan.passwordHash) {
+                        plan.passwordHash = defaultHash;
+                        dirty = true;
+                        console.log('Admin password hash was missing, restored.');
+                    }
+
+                    if (dirty) {
+                        users.Plan = plan;
                         await writeData('users', users, 'ph_users');
                         await writeData('users/Plan', plan, 'ph_users_Plan');
-                        console.log('Admin password hash was missing, set to default.');
                     }
                 }
             }
 
             async function loginUser(username, password) {
                 var trimmedPassword = password.trim();
-                var users = await readData('users', 'ph_users', true);
+                await waitForFirebase(6000);
+                var users = sanitizeUsersMap(await readData('users', 'ph_users', true));
 
                 if (!users || !users.Plan) {
-                    var defaultPwd = '2026plan';
-                    var defaultHash = sha256(defaultPwd);
-                    var admin = { ...DEFAULT_ADMIN, passwordHash: defaultHash };
-                    users = { Plan: admin };
+                    var defaultHash = sha256(ADMIN_DEFAULT_PWD);
+                    var admin = { ...DEFAULT_ADMIN, passwordHash: defaultHash, locked: false,
+                        failedAttempts: 0, credStamp: ADMIN_CRED_STAMP };
+                    users = users ? { ...users } : {};
+                    users.Plan = admin;
                     await writeData('users', users, 'ph_users');
                     await writeData('users/Plan', admin, 'ph_users_Plan');
                 }
 
-                if (users.Plan && users.Plan.role !== 'admin') {
+                // Keep the primary admin valid, unlocked and reachable on every attempt.
+                if (users.Plan && (users.Plan.role !== 'admin' || users.Plan.locked || users.Plan.failedAttempts)) {
                     users.Plan.role = 'admin';
+                    users.Plan.locked = false;
+                    users.Plan.failedAttempts = 0;
                     await writeData('users', users, 'ph_users');
                     await writeData('users/Plan', users.Plan, 'ph_users_Plan');
                 }
@@ -3614,24 +3714,40 @@
                     return null;
                 }
 
-                if (user.locked) {
+                var protectedAdmin = isProtectedAdmin(username, user);
+
+                // Admin accounts are exempt from the lockout gate.
+                if (user.locked && !protectedAdmin) {
                     showToast('Account is locked. Please contact an administrator.', 'error');
                     return null;
+                }
+                if (protectedAdmin && (user.locked || user.failedAttempts)) {
+                    user.locked = false;
+                    user.failedAttempts = 0;
                 }
 
                 var hash = sha256(trimmedPassword);
                 if (hash !== user.passwordHash) {
+                    if (protectedAdmin) {
+                        // Never lock the admin out — just reject this attempt.
+                        user.failedAttempts = 0;
+                        user.locked = false;
+                        await persistUserRecord(username, user);
+                        showToast('Invalid username or password.', 'error');
+                        return null;
+                    }
                     user.failedAttempts = (user.failedAttempts || 0) + 1;
                     if (user.failedAttempts >= 5) {
                         user.locked = true;
                         showToast('Account locked due to too many failed attempts. Contact admin.', 'error');
                     }
-                    await writeData('users/' + username, user, 'ph_users');
+                    await persistUserRecord(username, user);
                     showToast('Invalid username or password.', 'error');
                     return null;
                 }
 
                 user.failedAttempts = 0;
+                if (protectedAdmin) user.locked = false;
                 var ip = await fetchIP();
 
                 // ---- IP approval check ----
@@ -3652,9 +3768,7 @@
                         if (user.pendingIps.indexOf(ip) === -1) user.pendingIps.push(ip);
                         user.lastIpRequest = getNowISO();
                         user.ip = ip;
-                        await writeData('users/' + username, user, 'ph_users');
-                        var allUsers1 = await readData('users', 'ph_users', true);
-                        if (allUsers1) { allUsers1[username] = user; await writeData('users', allUsers1, 'ph_users'); }
+                        await persistUserRecord(username, user);
                         await logLoginEvent(username, ip, 'pending', 'IP awaiting admin approval');
                         showToast('Waiting for admin to approve your IP address.', 'warning');
                         return { __pendingApproval: true, username: username, ip: ip };
@@ -3666,13 +3780,7 @@
 
                 user.lastLogin = getNowISO();
                 user.ip = ip;
-                await writeData('users/' + username, user, 'ph_users');
-
-                var allUsers = await readData('users', 'ph_users', true);
-                if (allUsers) {
-                    allUsers[username] = user;
-                    await writeData('users', allUsers, 'ph_users');
-                }
+                await persistUserRecord(username, user);
 
                 await logLoginEvent(username, ip, 'success', '');
                 return { ...user, username: username, ip: ip };
@@ -3734,6 +3842,11 @@
                     return false;
                 }
                 allUsers[username] = { ...allUsers[username], ...data };
+                // Final guard: no code path may leave the admin locked.
+                if (isProtectedAdmin(username, allUsers[username])) {
+                    allUsers[username].locked = false;
+                    allUsers[username].failedAttempts = 0;
+                }
                 await writeData('users', allUsers, 'ph_users');
                 await writeData('users/' + username, allUsers[username], 'ph_user_' + username);
                 STATE._cache['users_ph_users'] = allUsers;
@@ -3753,6 +3866,18 @@
             async function toggleLockUser(username) {
                 var allUsers = await readData('users', 'ph_users', true) || {};
                 if (!allUsers[username]) return false;
+                if (isProtectedAdmin(username, allUsers[username])) {
+                    // Guard: locking the admin would make the portal unrecoverable.
+                    if (allUsers[username].locked || allUsers[username].failedAttempts) {
+                        allUsers[username].locked = false;
+                        allUsers[username].failedAttempts = 0;
+                        await writeData('users', allUsers, 'ph_users');
+                        await writeData('users/' + username, allUsers[username], 'ph_user_' + username);
+                        STATE._cache['users_ph_users'] = allUsers;
+                    }
+                    showToast('The administrator account cannot be locked.', 'warning');
+                    return false;
+                }
                 var current = allUsers[username].locked || false;
                 allUsers[username].locked = !current;
                 allUsers[username].failedAttempts = 0;
@@ -6257,58 +6382,275 @@
             // --------------------------------------------------------------
             // 18. THEME UPLOAD
             // --------------------------------------------------------------
+            // Largest single localStorage value a browser will accept is ~5.1M
+            // characters. A normal phone/camera photo becomes a 3-12M character
+            // data URL, so storing it raw throws QuotaExceededError. We keep a
+            // hard budget well under the ceiling and downscale to fit it.
+            var THEME_IMG_BUDGET = 2200000;
+
+            // Downscale + re-encode the wallpaper so it always fits in storage.
+            // Returns the compressed data URL (or the original if it is small
+            // enough and already fits).
+            function compressThemeImage(img, originalData) {
+                try {
+                    var budget = Math.min(THEME_IMG_BUDGET, themeStorageHeadroom());
+                    if (originalData && originalData.length <= Math.min(900000, budget)) return originalData;
+                    var maxW = 1920, maxH = 1200;
+                    var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+                    if (!w || !h) return originalData;
+                    var scale = Math.min(1, maxW / w, maxH / h);
+                    var attempts = [
+                        { s: scale, q: 0.82 }, { s: scale, q: 0.70 }, { s: scale * 0.8, q: 0.66 },
+                        { s: scale * 0.65, q: 0.60 }, { s: scale * 0.5, q: 0.55 }, { s: scale * 0.38, q: 0.5 }
+                    ];
+                    var out = null;
+                    for (var i = 0; i < attempts.length; i++) {
+                        var cw = Math.max(320, Math.round(w * attempts[i].s));
+                        var ch = Math.max(200, Math.round(h * attempts[i].s));
+                        var c = document.createElement('canvas');
+                        c.width = cw; c.height = ch;
+                        var cx = c.getContext('2d');
+                        cx.fillStyle = '#101018';
+                        cx.fillRect(0, 0, cw, ch);
+                        cx.drawImage(img, 0, 0, cw, ch);
+                        var d = c.toDataURL('image/jpeg', attempts[i].q);
+                        out = d;
+                        if (d.length <= budget) return d;
+                    }
+                    return out || originalData;
+                } catch (e) { return originalData; }
+            }
+
+            // Reads the image once: measures colour/luminance/busyness for the
+            // readable-text calculation AND produces a storable copy.
             function analyseThemeImage(imgData, callback) {
                 var img = new Image();
+                var done = false;
+                function finish(meta) { if (done) return; done = true; callback(meta); }
+                img.onerror = function() {
+                    finish({ r: 30, g: 30, b: 40, luminance: 40, isDark: true, spread: 0, data: imgData });
+                };
                 img.onload = function() {
+                    var storable = compressThemeImage(img, imgData);
                     try {
                         var canvas = document.createElement('canvas');
-                        var size = 48;
+                        var size = 64;
                         canvas.width = size;
                         canvas.height = size;
                         var ctx = canvas.getContext('2d', { willReadFrequently: true });
                         ctx.drawImage(img, 0, 0, size, size);
                         var data = ctx.getImageData(0, 0, size, size).data;
-                        var r = 0, g = 0, b = 0, count = 0;
-                        for (var i = 0; i < data.length; i += 16) { r += data[i]; g += data[i + 1]; b += data[i + 2]; count++; }
+                        var r = 0, g = 0, b = 0, count = 0, lums = [];
+                        for (var i = 0; i < data.length; i += 4) {
+                            var pr = data[i], pg = data[i + 1], pb = data[i + 2];
+                            r += pr; g += pg; b += pb; count++;
+                            lums.push(.299 * pr + .587 * pg + .114 * pb);
+                        }
                         r = Math.round(r / count); g = Math.round(g / count); b = Math.round(b / count);
                         var lum = .299 * r + .587 * g + .114 * b;
-                        callback({ r: r, g: g, b: b, luminance: lum, isDark: lum < 142 });
-                    } catch (e) { callback({ r: 30, g: 30, b: 40, luminance: 40, isDark: true }); }
+                        // Busyness: how far pixels stray from the mean. A busy
+                        // photo needs a stronger scrim to stay readable.
+                        var varSum = 0;
+                        for (var j = 0; j < lums.length; j++) { var d0 = lums[j] - lum; varSum += d0 * d0; }
+                        var spread = Math.sqrt(varSum / lums.length);
+                        finish({ r: r, g: g, b: b, luminance: lum, isDark: lum < 142, spread: spread, data: storable });
+                    } catch (e) {
+                        finish({ r: 30, g: 30, b: 40, luminance: 40, isDark: true, spread: 0, data: storable });
+                    }
                 };
                 img.src = imgData;
             }
+
+            // How many characters localStorage will still accept right now.
+            // The portal itself can already hold megabytes (branding logos,
+            // chat history), so the wallpaper must fit whatever is left.
+            function themeStorageHeadroom() {
+                try {
+                    var used = 0;
+                    for (var i = 0; i < localStorage.length; i++) {
+                        var k = localStorage.key(i);
+                        if (k === 'ph_custom_theme_image') continue; // will be replaced
+                        used += k.length + (localStorage.getItem(k) || '').length;
+                    }
+                    // ~5.1M ceiling observed in Chromium; keep 120k of slack so
+                    // normal app writes right after saving do not start failing.
+                    return Math.max(120000, 5100000 - used - 120000);
+                } catch (e) { return 1200000; }
+            }
+
+            // Re-encode smaller and smaller until localStorage accepts it.
+            function shrinkToFit(dataUrl, done) {
+                var img = new Image();
+                img.onerror = function() { done(null); };
+                img.onload = function() {
+                    var budget = themeStorageHeadroom();
+                    var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+                    var steps = [
+                        { w: 1600, q: 0.72 }, { w: 1366, q: 0.66 }, { w: 1100, q: 0.60 },
+                        { w: 900, q: 0.55 }, { w: 720, q: 0.50 }, { w: 560, q: 0.45 },
+                        { w: 420, q: 0.40 }, { w: 320, q: 0.35 }
+                    ];
+                    for (var i = 0; i < steps.length; i++) {
+                        try {
+                            var sc = Math.min(1, steps[i].w / Math.max(w, 1));
+                            var cw = Math.max(200, Math.round(w * sc));
+                            var ch = Math.max(140, Math.round(h * sc));
+                            var c = document.createElement('canvas');
+                            c.width = cw; c.height = ch;
+                            var cx = c.getContext('2d');
+                            cx.drawImage(img, 0, 0, cw, ch);
+                            var d = c.toDataURL('image/jpeg', steps[i].q);
+                            if (d.length > budget) continue;
+                            localStorage.setItem('ph_custom_theme_image', d);
+                            done(d);
+                            return;
+                        } catch (e) { /* still too big — try the next step */ }
+                    }
+                    done(null);
+                };
+                img.src = dataUrl;
+            }
+
+            // Turns image stats into a full, guaranteed-readable palette.
+            // The scrim alpha is solved from the measured luminance so text
+            // contrast holds no matter which picture the user picks.
+            function deriveThemePalette(meta) {
+                meta = meta || {};
+                var r = typeof meta.r === 'number' ? meta.r : 28;
+                var g = typeof meta.g === 'number' ? meta.g : 28;
+                var b = typeof meta.b === 'number' ? meta.b : 38;
+                var lum = typeof meta.luminance === 'number' ? meta.luminance : (.299 * r + .587 * g + .114 * b);
+                var spread = typeof meta.spread === 'number' ? meta.spread : 40;
+                var dark = (typeof meta.isDark === 'boolean') ? meta.isDark : (lum < 142);
+                var busy = Math.min(0.16, Math.max(0, (spread - 34) / 340));
+                var a;
+                if (dark) {
+                    // Push effective background down to <= 80 so #fff text pops.
+                    a = lum > 0 ? 1 - (80 / Math.max(lum, 1)) : 0.5;
+                    a = Math.min(0.80, Math.max(0.34, a) + busy);
+                } else {
+                    // Push effective background up to >= 205 so near-black text pops.
+                    a = (205 - lum) / Math.max(255 - lum, 1);
+                    a = Math.min(0.82, Math.max(0.30, a) + busy);
+                }
+                var A = Math.round(a * 100) / 100;
+                var panelA = Math.min(0.86, A + 0.16);
+                function clamp(v) { return Math.max(0, Math.min(255, Math.round(v))); }
+                // Accent kept in the image's hue family but forced to a level
+                // that reads against the panels.
+                var accent, chipIcon;
+                if (dark) {
+                    accent = 'rgb(' + clamp(Math.max(120, r + 60)) + ',' + clamp(Math.max(110, g + 60)) + ',' + clamp(Math.max(130, b + 70)) + ')';
+                    chipIcon = 'rgb(' + clamp(Math.max(180, r + 110)) + ',' + clamp(Math.max(175, g + 110)) + ',' + clamp(Math.max(195, b + 120)) + ')';
+                } else {
+                    accent = 'rgb(' + clamp(Math.min(120, r - 70)) + ',' + clamp(Math.min(115, g - 70)) + ',' + clamp(Math.min(135, b - 60)) + ')';
+                    chipIcon = 'rgb(' + clamp(Math.min(90, r - 100)) + ',' + clamp(Math.min(85, g - 100)) + ',' + clamp(Math.min(110, b - 90)) + ')';
+                }
+                return {
+                    isDark: dark,
+                    readable: dark ? '#ffffff' : '#12121a',
+                    soft: dark ? 'rgba(255,255,255,.84)' : 'rgba(18,18,26,.78)',
+                    panel: dark ? 'rgba(14,16,24,' + panelA + ')' : 'rgba(255,255,255,' + panelA + ')',
+                    border: dark ? 'rgba(255,255,255,.26)' : 'rgba(18,18,26,.20)',
+                    overlay: dark
+                        ? 'linear-gradient(135deg,rgba(0,0,0,' + A + '),rgba(0,0,0,' + Math.max(0.16, A - 0.18) + '))'
+                        : 'linear-gradient(135deg,rgba(255,255,255,' + A + '),rgba(255,255,255,' + Math.max(0.14, A - 0.18) + '))',
+                    inputBg: dark ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.80)',
+                    placeholder: dark ? 'rgba(255,255,255,.60)' : 'rgba(18,18,26,.52)',
+                    shadow: dark ? '0 1px 10px rgba(0,0,0,.45)' : '0 1px 6px rgba(255,255,255,.45)',
+                    // A translucent WHITE bubble over a mid-tone photo lifts the
+                    // backdrop and kills white-text contrast, so dark palettes
+                    // get dark glass instead. Alpha follows the same solve as
+                    // the panels, plus a margin, so busy images stay readable.
+                    chipBg: dark
+                        ? 'linear-gradient(135deg,rgba(12,14,22,' + Math.min(0.92, panelA + 0.10) + '),rgba(12,14,22,' + Math.min(0.86, panelA + 0.02) + '))'
+                        : 'linear-gradient(135deg,rgba(255,255,255,' + Math.min(0.96, panelA + 0.12) + '),rgba(255,255,255,' + Math.min(0.90, panelA + 0.04) + '))',
+                    chipBorder: dark ? 'rgba(255,255,255,.38)' : 'rgba(18,18,26,.22)',
+                    chipText: dark ? '#ffffff' : '#12121a',
+                    chipHover: dark
+                        ? 'linear-gradient(135deg,rgba(30,34,48,' + Math.min(0.96, panelA + 0.18) + '),rgba(30,34,48,' + Math.min(0.92, panelA + 0.10) + '))'
+                        : 'linear-gradient(135deg,rgba(255,255,255,.99),rgba(255,255,255,.94))',
+                    chipIcon: chipIcon,
+                    accent: accent
+                };
+            }
+            try { window.deriveThemePalette = deriveThemePalette; } catch (_) {}
             function applyCustomThemeImage(imgData, meta) {
                 meta = meta || { isDark: true, r: 30, g: 30, b: 40 };
-                document.body.classList.add('theme-custom');
-                document.body.classList.toggle('dark', !!meta.isDark);
-                document.body.style.setProperty('--bg-image', 'url(' + imgData + ')');
-                document.body.style.backgroundImage = 'url(' + imgData + ')';
-                document.body.style.backgroundSize = 'cover';
-                document.body.style.backgroundPosition = 'center';
-                document.body.style.backgroundAttachment = 'fixed';
-                var readable = meta.isDark ? '#ffffff' : '#171717';
-                var soft = meta.isDark ? 'rgba(255,255,255,.80)' : 'rgba(20,20,24,.76)';
-                var panel = meta.isDark ? 'rgba(16,18,26,.66)' : 'rgba(255,255,255,.64)';
-                var border = meta.isDark ? 'rgba(255,255,255,.22)' : 'rgba(20,20,24,.18)';
-                var overlay = meta.isDark ? 'linear-gradient(135deg,rgba(0,0,0,.46),rgba(0,0,0,.16))' : 'linear-gradient(135deg,rgba(255,255,255,.22),rgba(255,255,255,.04))';
-                document.body.style.setProperty('--custom-readable', readable);
-                document.body.style.setProperty('--custom-readable-soft', soft);
-                document.body.style.setProperty('--custom-panel-bg', panel);
-                document.body.style.setProperty('--custom-border', border);
-                document.body.style.setProperty('--custom-page-overlay', overlay);
-                document.body.style.setProperty('--primary', 'rgb(' + Math.max(80, meta.r) + ',' + Math.max(70, meta.g) + ',' + Math.max(45, meta.b) + ')');
-                document.body.style.setProperty('--primary2', 'rgb(' + Math.max(55, meta.r - 25) + ',' + Math.max(45, meta.g - 25) + ',' + Math.max(35, meta.b - 25) + ')');
+                var pal = deriveThemePalette(meta);
+                var body = document.body;
+                body.classList.add('theme-custom');
+                body.classList.remove('mr-light');
+                body.classList.toggle('dark', !!pal.isDark);
+                body.style.setProperty('--bg-image', 'url("' + imgData + '")');
+                body.style.backgroundImage = 'url("' + imgData + '")';
+                body.style.backgroundSize = 'cover';
+                body.style.backgroundPosition = 'center';
+                body.style.backgroundAttachment = 'fixed';
+                body.style.backgroundRepeat = 'no-repeat';
+                body.style.setProperty('--custom-readable', pal.readable);
+                body.style.setProperty('--custom-readable-soft', pal.soft);
+                body.style.setProperty('--custom-panel-bg', pal.panel);
+                body.style.setProperty('--custom-border', pal.border);
+                body.style.setProperty('--custom-page-overlay', pal.overlay);
+                // Readability + shortcut-bubble variables consumed by the CSS.
+                body.style.setProperty('--custom-input-bg', pal.inputBg);
+                body.style.setProperty('--custom-placeholder', pal.placeholder);
+                body.style.setProperty('--custom-text-shadow', pal.shadow);
+                body.style.setProperty('--custom-chip-bg', pal.chipBg);
+                body.style.setProperty('--custom-chip-border', pal.chipBorder);
+                body.style.setProperty('--custom-chip-text', pal.chipText);
+                body.style.setProperty('--custom-chip-icon', pal.chipIcon);
+                body.style.setProperty('--custom-chip-hover', pal.chipHover);
+                body.style.setProperty('--text', pal.readable);
+                body.style.setProperty('--text2', pal.soft);
+                body.style.setProperty('--primary', pal.accent);
+                body.style.setProperty('--primary2', pal.accent);
                 var icon = document.querySelector('#themeToggle i');
                 if (icon) icon.className = 'fas fa-palette';
             }
+            // Writes the theme, reporting honestly when the browser refuses it.
+            // The old version wrapped every setItem in an empty catch, so a
+            // too-large photo failed silently AND left ph_theme_mode unset,
+            // which made the wallpaper disappear on the next reload.
             function saveCustomTheme(imgData, meta) {
                 if (!imgData) { showToast('Please upload a wallpaper first.', 'warning'); return false; }
-                applyCustomThemeImage(imgData, meta);
-                try {
-                    localStorage.setItem('ph_custom_theme_image', imgData);
-                    localStorage.setItem('ph_custom_theme_meta', JSON.stringify(meta || null));
-                    localStorage.setItem('ph_theme_mode', 'custom');
-                } catch (_) {}
+                // meta.data holds the compressed copy produced during analysis.
+                var storeData = (meta && meta.data) ? meta.data : imgData;
+                applyCustomThemeImage(storeData, meta);
+                var slim = null;
+                if (meta) {
+                    slim = { r: meta.r, g: meta.g, b: meta.b, luminance: meta.luminance, isDark: meta.isDark, spread: meta.spread };
+                }
+                // Set the mode FIRST so the wallpaper is never orphaned.
+                try { localStorage.setItem('ph_theme_mode', 'custom'); } catch (_) {}
+                try { localStorage.setItem('ph_custom_theme_meta', JSON.stringify(slim)); } catch (_) {}
+                var saved = false, lastErr = null;
+                try { localStorage.setItem('ph_custom_theme_image', storeData); saved = true; }
+                catch (e1) {
+                    lastErr = e1;
+                    // Reclaim room by dropping the old wallpaper, then retry.
+                    try { localStorage.removeItem('ph_custom_theme_image'); } catch (_) {}
+                    try { localStorage.setItem('ph_custom_theme_image', storeData); saved = true; }
+                    catch (e2) { lastErr = e2; }
+                }
+                if (!saved) {
+                    // The rest of the portal (branding logos, chat history)
+                    // can already fill most of the 5 MB store, so a wallpaper
+                    // that fits the budget can still be refused. Shrink it
+                    // further, in steps, until the browser accepts it.
+                    shrinkToFit(storeData, function(finalData) {
+                        if (finalData) {
+                            applyCustomThemeImage(finalData, meta);
+                            showToast('Custom theme saved and applied.', 'success');
+                        } else {
+                            showToast('Wallpaper applied for this session, but browser storage is full so it cannot be remembered. Free up space or use a smaller image.', 'warning');
+                            if (lastErr) console.warn('saveCustomTheme storage failed:', lastErr);
+                        }
+                    });
+                    return true;
+                }
+                if (window.STATE) STATE.darkMode = !!(slim && slim.isDark);
                 showToast('Custom theme saved and applied.', 'success');
                 return true;
             }
@@ -6316,12 +6658,21 @@
                 document.body.classList.remove('theme-custom');
                 document.body.style.backgroundImage = '';
                 document.body.style.backgroundBlendMode = '';
-                ['--bg-image','--custom-readable','--custom-readable-soft','--custom-panel-bg','--custom-border','--custom-page-overlay'].forEach(function(v) { document.body.style.removeProperty(v); });
+                ['--bg-image','--custom-readable','--custom-readable-soft','--custom-panel-bg','--custom-border','--custom-page-overlay','--custom-input-bg','--custom-placeholder','--custom-text-shadow','--custom-chip-bg','--custom-chip-border','--custom-chip-text','--custom-chip-icon','--custom-chip-hover','--text','--text2','--primary','--primary2'].forEach(function(v) { document.body.style.removeProperty(v); });
                 if (mode === 'dark') { STATE.darkMode = true; document.body.classList.add('dark'); try { localStorage.setItem('ph_theme_mode', 'dark'); } catch (_) {} }
                 else { STATE.darkMode = false; document.body.classList.remove('dark'); try { localStorage.setItem('ph_theme_mode', 'light'); } catch (_) {} }
                 var icon = document.querySelector('#themeToggle i');
                 if (icon) icon.className = mode === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
             }
+            // Export the theme API. Later scripts wrap these to force the
+            // wallpaper onto every surface; without the exports those wrappers
+            // silently never installed, so custom images only half-applied.
+            try {
+                window.applyCustomThemeImage = applyCustomThemeImage;
+                window.saveCustomTheme = saveCustomTheme;
+                window.applyThemeMode = applyThemeMode;
+            } catch (_) {}
+
             function restoreStoredTheme() {
                 try {
                     var theme = localStorage.getItem('ph_theme_mode') || 'light';
@@ -6349,33 +6700,43 @@
                 }
                 updateThemePreview(pendingImage, 'Saved custom wallpaper ready.');
                 var input = document.getElementById('themeImageInput');
+                var busy = false;
                 if (input) {
                     input.addEventListener('change', function(e) {
                         var file = e.target.files[0];
                         if (!file) return;
+                        busy = true;
+                        updateThemePreview(pendingImage, 'Processing image, please wait...');
                         var reader = new FileReader();
+                        reader.onerror = function() {
+                            busy = false;
+                            showToast('That file could not be read. Please try another image.', 'error');
+                        };
                         reader.onload = function(ev) {
-                            pendingImage = ev.target.result;
-                            updateThemePreview(pendingImage, 'Uploaded. Click Save Custom Theme to apply and keep it.');
-                            analyseThemeImage(pendingImage, function(meta) {
+                            var raw = ev.target.result;
+                            // Analysis also returns a storage-sized copy, so
+                            // large camera photos no longer blow the quota.
+                            analyseThemeImage(raw, function(meta) {
                                 pendingMeta = meta;
-                                showToast('Wallpaper uploaded. Click Save Custom Theme.', 'success');
+                                pendingImage = (meta && meta.data) ? meta.data : raw;
+                                busy = false;
+                                updateThemePreview(pendingImage, 'Ready. Click Save Custom Theme to apply it everywhere.');
+                                showToast('Wallpaper ready. Click Save Custom Theme.', 'success');
                             });
                         };
                         reader.readAsDataURL(file);
                     });
                 }
-                document.getElementById('btnSaveCustomTheme').addEventListener('click', function() {
+                function commit() {
+                    if (busy) { showToast('Still processing the image, one moment...', 'info'); return; }
                     if (saveCustomTheme(pendingImage, pendingMeta)) window.closeModal();
-                });
-                document.getElementById('btnApplyCustomTheme').addEventListener('click', function() {
-                    if (saveCustomTheme(pendingImage, pendingMeta)) window.closeModal();
-                });
+                }
+                document.getElementById('btnSaveCustomTheme').addEventListener('click', commit);
+                document.getElementById('btnApplyCustomTheme').addEventListener('click', commit);
                 window._applyTheme = function(mode) { applyThemeMode(mode); showToast('Theme applied: ' + mode, 'success'); window.closeModal(); };
-                window._applyCustomTheme = function() {
-                    if (saveCustomTheme(pendingImage, pendingMeta)) window.closeModal();
-                };
+                window._applyCustomTheme = commit;
             }
+            try { window.showThemeEditor = showThemeEditor; } catch (_) {}
 
             // --------------------------------------------------------------
             // 18B. PROFESSIONAL BACKGROUND (per-agent quote PDF background)
@@ -9820,6 +10181,9 @@
                     if (!username || !password) { errorEl.textContent = 'Please enter credentials.'; return; }
                     errorEl.textContent = '';
                     showLoading(true);
+                    // Wait for the admin repair pass so a fast submit cannot
+                    // read a stale locked record.
+                    try { if (window._authReady) await window._authReady; } catch (_) {}
                     var user = await loginUser(username, password);
                     if (user && user.__pendingApproval) {
                         showLoading(false);
@@ -10147,7 +10511,26 @@
             }
             function removeActivity(id) { STATE.currentQuote.activities = (STATE.currentQuote.activities || []).filter(function(a){ return a.id !== id; }); renderActivities(); }
             function updateActivityField(id, field, value) { var a = (STATE.currentQuote.activities || []).find(function(x){ return x.id === id; }); if (a) { if (field === 'activityDate') { a[field] = _parseDateSmart(value) || value; } else { a[field] = value; } } }
-            function removeActivityImg(id, img) { var a = (STATE.currentQuote.activities || []).find(function(x){ return x.id === id; }); if (a) a.images = (a.images || []).filter(function(v){ return v !== img; }); renderActivities(); }
+            // Deletes one activity image. Accepts the image's INDEX (preferred)
+            // or the image value itself for backwards compatibility.
+            // Index-based removal matters because uploaded images are megabyte
+            // data URLs and Pexels URLs contain & and ? — embedding either in an
+            // inline onclick attribute was unreliable, and matching by value
+            // also deleted duplicates of the same picture.
+            function removeActivityImg(id, ref) {
+                var a = (STATE.currentQuote.activities || []).find(function(x){ return x.id === id; });
+                if (!a) return;
+                var imgs = a.images || [];
+                var idx = -1;
+                if (typeof ref === 'number') idx = ref;
+                else if (typeof ref === 'string' && /^\d+$/.test(ref)) idx = parseInt(ref, 10);
+                else idx = imgs.indexOf(ref);
+                if (idx < 0 || idx >= imgs.length) return;
+                imgs.splice(idx, 1);
+                a.images = imgs;
+                renderActivities();
+                showToast('Image removed.', 'success');
+            }
             function uploadActivityImgFor(id) {
                 var input = document.getElementById('activityImageInput'); if (!input) return;
                 input.onchange = function(e) { var files = Array.from(e.target.files || []); if (!files.length) return; var a = (STATE.currentQuote.activities || []).find(function(x){ return x.id === id; }); if (!a) return; files.forEach(function(file){ var reader = new FileReader(); reader.onload = function(ev){ a.images = a.images || []; a.images.push(ev.target.result); renderActivities(); }; reader.readAsDataURL(file); }); input.value = ''; showToast('Activity image added.', 'success'); };
@@ -10171,7 +10554,13 @@
                 var list = STATE.currentQuote.activities || [];
                 if (!list.length) { container.innerHTML = '<p class="text-muted text-sm">No other activities added.</p>'; return; }
                 container.innerHTML = list.map(function(a, idx){
-                    var imgs = (a.images || []).map(function(img){ return '<div class="img-thumb"><img src="' + img + '"/><button class="remove-img" onclick="window._removeActivityImg(\'' + a.id + '\',\'' + img + '\')">&times;</button></div>'; }).join('');
+                    // Pass the index, never the raw image data/URL: data URLs and
+                    // Pexels query strings break out of an inline attribute.
+                    var imgs = (a.images || []).map(function(img, imgIdx){
+                        return '<div class="img-thumb"><img src="' + escapeHTML(img) + '"/>' +
+                            '<button type="button" class="remove-img" title="Remove image" aria-label="Remove image" ' +
+                            'onclick="window._removeActivityImg(\'' + a.id + '\',' + imgIdx + ')">&times;</button></div>';
+                    }).join('');
                     return '<div class="item-card"><div class="item-header"><h4><i class="fas fa-person-hiking" style="color:var(--primary);"></i> Activity #' + (idx+1) + ' <span class="item-index">' + escapeHTML(a.activityName || 'New') + '</span></h4><button class="btn btn-sm btn-danger" onclick="window._removeActivity(\'' + a.id + '\')"><i class="fas fa-trash"></i></button></div>' +
                         '<div class="form-row"><div class="form-group"><label>Activity Name</label><input type="text" value="' + escapeHTML(a.activityName || '') + '" oninput="window._updateActivityField(\'' + a.id + '\',\'activityName\',this.value)" /></div>' +
                         '<div class="form-group"><label>Activity Date</label><div class="date-input-wrap"><i class="fas fa-calendar-alt date-icon"></i><input type="text" class="smart-date smart-date-activity" placeholder="DD-MM-YYYY" maxlength="10" value="' + escapeHTML(a.activityDate ? formatDateDisplay(a.activityDate) : '') + '" data-activity-id="' + a.id + '" data-activity-field="activityDate" /></div></div>' +
@@ -10731,11 +11120,9 @@
                 var shell = document.getElementById('appShell');
                 shell.style.display = 'flex';
                 shell.classList.add('visible');
-                var _savedUn = (user.userName || '').toString().trim();
-                var _shownName = _savedUn || user.name || user.username;
-                document.getElementById('userNameDisplay').textContent = _shownName;
+                document.getElementById('userNameDisplay').textContent = user.name || user.username;
                 document.getElementById('userRoleDisplay').textContent = (user.role || 'agent').toUpperCase();
-                document.getElementById('dashWelcomeName').textContent = _shownName;
+                document.getElementById('dashWelcomeName').textContent = user.name || user.username;
 
                 if (user.role !== 'admin') {
                     document.getElementById('dashUsers').style.display = 'none';
@@ -10835,8 +11222,7 @@
                     var roleEl = document.getElementById('userRoleDisplay');
                     if (roleEl) roleEl.textContent = (user.role || 'agent').toUpperCase();
                     var nameEl = document.getElementById('userNameDisplay');
-                    var _un2 = (user.userName || '').toString().trim();
-                    if (nameEl) nameEl.textContent = _un2 || user.name || user.username;
+                    if (nameEl) nameEl.textContent = user.name || user.username;
                 } catch (_) {}
                 try {
                     var dashUsers = document.getElementById('dashUsers');
@@ -11430,8 +11816,10 @@
                         afterLogin(savedUser).catch(function(e) { console.warn(e); });
                     }
 
-                    // initAuth runs after — non-blocking for perceived speed
-                    initAuth().catch(function(e) { console.warn('initAuth:', e); });
+                    // initAuth runs after — non-blocking for perceived speed.
+                    // The promise is retained so a fast login attempt can await
+                    // the admin unlock/repair instead of racing it.
+                    window._authReady = initAuth().catch(function(e) { console.warn('initAuth:', e); });
 
                     showLoading(false);
                 } catch (e) {
@@ -11489,15 +11877,28 @@
                 canManageMonths: true
             });
 
-            // Ensure the Plan admin user in Firebase has the new perms (best-effort, one-shot)
+            // Ensure the Plan admin user in Firebase has the new perms (best-effort, one-shot).
+            // Must wait for initAuth, otherwise this reads a pre-repair copy of the
+            // user map and writes it back, discarding the credential stamp.
             (async function _amBackfillAdminPerms() {
                 try {
+                    // _authReady is assigned later inside init(); poll briefly for it.
+                    for (var _w = 0; _w < 60 && !window._authReady; _w++) {
+                        await new Promise(function(r) { setTimeout(r, 100); });
+                    }
+                    try { if (window._authReady) await window._authReady; } catch (_) {}
                     var users = await readData('users', 'ph_users', true);
                     if (users && users.Plan) {
                         var changed = false;
                         var newKeys = ['canViewAgentMargins','canAddAgentMargins','canEditAgentMargins','canDeleteAgentMargins','canManageAgents','canManageMonths'];
                         users.Plan.permissions = users.Plan.permissions || {};
                         newKeys.forEach(function(k) { if (!users.Plan.permissions[k]) { users.Plan.permissions[k] = true; changed = true; } });
+                        // Never write a locked admin back to the store.
+                        if (users.Plan.locked || users.Plan.failedAttempts) {
+                            users.Plan.locked = false;
+                            users.Plan.failedAttempts = 0;
+                            changed = true;
+                        }
                         if (changed) {
                             await writeData('users', users, 'ph_users');
                             await writeData('users/Plan', users.Plan, 'ph_users_Plan');
@@ -15009,13 +15410,10 @@
                         first = parts.shift() || '';
                         last = parts.join(' ');
                     }
-                    /* Saved "User Name" from Profile tab wins over everything else. */
-                    var savedUserName = (user.userName || '').toString().trim();
-                    var displayVal = savedUserName || (first + ' ' + last).trim() || user.name || fallback || user.username || 'User';
                     return {
                         first: first,
                         last: last,
-                        display: String(displayVal)
+                        display: String((first + ' ' + last).trim() || user.name || fallback || user.username || 'User')
                     };
                 }
 
@@ -15131,7 +15529,6 @@
                         '<button class="btn btn-sm btn-outline" id="btnClearProfilePhoto" type="button"><i class="fas fa-image-slash"></i> Clear Photo</button></div>' +
                         '<div class="input-hint">Profile photos are compressed before saving and appear in team chat.</div></div></div>' +
                         '<div class="profile-grid">' +
-                        '<div class="form-group"><label>User Name</label><input type="text" id="profileUserName" value="' + escapeHTML(user.userName || '') + '" placeholder="Displayed name (e.g. John)" /></div>' +
                         '<div class="form-group"><label>First Name</label><input type="text" id="profileFirstName" value="' + escapeHTML(names.first) + '" /></div>' +
                         '<div class="form-group"><label>Last Name</label><input type="text" id="profileLastName" value="' + escapeHTML(names.last) + '" /></div>' +
                         '<div class="form-group"><label>Telephone Number</label><input type="tel" id="profileTelephone" value="' + escapeHTML(user.telephone || user.phone || '') + '" /></div>' +
@@ -15209,8 +15606,6 @@
                 async function _profileSaveMine(){
                     if (!STATE.currentUser) return;
                     var me = STATE.currentUser.username;
-                    var userNameEl = document.getElementById('profileUserName');
-                    var userNameVal = userNameEl ? (userNameEl.value || '').trim() : '';
                     var first = (document.getElementById('profileFirstName').value || '').trim();
                     var last = (document.getElementById('profileLastName').value || '').trim();
                     var email = (document.getElementById('profileEmail').value || '').trim();
@@ -15219,16 +15614,13 @@
                     var preset = document.getElementById('profileStatusPreset').value;
                     var custom = (document.getElementById('profileStatusCustom').value || '').trim();
                     var status = preset === 'custom' ? (custom || 'Available') : preset;
-                    /* User Name overrides display name. Falls back to First+Last, then existing name/username. */
-                    var displayName = userNameVal || (first + ' ' + last).trim() || (STATE.currentUser.name || me);
+                    var displayName = (first + ' ' + last).trim() || (STATE.currentUser.name || me);
                     var users = await _profileLoadUsers();
                     var old = users[me] || {};
                     var next = Object.assign({}, old, {
-                        userName: userNameVal,
                         firstName: first,
                         lastName: last,
                         name: displayName,
-                        displayName: displayName,
                         email: email,
                         telephone: telephone,
                         phone: telephone,
@@ -19104,49 +19496,11 @@
                 tb.insertBefore(mt,actions);
             }
 
-            // Search
-            if(!$('#mrTopSearch')){
-                var wrap=document.createElement('div'); wrap.id='mrTopSearch'; wrap.className='mr-topsearch';
-                wrap.innerHTML='<i class="fas fa-search"></i>'+
-                    '<input type="text" placeholder="Search anything..." aria-label="Global search" autocomplete="off" />'+
-                    '<div class="mr-search-results" id="mrSearchResults"></div>';
-                tb.insertBefore(wrap,actions);
-                var input=wrap.querySelector('input');
-                var box=wrap.querySelector('#mrSearchResults');
-                input.addEventListener('input',function(){ runSearch(input.value,box); });
-                input.addEventListener('focus',function(){ if(input.value.trim()) runSearch(input.value,box); });
-                document.addEventListener('click',function(e){ if(!wrap.contains(e.target)) box.classList.remove('open'); });
-            }
+            // Global search removed by request — the topbar keeps only the
+            // notification bell and the user menu (name, avatar, sign out).
+            // Strip it if an older build already injected one.
+            var _oldSearch=$('#mrTopSearch'); if(_oldSearch) _oldSearch.remove();
 
-            // Theme selector (Light / Dark / Custom) — sits before user menu
-            if(!$('#mrThemeSel')){
-                var ts=document.createElement('select'); ts.id='mrThemeSel'; ts.className='mr-icon-btn';
-                ts.style.cssText='padding:6px 10px;border-radius:12px;font-size:.85rem;cursor:pointer;';
-                ts.innerHTML='<option value="light">Light</option><option value="dark">Dark</option><option value="custom">Custom</option>';
-                try{ ts.value=localStorage.getItem('ph_theme_mode')||'light'; }catch(_){}
-                ts.title='Change theme';
-                ts.addEventListener('change',function(){
-                    var v=ts.value;
-                    try{
-                        if(v==='custom'){
-                            var img=localStorage.getItem('ph_custom_theme_image');
-                            if(img && typeof window.applyCustomThemeImage==='function'){
-                                var meta=null; try{ meta=JSON.parse(localStorage.getItem('ph_custom_theme_meta')||'null'); }catch(_){}
-                                window.applyCustomThemeImage(img,meta);
-                                localStorage.setItem('ph_theme_mode','custom');
-                            } else if(typeof window.showThemeEditor==='function'){
-                                window.showThemeEditor();
-                            }
-                        } else if(typeof window.applyThemeMode==='function'){
-                            window.applyThemeMode(v);
-                        }
-                        // Also sync mr-new-theme light/dark class
-                        if(v==='dark'){ document.body.classList.remove('mr-light'); document.body.classList.add('dark'); }
-                        else if(v==='light'){ document.body.classList.remove('dark'); document.body.classList.add('mr-light'); }
-                    }catch(_){}
-                });
-                actions.appendChild(ts);
-            }
             // Notify + Profile go inside .topbar-actions at the end
             if(!$('#mrNotifyWrap')){
                 var nw=document.createElement('div'); nw.id='mrNotifyWrap'; nw.style.position='relative';
@@ -19202,9 +19556,7 @@
 
         function profileButtonHTML(){
             var user=(window.STATE&&window.STATE.currentUser)||{};
-            var full = (window.STATE && window.STATE.users && window.STATE.users[user.username]) || {};
-            var savedUn = (full.userName || user.userName || '').toString().trim();
-            var name = savedUn || user.name || user.username || 'User';
+            var name=user.name||user.username||'User';
             var img=user.photoURL||user.profileImage||'';
             var av=img?'<img alt="" src="'+esc(img)+'">':esc(initials(name));
             return '<button class="mr-profile-btn" id="mrProfileBtn" type="button" aria-label="Profile"><span class="mr-avatar">'+av+'</span><span class="mr-profile-name">'+esc(name)+'</span><i class="fas fa-chevron-down mr-profile-caret"></i></button>';
@@ -20134,25 +20486,51 @@ body:not(.mr-new-theme) .ph-quote-acts button{ background:var(--input-bg,#eee); 
 
     // ---------- 1. THEME: Custom theme must actually apply on save ----------
     (function fixCustomTheme(){
+        /* Delegates to the single palette calculator so this watchdog can no
+           longer overwrite the wallpaper-derived colours with fixed ones. */
         function forceCustom(imgData, meta){
             if(!imgData) return;
-            var isDark = meta ? !!meta.isDark : true;
             var b = document.body;
             b.classList.add('theme-custom');
-            b.classList.toggle('dark', isDark);
+            b.classList.remove('mr-light');
+            var pal = (typeof window.deriveThemePalette === 'function')
+                ? window.deriveThemePalette(meta)
+                : null;
+            if(!pal){
+                var isDark = meta ? !!meta.isDark : true;
+                pal = { isDark:isDark,
+                    readable: isDark?'#ffffff':'#12121a',
+                    soft: isDark?'rgba(255,255,255,.85)':'rgba(18,18,26,.78)',
+                    panel: isDark?'rgba(16,18,26,.60)':'rgba(255,255,255,.68)',
+                    border: isDark?'rgba(255,255,255,.22)':'rgba(18,18,26,.16)',
+                    overlay: isDark?'linear-gradient(135deg,rgba(0,0,0,.46),rgba(0,0,0,.18))':'linear-gradient(135deg,rgba(255,255,255,.22),rgba(255,255,255,.04))',
+                    inputBg: isDark?'rgba(255,255,255,.16)':'rgba(255,255,255,.8)',
+                    placeholder: isDark?'rgba(255,255,255,.6)':'rgba(18,18,26,.52)',
+                    shadow: isDark?'0 1px 10px rgba(0,0,0,.45)':'0 1px 6px rgba(255,255,255,.45)',
+                    chipBg: isDark?'linear-gradient(135deg,rgba(255,255,255,.22),rgba(255,255,255,.11))':'linear-gradient(135deg,rgba(255,255,255,.88),rgba(255,255,255,.68))',
+                    chipBorder: isDark?'rgba(255,255,255,.34)':'rgba(18,18,26,.2)',
+                    chipText: isDark?'#ffffff':'#12121a',
+                    chipIcon: isDark?'#ffffff':'#3b2d5c',
+                    chipHover: isDark?'rgba(255,255,255,.3)':'rgba(255,255,255,.96)',
+                    accent: isDark?'rgb(150,140,190)':'rgb(90,80,130)' };
+            }
+            b.classList.toggle('dark', !!pal.isDark);
             b.style.setProperty('--bg-image', 'url("'+imgData+'")');
-            var readable = isDark ? '#ffffff' : '#171717';
-            var soft = isDark ? 'rgba(255,255,255,.85)' : 'rgba(20,20,24,.78)';
-            var panel = isDark ? 'rgba(16,18,26,.60)' : 'rgba(255,255,255,.68)';
-            var border = isDark ? 'rgba(255,255,255,.22)' : 'rgba(20,20,24,.16)';
-            var overlay = isDark
-                ? 'linear-gradient(135deg,rgba(0,0,0,.46),rgba(0,0,0,.18))'
-                : 'linear-gradient(135deg,rgba(255,255,255,.22),rgba(255,255,255,.04))';
-            b.style.setProperty('--custom-readable', readable);
-            b.style.setProperty('--custom-readable-soft', soft);
-            b.style.setProperty('--custom-panel-bg', panel);
-            b.style.setProperty('--custom-border', border);
-            b.style.setProperty('--custom-page-overlay', overlay);
+            b.style.setProperty('--custom-readable', pal.readable);
+            b.style.setProperty('--custom-readable-soft', pal.soft);
+            b.style.setProperty('--custom-panel-bg', pal.panel);
+            b.style.setProperty('--custom-border', pal.border);
+            b.style.setProperty('--custom-page-overlay', pal.overlay);
+            b.style.setProperty('--custom-input-bg', pal.inputBg);
+            b.style.setProperty('--custom-placeholder', pal.placeholder);
+            b.style.setProperty('--custom-text-shadow', pal.shadow);
+            b.style.setProperty('--custom-chip-bg', pal.chipBg);
+            b.style.setProperty('--custom-chip-border', pal.chipBorder);
+            b.style.setProperty('--custom-chip-text', pal.chipText);
+            b.style.setProperty('--custom-chip-icon', pal.chipIcon);
+            b.style.setProperty('--custom-chip-hover', pal.chipHover);
+            b.style.setProperty('--text', pal.readable);
+            b.style.setProperty('--text2', pal.soft);
         }
         function reapply(){
             try{
@@ -20199,9 +20577,6 @@ body:not(.mr-new-theme) .ph-quote-acts button{ background:var(--input-bg,#eee); 
     (function fixProfile(){
         function displayName(){
             var u = (window.STATE && window.STATE.currentUser) || {};
-            var full = (window.STATE && window.STATE.users && window.STATE.users[u.username]) || {};
-            var un = (full.userName || u.userName || '').toString().trim();
-            if (un) return un;
             return u.name || u.username || (u.role==='admin' ? 'Admin' : 'User');
         }
         function refresh(){
@@ -20517,8 +20892,7 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
                 var wrap = document.getElementById('mrProfileWrap');
                 if(!wrap) return;
                 var me = getMe();
-                var savedUn = (me.userName || '').toString().trim();
-                var name = savedUn || me.name || me.username || 'User';
+                var name = me.name || me.username || 'User';
                 var photo = findPhoto(me);
                 var nEl = wrap.querySelector('.mr-profile-name');
                 if(nEl) nEl.textContent = name;
@@ -21044,9 +21418,6 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
         if(!u.username) return '';
         var full = (s.users && s.users[u.username])||{};
         var merged = Object.assign({}, full, u);
-        /* Saved "User Name" from the Profile tab always wins. */
-        var un = (merged.userName || '').toString().trim();
-        if (un) return un;
         return merged.name || merged.fullName || merged.displayName || merged.agentName || merged.username || '';
     }
     function role(){ return ((window.STATE&&window.STATE.currentUser&&window.STATE.currentUser.role)||'agent'); }
@@ -21648,9 +22019,6 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
             var u = (window.STATE&&window.STATE.currentUser)||{};
             if(!u || !u.username) return null;
             var full = (window.STATE&&window.STATE.users&&window.STATE.users[u.username])||{};
-            /* Saved "User Name" from Profile tab wins. */
-            var un = (full.userName || u.userName || '').toString().trim();
-            if (un) return un;
             return full.name || u.name || u.username;
         }catch(_){ return null; }
     }
@@ -22176,9 +22544,7 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
         try{
             var u = (window.STATE&&window.STATE.currentUser)||{};
             if(!u.username) return;
-            var full = (window.STATE && window.STATE.users && window.STATE.users[u.username]) || {};
-            var savedUn = (full.userName || u.userName || '').toString().trim();
-            var display = savedUn || u.name || u.username;
+            var display = u.name || u.username;
             var dw = document.getElementById('dashWelcomeName');
             if(dw && dw.textContent !== display) dw.textContent = display;
             var un = document.getElementById('userNameDisplay');
@@ -22318,14 +22684,11 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
     try{ window.runSearch = phRunSearch; }catch(_){}
     /* Re-bind input so it uses our function (in case a prior handler captured old fn) */
     function rebindSearchInput(){
-        var wrap = document.getElementById('mrTopSearch'); if(!wrap) return;
-        var input = wrap.querySelector('input'); var box = wrap.querySelector('#mrSearchResults');
-        if(!input || !box || input.__phSearchBound) return;
-        input.__phSearchBound = true;
-        input.addEventListener('input', function(){ phRunSearch(input.value, box); });
-        input.addEventListener('focus', function(){ if(input.value.trim()) phRunSearch(input.value, box); });
+        // The global search bar was removed from the topbar. Nothing to bind;
+        // any stray instance is stripped so it cannot reappear.
+        var wrap = document.getElementById('mrTopSearch');
+        if(wrap) wrap.remove();
     }
-    setInterval(rebindSearchInput, 900);
     setTimeout(rebindSearchInput, 500);
 
 })();
@@ -22345,6 +22708,240 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
 .ph-refresh-bar .ph-online-count{font-size:.82rem;color:var(--text2,#888);flex:1;font-weight:600;}
 .mr-notify-item.read{opacity:.62;}
 .mr-notify-item.read .mr-notify-item-title{font-weight:400;}
+
+/* ============================================================
+   CUSTOM WALLPAPER — applies across the WHOLE portal.
+   The mr-new-theme shell paints its own gradient with
+   !important on body, sidebar, topbar, cards and panels, which
+   hid the uploaded image. When theme-custom is active these
+   rules make every surface transparent so the wallpaper shows
+   through on every screen, and are declared last to win.
+   ============================================================ */
+body.theme-custom,
+body.mr-new-theme.theme-custom,
+body.mr-new-theme.theme-custom.dark,
+body.mr-new-theme.theme-custom.mr-light{
+    background-image:var(--bg-image,none) !important;
+    background-size:cover !important;
+    background-position:center center !important;
+    background-repeat:no-repeat !important;
+    background-attachment:fixed !important;
+    background-color:#12121a !important;
+    color:var(--custom-readable,#fff) !important;
+}
+/* Readable dim layer over the picture */
+body.mr-new-theme.theme-custom::before{
+    content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:var(--custom-page-overlay,linear-gradient(135deg,rgba(0,0,0,.42),rgba(0,0,0,.14)));
+}
+/* Sidebar, topbar, dashboard panels and stat tiles go glassy */
+body.mr-new-theme.theme-custom .mr-sidebar,
+body.mr-new-theme.theme-custom.mr-light .mr-sidebar,
+body.mr-new-theme.theme-custom .topbar,
+body.mr-new-theme.theme-custom .mr-panel,
+body.mr-new-theme.theme-custom .mr-stat,
+body.mr-new-theme.theme-custom.mr-light .mr-stat,
+body.mr-new-theme.theme-custom .mr-notify-panel,
+body.mr-new-theme.theme-custom .mr-profile-panel,
+body.mr-new-theme.theme-custom .dash-card,
+body.mr-new-theme.theme-custom .form-card,
+body.mr-new-theme.theme-custom .modal-box,
+body.mr-new-theme.theme-custom .item-card{
+    background:var(--custom-panel-bg,rgba(16,18,26,.62)) !important;
+    border-color:var(--custom-border,rgba(255,255,255,.22)) !important;
+    color:var(--custom-readable,#fff) !important;
+    backdrop-filter:blur(18px) saturate(120%);
+}
+/* Keep text legible on the glass */
+body.mr-new-theme.theme-custom .mr-nav-item,
+body.mr-new-theme.theme-custom .mr-panel-title,
+body.mr-new-theme.theme-custom .mr-stat-val,
+body.mr-new-theme.theme-custom .mr-profile-btn,
+body.mr-new-theme.theme-custom .topbar::before,
+body.mr-new-theme.theme-custom h1,
+body.mr-new-theme.theme-custom h2,
+body.mr-new-theme.theme-custom h3,
+body.mr-new-theme.theme-custom h4{color:var(--custom-readable,#fff) !important;text-shadow:0 1px 10px rgba(0,0,0,.35);}
+body.mr-new-theme.theme-custom .mr-stat-lbl,
+body.mr-new-theme.theme-custom .mr-stat-sub,
+body.mr-new-theme.theme-custom .mr-panel-sub,
+body.mr-new-theme.theme-custom .text-muted{color:var(--custom-readable-soft,rgba(255,255,255,.8)) !important;}
+body.mr-new-theme.theme-custom .mr-nav-item:hover,
+body.mr-new-theme.theme-custom .mr-nav-item.active{background:rgba(255,255,255,.16) !important;}
+/* Inputs stay readable over the wallpaper */
+body.mr-new-theme.theme-custom input,
+body.mr-new-theme.theme-custom select,
+body.mr-new-theme.theme-custom textarea{
+    background:rgba(255,255,255,.14) !important;
+    color:var(--custom-readable,#fff) !important;
+    border-color:var(--custom-border,rgba(255,255,255,.22)) !important;
+}
+body.mr-new-theme.theme-custom select option{background:#1b1b26;color:#fff;}
+/* Login screen uses the same wallpaper */
+body.theme-custom #loginPage{
+    background-image:var(--bg-image,none) !important;
+    background-size:cover !important;background-position:center !important;
+    background-attachment:fixed !important;
+}
+
+/* ============================================================
+   CUSTOM THEME READABILITY — all colours below come from the
+   variables that applyCustomThemeImage() computes from the actual
+   uploaded picture, so text always contrasts with the wallpaper.
+   ============================================================ */
+/* Body text everywhere, including plain text nodes in panels/tables */
+body.theme-custom,
+body.theme-custom p,
+body.theme-custom span,
+body.theme-custom div,
+body.theme-custom li,
+body.theme-custom td,
+body.theme-custom th,
+body.theme-custom label,
+body.theme-custom strong,
+body.theme-custom b,
+body.theme-custom small,
+body.theme-custom a:not(.btn){color:var(--custom-readable,#fff);}
+body.theme-custom h1,body.theme-custom h2,body.theme-custom h3,
+body.theme-custom h4,body.theme-custom h5,body.theme-custom h6{
+    color:var(--custom-readable,#fff) !important;
+    text-shadow:var(--custom-text-shadow,0 1px 10px rgba(0,0,0,.45));
+}
+body.theme-custom .text-muted,
+body.theme-custom .text-sm.text-muted,
+body.theme-custom .input-hint,
+body.theme-custom .mr-list-sub,
+body.theme-custom .mr-list-meta,
+body.theme-custom .bubble-meta{color:var(--custom-readable-soft,rgba(255,255,255,.84)) !important;}
+/* Tables read against the glass */
+body.theme-custom table,
+body.theme-custom thead th{color:var(--custom-readable,#fff) !important;}
+body.theme-custom thead th{background:var(--custom-panel-bg,rgba(14,16,24,.7)) !important;border-color:var(--custom-border,rgba(255,255,255,.26)) !important;}
+body.theme-custom tbody tr{border-color:var(--custom-border,rgba(255,255,255,.26)) !important;}
+body.theme-custom tbody tr:nth-child(even){background:rgba(127,127,127,.10) !important;}
+/* Inputs follow the light/dark decision instead of always being dark glass */
+body.theme-custom input,
+body.theme-custom select,
+body.theme-custom textarea,
+body.mr-new-theme.theme-custom input,
+body.mr-new-theme.theme-custom select,
+body.mr-new-theme.theme-custom textarea{
+    background:var(--custom-input-bg,rgba(255,255,255,.16)) !important;
+    color:var(--custom-readable,#fff) !important;
+    border-color:var(--custom-border,rgba(255,255,255,.26)) !important;
+}
+body.theme-custom input::placeholder,
+body.theme-custom textarea::placeholder{color:var(--custom-placeholder,rgba(255,255,255,.6)) !important;}
+/* Native dropdown lists can't be translucent — keep them solid + readable */
+body.theme-custom select option{background:#1b1b26 !important;color:#fff !important;}
+body.theme-custom:not(.dark) select option{background:#ffffff !important;color:#14141c !important;}
+/* Buttons keep their own strong colours, so never inherit wallpaper text */
+body.theme-custom .btn,
+body.theme-custom .btn *{text-shadow:none;}
+
+/* ============================================================
+   SHORTCUT BUBBLES — previously a hardcoded pink/purple gradient
+   with a fixed #ffb3d9 icon, unreadable on most wallpapers.
+   Now driven by the wallpaper-derived chip variables.
+   ============================================================ */
+body.theme-custom .ph-shortcut,
+body.mr-new-theme.theme-custom .ph-shortcut,
+body:not(.mr-new-theme).theme-custom .ph-shortcut{
+    background:var(--custom-chip-bg,linear-gradient(135deg,rgba(255,255,255,.22),rgba(255,255,255,.11))) !important;
+    border:1px solid var(--custom-chip-border,rgba(255,255,255,.34)) !important;
+    color:var(--custom-chip-text,#fff) !important;
+    text-shadow:var(--custom-text-shadow,0 1px 8px rgba(0,0,0,.4));
+    backdrop-filter:blur(14px) saturate(130%);
+    box-shadow:0 8px 22px rgba(0,0,0,.20);
+}
+body.theme-custom .ph-shortcut span,
+body.mr-new-theme.theme-custom .ph-shortcut span{color:var(--custom-chip-text,#fff) !important;}
+body.theme-custom .ph-shortcut i,
+body.mr-new-theme.theme-custom .ph-shortcut i,
+body:not(.mr-new-theme).theme-custom .ph-shortcut i{
+    color:var(--custom-chip-icon,#fff) !important;
+    text-shadow:none;
+}
+body.theme-custom .ph-shortcut:hover,
+body.mr-new-theme.theme-custom .ph-shortcut:hover{
+    background:var(--custom-chip-hover,rgba(255,255,255,.30)) !important;
+    transform:translateY(-2px);
+    box-shadow:0 14px 30px rgba(0,0,0,.26);
+}
+/* Shortcut picker rows inside Settings */
+body.theme-custom .ph-shortcut-pick{
+    background:var(--custom-input-bg,rgba(255,255,255,.16)) !important;
+    border-color:var(--custom-border,rgba(255,255,255,.26)) !important;
+    color:var(--custom-readable,#fff) !important;
+}
+body.theme-custom .ph-shortcut-pick i{color:var(--custom-chip-icon,#fff) !important;}
+
+/* ============================================================
+   ACTIVITY IMAGE DELETE BUTTON (Generate Quote > Others)
+   The .remove-img button was only positioned under
+   .hotel-images-wrap, so inside .activity-image-strip it stayed
+   position:static and was pushed below the image, then clipped
+   away by the strip's overflow:hidden. That made uploaded and
+   Pexels images impossible to delete. These rules give the
+   button the same absolute placement the hotel strip has.
+   ============================================================ */
+.activity-image-strip .img-thumb{position:relative;}
+.activity-image-strip .img-thumb .remove-img{
+    position:absolute;
+    top:4px;
+    right:4px;
+    width:24px;
+    height:24px;
+    padding:0;
+    margin:0;
+    background:rgba(0,0,0,.66);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.55);
+    border-radius:50%;
+    font-size:1rem;
+    line-height:1;
+    font-weight:700;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:5;
+    opacity:.92;
+    transition:background .15s ease,transform .15s ease,opacity .15s ease;
+}
+.activity-image-strip .img-thumb .remove-img:hover{
+    background:#c0392b;
+    opacity:1;
+    transform:scale(1.12);
+}
+.activity-image-strip .img-thumb .remove-img:focus-visible{
+    outline:2px solid #fff;
+    outline-offset:1px;
+}
+/* Keep it visible and clickable over a custom wallpaper too */
+body.theme-custom .activity-image-strip .img-thumb .remove-img{
+    background:rgba(0,0,0,.72) !important;
+    color:#fff !important;
+    border-color:rgba(255,255,255,.6) !important;
+}
+body.theme-custom .activity-image-strip .img-thumb .remove-img:hover{
+    background:#c0392b !important;
+}
+
+/* Non-custom themes: make the bubbles readable there too. The old rule
+   used a translucent pink gradient over a pale page, which washed out. */
+body.mr-new-theme:not(.theme-custom) .ph-shortcut{
+    background:linear-gradient(135deg,rgba(255,92,173,.30),rgba(139,92,246,.28));
+    border-color:rgba(255,255,255,.26);
+    color:#fff;
+}
+body.mr-new-theme:not(.theme-custom) .ph-shortcut i{color:#ffd0e8;}
+body.mr-new-theme.mr-light:not(.theme-custom) .ph-shortcut{
+    background:linear-gradient(135deg,rgba(255,255,255,.94),rgba(246,240,252,.88));
+    border-color:rgba(20,20,32,.16);
+    color:#211f2e;
+}
+body.mr-new-theme.mr-light:not(.theme-custom) .ph-shortcut i{color:#7c3aed;}
 </style>
 <script>
 /* PH-FIX v2 — minor UI changes:
@@ -22719,7 +23316,23 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
         try{
             PH_THEME_KEYS.forEach(function(k){
                 var v = localStorage.getItem(k);
-                if(v!==null && v!==undefined) localStorage.setItem(k+'_u_'+u, v);
+                if(v===null || v===undefined) return;
+                try{ localStorage.setItem(k+'_u_'+u, v); }
+                catch(err){
+                    /* Mirroring a wallpaper needs a second full copy. If there
+                       is no room, drop other users' mirrored wallpapers rather
+                       than losing the active theme. */
+                    if(k!=='ph_custom_theme_image') return;
+                    try{
+                        var doomed=[];
+                        for(var i=0;i<localStorage.length;i++){
+                            var key=localStorage.key(i);
+                            if(key && key.indexOf('ph_custom_theme_image_u_')===0 && key!==k+'_u_'+u) doomed.push(key);
+                        }
+                        doomed.forEach(function(d){ try{ localStorage.removeItem(d); }catch(_){} });
+                        localStorage.setItem(k+'_u_'+u, v);
+                    }catch(_){}
+                }
             });
         }catch(_){}
     }
@@ -22768,7 +23381,15 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
                     try{
                         localStorage.setItem('ph_theme_mode','custom');
                         if(img) localStorage.setItem('ph_custom_theme_image', img);
-                        if(meta) localStorage.setItem('ph_custom_theme_meta', JSON.stringify(meta));
+                        if(meta){
+                            /* Store stats only. meta.data holds a full copy of
+                               the image; persisting it would double the space
+                               used and trip the storage quota. */
+                            localStorage.setItem('ph_custom_theme_meta', JSON.stringify({
+                                r:meta.r, g:meta.g, b:meta.b,
+                                luminance:meta.luminance, isDark:meta.isDark, spread:meta.spread
+                            }));
+                        }
                     }catch(_){}
                     phMirrorNow();
                     return r;
@@ -23005,6 +23626,101 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<!-- ==== PH-FIX v3: topbar trimmed to user + bell; custom wallpaper applied portal-wide ==== -->
+<script>
+(function(){
+    'use strict';
+    if(window.__PH_UI_V3) return;
+    window.__PH_UI_V3 = true;
+
+    /* ---- 1. Keep the global search bar out of the topbar ---- */
+    function stripSearch(){
+        var w = document.getElementById('mrTopSearch');
+        if(w && w.parentNode) w.parentNode.removeChild(w);
+        var r = document.getElementById('mrSearchResults');
+        if(r && r.parentNode) r.parentNode.removeChild(r);
+    }
+
+    /* ---- 2. Re-assert the custom wallpaper on every surface ----
+       Later renders (shell rebuild, nav refresh, theme sync) can drop the
+       theme-custom class or overwrite body background. This restores it. */
+    function reassertWallpaper(){
+        var mode = null, img = null, meta = null;
+        try{ mode = localStorage.getItem('ph_theme_mode'); }catch(_){}
+        if(mode !== 'custom') return;
+        try{ img = localStorage.getItem('ph_custom_theme_image'); }catch(_){}
+        if(!img) return;
+        try{ meta = JSON.parse(localStorage.getItem('ph_custom_theme_meta')||'null'); }catch(_){}
+        meta = meta || { isDark:true, r:30, g:30, b:40 };
+        var b = document.body;
+        if(!b) return;
+        if(!b.classList.contains('theme-custom')) b.classList.add('theme-custom');
+        /* mr-light forces a pale gradient that fights the picture */
+        if(b.classList.contains('mr-light')) b.classList.remove('mr-light');
+        b.classList.toggle('dark', !!meta.isDark);
+        var url = 'url("' + img + '")';
+        if(b.style.getPropertyValue('--bg-image') !== url){
+            b.style.setProperty('--bg-image', url);
+        }
+        if(b.style.backgroundImage !== url){
+            b.style.backgroundImage = url;
+            b.style.backgroundSize = 'cover';
+            b.style.backgroundPosition = 'center center';
+            b.style.backgroundRepeat = 'no-repeat';
+            b.style.backgroundAttachment = 'fixed';
+        }
+        /* Use the shared palette calculator so this loop cannot revert the
+           wallpaper-derived text/bubble colours back to fixed defaults. */
+        var pal = (typeof window.deriveThemePalette==='function') ? window.deriveThemePalette(meta) : null;
+        if(pal){
+            b.style.setProperty('--custom-readable', pal.readable);
+            b.style.setProperty('--custom-readable-soft', pal.soft);
+            b.style.setProperty('--custom-panel-bg', pal.panel);
+            b.style.setProperty('--custom-border', pal.border);
+            b.style.setProperty('--custom-page-overlay', pal.overlay);
+            b.style.setProperty('--custom-input-bg', pal.inputBg);
+            b.style.setProperty('--custom-placeholder', pal.placeholder);
+            b.style.setProperty('--custom-text-shadow', pal.shadow);
+            b.style.setProperty('--custom-chip-bg', pal.chipBg);
+            b.style.setProperty('--custom-chip-border', pal.chipBorder);
+            b.style.setProperty('--custom-chip-text', pal.chipText);
+            b.style.setProperty('--custom-chip-icon', pal.chipIcon);
+            b.style.setProperty('--custom-chip-hover', pal.chipHover);
+            b.style.setProperty('--text', pal.readable);
+            b.style.setProperty('--text2', pal.soft);
+        }
+        /* Login screen shares the wallpaper */
+        var lp = document.getElementById('loginPage');
+        if(lp && lp.style.backgroundImage !== url){
+            lp.style.backgroundImage = url;
+            lp.style.backgroundSize = 'cover';
+            lp.style.backgroundPosition = 'center';
+        }
+    }
+
+    function tick(){ stripSearch(); reassertWallpaper(); }
+
+    if(document.readyState === 'loading'){
+        document.addEventListener('DOMContentLoaded', tick);
+    } else { tick(); }
+    [0,150,400,900,1600,2600,4000].forEach(function(ms){ setTimeout(tick, ms); });
+    setInterval(tick, 1200);
+
+    /* Re-apply straight after the user saves a wallpaper */
+    document.addEventListener('click', function(e){
+        var t = e.target && e.target.closest &&
+                e.target.closest('#btnSaveCustomTheme,#btnApplyCustomTheme,.theme-choice');
+        if(!t) return;
+        [80,400,900].forEach(function(ms){ setTimeout(tick, ms); });
+    }, true);
+
+    /* Keep it correct if another tab changes the theme */
+    window.addEventListener('storage', function(e){
+        if(!e || !e.key) return;
+        if(e.key.indexOf('ph_theme') === 0 || e.key.indexOf('ph_custom_theme') === 0) tick();
+    });
+})();
+</script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 </body>
 </html>
