@@ -15,18 +15,64 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js">
     </script>
 
-    <!-- jsPDF for precise multi-page Hotel Voucher PDF generation -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
-    </script>
+    <!-- PDF + Excel libraries are ~480KB and are ONLY needed when the user
+         actually exports something. Loading them here blocked the first paint
+         of every page view, so they are now fetched on demand by phLoadLib()
+         (see below) the first time a PDF or spreadsheet is generated.
+         The browser caches them after the first use, so a second export is
+         instant. Nothing else about export behaviour changes. -->
+    <script>
+    (function () {
+        var _libs = {
+            jspdf:       'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+            html2pdf:    'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
+            html2canvas: 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+            xlsx:        'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+        };
+        var _ready = {
+            jspdf:       function () { return !!(window.jspdf && window.jspdf.jsPDF) || !!window.jsPDF; },
+            html2pdf:    function () { return typeof window.html2pdf === 'function'; },
+            html2canvas: function () { return typeof window.html2canvas === 'function'; },
+            xlsx:        function () { return !!window.XLSX; }
+        };
+        var _pending = {};
 
-    <!-- html2pdf for PDF generation -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js">
-    </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js">
-    </script>
+        function loadOne(name) {
+            if (_ready[name] && _ready[name]()) return Promise.resolve(true);
+            if (_pending[name]) return _pending[name];
+            _pending[name] = new Promise(function (resolve, reject) {
+                var s = document.createElement('script');
+                s.src = _libs[name];
+                s.async = true;
+                s.onload = function () { resolve(true); };
+                s.onerror = function () {
+                    _pending[name] = null;
+                    reject(new Error('Could not load ' + name));
+                };
+                document.head.appendChild(s);
+            });
+            return _pending[name];
+        }
 
-    <!-- SheetJS for multi-tab Excel export -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+        // phLoadLib('html2pdf','jspdf') -> resolves once all are available.
+        window.phLoadLib = function () {
+            var names = Array.prototype.slice.call(arguments);
+            return Promise.all(names.map(loadOne));
+        };
+        // html2pdf bundles html2canvas, so asking for the PDF stack is enough.
+        window.phLoadPdfLibs = function () { return window.phLoadLib('html2pdf', 'jspdf'); };
+        window.phLoadXlsx = function () { return window.phLoadLib('xlsx'); };
+
+        // Warm the cache once the page is idle and interactive, so the first
+        // real export is fast without delaying startup.
+        function warm() {
+            var idle = window.requestIdleCallback || function (fn) { return setTimeout(fn, 2500); };
+            idle(function () { window.phLoadPdfLibs().catch(function () {}); });
+        }
+        if (document.readyState === 'complete') warm();
+        else window.addEventListener('load', warm);
+    })();
+    </script>
 
     <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet" />
@@ -1614,6 +1660,93 @@
         .pexels-grid .pexels-item.selected .pexels-check {
             background: var(--success);
         }
+        /* ===== PROMO / SPECIAL OFFER ===== */
+        .promo-builder-card { border-left: 4px solid #1d4ed8; }
+        .promo-live-preview {
+            min-height: 64px;
+            border: 1px dashed var(--card-border);
+            border-radius: 12px;
+            padding: 12px;
+            background: repeating-linear-gradient(45deg, rgba(29,78,216,.03), rgba(29,78,216,.03) 12px, transparent 12px, transparent 24px);
+        }
+        .promo-live-preview .promo-empty {
+            color: var(--text2);
+            font-size: .85rem;
+            text-align: center;
+            padding: 12px 0;
+        }
+        /* Blue offer box — shared look between live preview and PDF */
+        .promo-offer-box {
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 55%, #2563eb 100%);
+            box-shadow: 0 14px 34px rgba(29, 78, 216, .34);
+            border: 1px solid rgba(255, 255, 255, .18);
+        }
+        .promo-offer-box .promo-ribbon {
+            position: absolute;
+            top: 14px;
+            right: -42px;
+            transform: rotate(45deg);
+            background: #f59e0b;
+            color: #1e3a8a;
+            font-weight: 800;
+            font-size: .62rem;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            padding: 5px 52px;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, .25);
+        }
+        .promo-offer-box .promo-inner {
+            display: flex;
+            gap: 18px;
+            align-items: center;
+            padding: 20px 24px;
+        }
+        .promo-offer-box .promo-inner.no-img { justify-content: center; text-align: center; }
+        .promo-offer-box .promo-img-wrap {
+            flex: 0 0 190px;
+            max-width: 190px;
+        }
+        .promo-offer-box .promo-img-wrap img {
+            width: 100%;
+            height: 130px;
+            object-fit: cover;
+            border-radius: 12px;
+            border: 3px solid rgba(255, 255, 255, .28);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, .28);
+            display: block;
+        }
+        .promo-offer-box .promo-body { flex: 1 1 auto; min-width: 0; }
+        .promo-offer-box .promo-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: rgba(255, 255, 255, .16);
+            color: #ffffff;
+            font-weight: 700;
+            font-size: .72rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding: 5px 12px;
+            border-radius: 999px;
+            margin-bottom: 8px;
+        }
+        .promo-offer-box .promo-badge i { color: #fbbf24; }
+        .promo-offer-box .promo-text {
+            color: #ffffff;
+            font-size: 1rem;
+            line-height: 1.55;
+            font-weight: 500;
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin: 0;
+        }
+        @media (max-width: 640px) {
+            .promo-offer-box .promo-inner { flex-direction: column; text-align: center; }
+            .promo-offer-box .promo-img-wrap { flex-basis: auto; max-width: 100%; width: 100%; }
+        }
         /* FLIGHT TIMELINE */
         .flight-timeline {
             display: flex;
@@ -2867,6 +3000,28 @@
                     </div>
                     <div class="form-row"><div class="form-group full"><label>Notes</label><textarea id="custNotes" rows="2" placeholder="Any special notes about this customer..."></textarea></div></div>
                 </div>
+
+                <!-- ===== PROMO / SPECIAL OFFER ===== -->
+                <div class="form-card promo-builder-card">
+                    <h3><i class="fas fa-tags"></i> Promo <span class="text-muted text-sm" style="font-weight:400;">— appears as a special offer on the quotation PDF</span></h3>
+                    <p class="text-muted text-sm mb-16">Type any promotional message (no word limit) and optionally attach an image. Everything below is shown in a blue offer box on the quote, just after the Payment section.</p>
+                    <div class="form-row">
+                        <div class="form-group full">
+                            <label>Promo Message</label>
+                            <textarea id="promoText" rows="4" placeholder="e.g. Book before 31st August and save £250 per couple — includes complimentary airport lounge access and a free room upgrade!"></textarea>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;margin:4px 0 12px;">
+                        <button type="button" class="btn btn-primary" id="btnUploadPromoImage"><i class="fas fa-upload"></i> Attach Image from Computer</button>
+                        <button type="button" class="btn" id="btnSearchPromoPexels"><i class="fas fa-image"></i> Auto Pexels Image Search</button>
+                        <button type="button" class="btn btn-danger" id="btnRemovePromoImage" style="display:none;"><i class="fas fa-trash"></i> Remove Image</button>
+                    </div>
+                    <div class="form-group full" style="margin-bottom:12px;">
+                        <label>Live Preview <span class="text-muted text-sm" style="font-weight:400;">— this is how the offer will look on the quote</span></label>
+                        <div id="promoPreview" class="promo-live-preview"></div>
+                    </div>
+                    <input type="file" id="promoImageInput" accept=".jpg,.jpeg,.png,.webp" style="display:none;" />
+                </div>
             </div>
 
             <!-- ===== TAB: FLIGHTS ===== -->
@@ -3033,6 +3188,8 @@
                     expiryDate: '',
                     referenceNumber: '',
                     notes: '',
+                    promoText: '',
+                    promoImage: '',
                     flights: [],
                     hotels: [],
                     transfers: [],
@@ -3341,6 +3498,21 @@
                 window.isAdmin = isAdmin;
                 window.hasPermission = hasPermission;
                 window.showToast = showToast;
+                // The later patch layers (calendar day view, task edit/delete,
+                // activity log) all begin with `if (typeof window.readData !==
+                // 'function') return;`. These live in their own <script> blocks
+                // and cannot see this IIFE's scope, so without these exports they
+                // silently did nothing and clicking a calendar date opened no day
+                // view at all. Function declarations are hoisted, so these bind to
+                // the final definition of each helper.
+                window.readData = readData;
+                window.writeData = writeData;
+                window.escapeHTML = escapeHTML;
+                window.formatDateTime = formatDateTime;
+                window.formatTime = formatTime;
+                window.safeDateDisplay = safeDateDisplay;
+                window.genId = genId;
+                window.getNowISO = getNowISO;
             } catch (_) {}
 
             // Check if current user can edit invoice/accounts
@@ -3392,7 +3564,11 @@
                     firebaseConnected = true;
                     db.ref('.info/connected').on('value', function(snap) {
                         firebaseConnected = snap.val() === true;
-                        if (firebaseConnected) window._fbEverConnected = true;
+                        if (firebaseConnected) {
+                            window._fbEverConnected = true;
+                            // Wake anything blocked in waitForFirebase immediately.
+                            try { _fbNotifyConnected(); } catch (_) {}
+                        }
                     });
                     return true;
                 } catch (e) {
@@ -3612,20 +3788,48 @@
             // Waits briefly for the realtime socket. Without this, initAuth can run
             // while '.info/connected' is still false, so the admin repair lands only
             // in localStorage and is then overwritten by the first remote read.
+            // Resolves the instant the socket reports "connected" instead of
+            // polling a flag every 100ms. The old version almost always burned
+            // its FULL timeout (6s at page load and another 6s on login, i.e.
+            // ~12s before the dashboard appeared) because nothing woke it early.
+            // A shorter ceiling is enough: the app already falls back to
+            // localStorage and the realtime listeners refresh data as it arrives.
+            var _fbWaiters = [];
+            // Set once a wait has expired without the socket ever coming up, i.e.
+            // we already know this browser is offline / the DB is unreachable.
+            var _fbKnownOffline = false;
+            function _fbNotifyConnected() {
+                _fbKnownOffline = false;
+                var list = _fbWaiters; _fbWaiters = [];
+                list.forEach(function(fn) { try { fn(); } catch (_) {} });
+            }
             async function waitForFirebase(maxMs) {
                 if (!db) return false;
-                var waited = 0, step = 100;
-                while (!firebaseConnected && waited < (maxMs || 6000)) {
-                    await new Promise(function(r) { setTimeout(r, step); });
-                    waited += step;
-                }
+                if (firebaseConnected) return true;
+                // Already proved unreachable once, so don't stall the UI for the
+                // full timeout again on every subsequent login. A short grace is
+                // enough to catch a socket that has just come back up, and if it
+                // connects mid-wait _fbNotifyConnected() resolves us instantly.
+                var cap = _fbKnownOffline ? 400 : (maxMs || 2500);
+                await new Promise(function(resolve) {
+                    var done = false;
+                    function finish() {
+                        if (done) return;
+                        done = true;
+                        clearTimeout(timer);
+                        resolve();
+                    }
+                    var timer = setTimeout(finish, cap);
+                    _fbWaiters.push(finish);
+                });
+                if (!firebaseConnected) _fbKnownOffline = true;
                 return !!firebaseConnected;
             }
 
             async function initAuth() {
                 var defaultHash = sha256(ADMIN_DEFAULT_PWD);
 
-                await waitForFirebase(6000);
+                await waitForFirebase(3000);
 
                 var users = sanitizeUsersMap(await readData('users', 'ph_users', true));
 
@@ -3686,7 +3890,10 @@
 
             async function loginUser(username, password) {
                 var trimmedPassword = password.trim();
-                await waitForFirebase(6000);
+                // initAuth() already waited for the socket during startup, so this
+                // only needs a short grace period for a slow-but-recovering
+                // connection. Waiting the full 6s again just delayed every login.
+                await waitForFirebase(1500);
                 var users = sanitizeUsersMap(await readData('users', 'ph_users', true));
 
                 if (!users || !users.Plan) {
@@ -4803,6 +5010,121 @@
             }
 
             // --------------------------------------------------------------
+            // PROMO / SPECIAL OFFER
+            // Builds the blue offer box markup shared by the on-portal live
+            // preview and the quote PDF. `forPdf` uses inline styles so the
+            // html2canvas rasteriser reproduces it exactly (it does not read
+            // the stylesheet). White font on a blue rectangle, per spec.
+            // --------------------------------------------------------------
+            function buildPromoOfferHTML(promoText, promoImage, forPdf) {
+                var text = (promoText == null ? '' : String(promoText)).trim();
+                var img = promoImage || '';
+                if (!text && !img) return '';
+                var safeText = escapeHTML(text).replace(/\n/g, '<br>');
+                if (!forPdf) {
+                    var imgWrap = img ? '<div class="promo-img-wrap"><img src="' + img + '" alt="Promo" /></div>' : '';
+                    var bodyText = text ? '<p class="promo-text">' + safeText + '</p>' : '<p class="promo-text" style="opacity:.75;font-style:italic;">Your promo message will appear here…</p>';
+                    return '<div class="promo-offer-box">' +
+                        '<span class="promo-ribbon">Offer</span>' +
+                        '<div class="promo-inner' + (img ? '' : ' no-img') + '">' +
+                        imgWrap +
+                        '<div class="promo-body"><span class="promo-badge"><i class="fas fa-star"></i> Special Offer</span>' +
+                        bodyText + '</div></div></div>';
+                }
+                // ---- PDF version: fully inlined styles ----
+                var GOLD = '#f59e0b';
+                var boxOpen = '<div style="position:relative;border-radius:16px;overflow:hidden;background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 55%,#2563eb 100%);box-shadow:0 12px 30px rgba(29,78,216,0.34);border:1px solid rgba(255,255,255,0.18);">';
+                var ribbon = '<div style="position:absolute;top:13px;right:-40px;transform:rotate(45deg);background:' + GOLD + ';color:#1e3a8a;font-weight:800;font-size:0.6rem;letter-spacing:1.5px;text-transform:uppercase;padding:5px 50px;box-shadow:0 3px 8px rgba(0,0,0,0.25);">Offer</div>';
+                var imgHtml = img ? '<div style="flex:0 0 180px;max-width:180px;"><img src="' + img + '" style="width:100%;height:125px;object-fit:cover;border-radius:12px;border:3px solid rgba(255,255,255,0.28);box-shadow:0 8px 18px rgba(0,0,0,0.28);display:block;" /></div>' : '';
+                var badge = '<div style="display:inline-block;background:rgba(255,255,255,0.16);color:#ffffff;font-weight:700;font-size:0.66rem;letter-spacing:2px;text-transform:uppercase;padding:5px 12px;border-radius:999px;margin-bottom:8px;"><span style="color:#fbbf24;">&#9733;</span> Special Offer</div>';
+                var bodyHtml = '<div style="flex:1 1 auto;min-width:0;">' + badge +
+                    '<div style="color:#ffffff;font-size:0.95rem;line-height:1.55;font-weight:500;white-space:pre-wrap;word-break:break-word;">' + safeText + '</div></div>';
+                var innerAlign = img ? 'flex-start' : 'center';
+                var inner = '<div style="display:flex;gap:16px;align-items:center;justify-content:' + innerAlign + ';padding:18px 22px;' + (img ? '' : 'text-align:center;') + '">' + imgHtml + bodyHtml + '</div>';
+                return boxOpen + ribbon + inner + '</div>';
+            }
+
+            function renderPromoPreview() {
+                var wrap = document.getElementById('promoPreview');
+                if (!wrap) return;
+                var textEl = document.getElementById('promoText');
+                var text = textEl ? textEl.value : '';
+                var img = (STATE.currentQuote && STATE.currentQuote.promoImage) || '';
+                var removeBtn = document.getElementById('btnRemovePromoImage');
+                if (removeBtn) removeBtn.style.display = img ? '' : 'none';
+                if (!text.trim() && !img) {
+                    wrap.innerHTML = '<div class="promo-empty">Nothing yet — type a promo message or attach an image and it will appear here as a blue offer box on the quote.</div>';
+                    return;
+                }
+                wrap.innerHTML = buildPromoOfferHTML(text, img, false);
+            }
+
+            function uploadPromoImage() {
+                var input = document.getElementById('promoImageInput');
+                if (!input) return;
+                input.onchange = function(e) {
+                    var file = (e.target.files || [])[0];
+                    if (!file) return;
+                    var reader = new FileReader();
+                    reader.onload = function(ev) {
+                        STATE.currentQuote.promoImage = ev.target.result;
+                        renderPromoPreview();
+                        showToast('Promo image attached.', 'success');
+                    };
+                    reader.readAsDataURL(file);
+                    input.value = '';
+                };
+                input.click();
+            }
+
+            async function searchPexelsForPromo() {
+                var textEl = document.getElementById('promoText');
+                var promoText = textEl ? textEl.value.trim() : '';
+                // Use the first few promo words, else fall back to the route
+                // or a sensible travel-offer default so a search always works.
+                var searchTerm = promoText.split(/\s+/).slice(0, 5).join(' ');
+                if (!searchTerm) searchTerm = (STATE.currentQuote && STATE.currentQuote.route) || 'luxury holiday travel offer';
+                var apiKey = 'MDDTJZrUclUD2bDx4sGrTt4nnlvBR8LoS988l5GoBvF51gCTOuqX1LYs';
+                try {
+                    var res = await fetch('https://api.pexels.com/v1/search?query=' + encodeURIComponent(searchTerm) + '&per_page=30', { headers: { 'Authorization': apiKey } });
+                    if (!res.ok) throw new Error('Pexels API error');
+                    var data = await res.json();
+                    var photos = data.photos || [];
+                    if (!photos.length) { showToast('No images found for "' + searchTerm + '".', 'warning'); return; }
+                    var modalHtml = '<h3>📸 Choose a Promo Image</h3><p class="text-muted text-sm">Search: "' + escapeHTML(searchTerm) + '". Click one image, then "Use Image".</p><div class="pexels-grid">';
+                    photos.forEach(function(p, idx) {
+                        modalHtml += '<div class="pexels-item" data-index="' + idx + '" onclick="window._selectPromoPexels(this)"><img src="' + p.src.medium + '" /><div class="pexels-check"><i class="fas fa-check"></i></div></div>';
+                    });
+                    modalHtml += '</div><div class="modal-actions"><button class="btn btn-success" onclick="window._addSelectedPromoPexels()"><i class="fas fa-check"></i> Use Image</button><button class="btn btn-close-modal" data-close-modal>Cancel</button></div>';
+                    window._selectPromoPexels = function(el) {
+                        document.querySelectorAll('.pexels-item.selected').forEach(function(x) { if (x !== el) x.classList.remove('selected'); });
+                        el.classList.toggle('selected');
+                    };
+                    window._addSelectedPromoPexels = function() {
+                        var sel = document.querySelector('.pexels-item.selected');
+                        if (!sel) { showToast('Please select an image.', 'warning'); return; }
+                        var idx = parseInt(sel.dataset.index, 10);
+                        var src = photos[idx] && (photos[idx].src.large || photos[idx].src.medium || photos[idx].src.tiny);
+                        if (src) {
+                            STATE.currentQuote.promoImage = src;
+                            renderPromoPreview();
+                            showToast('Promo image added.', 'success');
+                        }
+                        window.closeModal();
+                    };
+                    showModal(modalHtml);
+                } catch (e) {
+                    showToast('Pexels search failed: ' + e.message, 'error');
+                }
+            }
+
+            function removePromoImage() {
+                STATE.currentQuote.promoImage = '';
+                renderPromoPreview();
+                showToast('Promo image removed.', 'info');
+            }
+
+            // --------------------------------------------------------------
             // 13. TRANSFER FUNCTIONS
             // --------------------------------------------------------------
             function addTransferToQuote(transferData) {
@@ -5675,6 +5997,15 @@
             async function generatePDF(quoteData, action, isInvoice) {
                 showLoading(true);
                 try {
+                    // PDF engine is fetched on first use (see phLoadPdfLibs).
+                    if (action === 'download' && typeof window.phLoadPdfLibs === 'function') {
+                        try { await window.phLoadPdfLibs(); }
+                        catch (_libErr) {
+                            showLoading(false);
+                            showToast('Could not load the PDF engine. Check your connection and try again.', 'error');
+                            return;
+                        }
+                    }
                     var branding = STATE.branding || await loadBranding();
                     var conditions = isInvoice ? STATE.invoiceConditions : STATE.quoteConditions;
                     var condText = conditions && typeof conditions === 'object' ? conditions.text : conditions || '';
@@ -6025,6 +6356,11 @@
 
                 var conditionsBlock = (conditions ? '<div class="pdf-compact-section" style="margin-top:5px;padding:9px 12px;background:#fbf7ec;border-radius:10px;font-size:0.85rem;color:#333;border:1px solid #ecdcb4;border-left:4px solid ' + GOLD + ';"><h5 style="margin:0 0 5px;font-size:1rem;color:' + ACC2 + ';">Booking Conditions</h5><div style="white-space:pre-wrap;line-height:1.38;word-break:break-word;">' + conditions + '</div></div>' : '');
 
+                // Promo / Special Offer — sits after Payment, before Conditions
+                var _promoInner = (typeof buildPromoOfferHTML === 'function')
+                    ? buildPromoOfferHTML(quote.promoText, quote.promoImage, true) : '';
+                var promoBlock = _promoInner ? '<div style="margin:7px 0 5px;">' + _promoInner + '</div>' : '';
+
                 var footerHtml = '<div style="margin-top:6px;border-top:2px solid ' + GOLD + ';padding-top:6px;text-align:center;font-size:0.8rem;color:#000000;font-weight:600;">' +
                     (branding && branding.footer || '&copy; 2026 Plan Holidays UK. All rights reserved.') +
                     '<span style="display:block;margin-top:2px;color:#000000;font-weight:600;">' + (branding && branding.website || '') + ' · ' +
@@ -6033,7 +6369,7 @@
 
                 var bodyHtml = headerHtml + titleHtml + custBlock +
                     flightsSection + itinerarySection + activitiesSection + paymentSection +
-                    conditionsBlock + footerHtml;
+                    promoBlock + conditionsBlock + footerHtml;
 
                 if (proBg) {
                     // Full-bleed A4 background repeated on every page. The wrapper is
@@ -6049,7 +6385,10 @@
                         '</div></div></div>';
                 }
 
-                var quoteBgStyle = (branding && branding.bgImage) ? 'background:#fff url(' + branding.bgImage + ') center/cover no-repeat;' : 'background:#fff;';
+                // A deliberate "Remove" wins over the company-wide brand background,
+                // so the page is plain white.
+                var _blankBg = (typeof agentQuoteBgBlank === 'function') && agentQuoteBgBlank();
+                var quoteBgStyle = (!_blankBg && branding && branding.bgImage) ? 'background:#fff url(' + branding.bgImage + ') center/cover no-repeat;' : 'background:#fff;';
                 return '<div style="font-family:Inter,sans-serif;width:190mm;max-width:190mm;margin:0 auto;padding:8mm;' + quoteBgStyle + 'color:#1f2933;font-size:11.5px;line-height:1.42;border:1px solid #d7e0e8;border-radius:12px;box-shadow:none;box-sizing:border-box;overflow:hidden;">' +
                     bodyHtml + '</div>';
             }
@@ -6772,12 +7111,31 @@
             // --------------------------------------------------------------
             function proBgKeyFor(username) { return 'ph_pro_bg_' + username; }
 
-            function getAgentQuoteBg() {
+            // Sentinel written when a user explicitly presses "Remove". It means
+            // "I want NO background at all on my quote PDFs" — which must also
+            // suppress the separate company-wide Brand Settings background image,
+            // otherwise removing the professional background leaves the brand one
+            // behind and the PDF is not blank.
+            var PRO_BG_NONE = 'none';
+
+            function rawAgentQuoteBg() {
                 try {
                     var u = STATE.currentUser && STATE.currentUser.username;
                     if (!u) return '';
                     return (STATE.proBackgrounds && STATE.proBackgrounds[u]) || '';
                 } catch (_) { return ''; }
+            }
+
+            function getAgentQuoteBg() {
+                var v = rawAgentQuoteBg();
+                return v === PRO_BG_NONE ? '' : v;
+            }
+
+            // True only when the user deliberately removed their background.
+            // Never set for users who simply never configured one, so their
+            // existing Brand Settings background keeps working as before.
+            function agentQuoteBgBlank() {
+                return rawAgentQuoteBg() === PRO_BG_NONE;
             }
 
             async function loadProBackground() {
@@ -6839,9 +7197,12 @@
                 });
                 document.getElementById('btnRemoveProBg').addEventListener('click', async function() {
                     showLoading(true);
-                    await saveProBackground('');
+                    // Record an explicit "no background" choice rather than just an
+                    // empty value, so the quote PDF comes out genuinely blank
+                    // instead of falling back to the Brand Settings background.
+                    await saveProBackground(PRO_BG_NONE);
                     showLoading(false);
-                    showToast('Professional background removed.', 'success');
+                    showToast('Professional background removed. Your quote PDFs will now be blank white.', 'success');
                     window.closeModal();
                 });
             }
@@ -6854,11 +7215,24 @@
                 try {
                     var grid = document.getElementById('dashGrid') || document.querySelector('.dashboard-grid');
                     if (!grid) return;
-                    Array.prototype.slice.call(grid.querySelectorAll('.dash-card')).sort(function(a, b) {
+                    var cards = Array.prototype.slice.call(grid.querySelectorAll('.dash-card'));
+                    if (cards.length < 2) return;
+                    var sorted = cards.slice().sort(function(a, b) {
                         var at = ((a.querySelector('h4') || {}).textContent || '').trim();
                         var bt = ((b.querySelector('h4') || {}).textContent || '').trim();
                         return at.localeCompare(bt, undefined, { sensitivity: 'base' });
-                    }).forEach(function(card) { grid.appendChild(card); });
+                    });
+                    // Bail out when the cards are already in order. This runs from
+                    // several 1.5s polling timers, and re-appending every card each
+                    // time caused ~80 pointless DOM mutations a second, which in turn
+                    // re-triggered the #dashGrid MutationObserver -> renderNav().
+                    // Same end result, without the constant relayout.
+                    var same = true;
+                    for (var i = 0; i < cards.length; i++) {
+                        if (cards[i] !== sorted[i]) { same = false; break; }
+                    }
+                    if (same) return;
+                    sorted.forEach(function(card) { grid.appendChild(card); });
                 } catch (_) {}
             }
 
@@ -7536,7 +7910,9 @@
                 var html = buildInvoicePDFHTML(inv, STATE.branding || {}, STATE.invoiceConditions || '');
                 showModal(
                     '<h3>Invoice #' + (inv.invoiceNumber || inv.quoteNumber) +
-                    '</h3><div style="max-height:60vh;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px;padding:12px;background:var(--bg);">' +
+                    // Same as the quote preview: the invoice preview is the PDF markup,
+                    // so it must read dark-on-white rather than inherit the theme's text.
+                    '</h3><div class="pdf-safe" style="max-height:60vh;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px;padding:12px;background:#fff;">' +
                     html +
                     '</div><div class="modal-actions"><button class="btn btn-success" onclick="window._downloadInvoicePDFFromModal(\'' +
                     inv.id +
@@ -8007,6 +8383,8 @@
                     expiryDate: getDefaultExpiry(),
                     referenceNumber: '',
                     notes: '',
+                    promoText: '',
+                    promoImage: '',
                     flights: [],
                     hotels: [],
                     transfers: [],
@@ -8057,6 +8435,10 @@
                 setTimeout(function(){ _wireAllSmartDates(); }, 0);
                 document.getElementById('refNumber').value = q.referenceNumber || '';
                 document.getElementById('custNotes').value = q.notes || '';
+                var _promoTextEl = document.getElementById('promoText');
+                if (_promoTextEl) _promoTextEl.value = q.promoText || '';
+                STATE.currentQuote.promoImage = q.promoImage || '';
+                if (typeof renderPromoPreview === 'function') renderPromoPreview();
                 document.getElementById('totalPrice').value = q.totalPrice || 0;
                 document.getElementById('depositAmount').value = q.deposit || 0;
                 document.getElementById('pricePerPerson').value = q.pricePerPerson || 0;
@@ -8094,7 +8476,13 @@
                 var html = buildQuotePDFHTML(q, STATE.branding || {}, STATE.quoteConditions || '');
                 showModal(
                     '<h3>Quote #' + q.quoteNumber +
-                    '</h3><div style="max-height:60vh;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px;padding:12px;background:var(--bg);">' +
+                    // class="pdf-safe" — this is the SAME markup that becomes the PDF,
+                    // so on screen it inherited the custom-theme's white body text and
+                    // the labels vanished against the white paper. The .pdf-safe rules
+                    // (already used for #pdfContent) force dark text on anything without
+                    // its own inline colour, so the preview now matches the PDF exactly
+                    // while the deliberate coloured headings stay coloured.
+                    '</h3><div class="pdf-safe" style="max-height:60vh;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px;padding:12px;background:#fff;">' +
                     html +
                     '</div><div class="modal-actions"><button class="btn btn-success" onclick="window._downloadQuotePDF(\'' +
                     q.id +
@@ -8454,7 +8842,7 @@
                             var blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json' });
                             downloadBlob(blob, 'planholidays_backup_' + getToday() + '.json');
                         } else {
-                            exportBackupToXlsx(pack, 'planholidays_backup_' + getToday() + '.xlsx');
+                            await exportBackupToXlsx(pack, 'planholidays_backup_' + getToday() + '.xlsx');
                         }
                         showToast('Backup downloaded.', 'success');
                     } catch (err) {
@@ -8681,9 +9069,13 @@
                 document.body.appendChild(a); a.click(); document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             }
-            function exportBackupToXlsx(pack, filename) {
+            async function exportBackupToXlsx(pack, filename) {
+                // SheetJS is fetched on first use (see phLoadXlsx).
+                if (typeof XLSX === 'undefined' && typeof window.phLoadXlsx === 'function') {
+                    try { await window.phLoadXlsx(); } catch (_libErr) {}
+                }
                 if (typeof XLSX === 'undefined') {
-                    // Fallback to JSON if SheetJS not loaded
+                    // Fallback to JSON if SheetJS is genuinely unavailable
                     downloadBlob(new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json' }), filename.replace(/\.xlsx$/, '.json'));
                     return;
                 }
@@ -10097,6 +10489,14 @@
 
             async function downloadHotelVoucherPDF(v) {
                 if (!canDownloadHotelVoucher(v)) { showToast('You do not have permission to download this voucher.', 'error'); return; }
+                // PDF engine is fetched on first use (see phLoadPdfLibs).
+                if (typeof window.phLoadPdfLibs === 'function') {
+                    try { await window.phLoadPdfLibs(); }
+                    catch (_libErr) {
+                        showToast('Could not load the PDF engine. Check your connection and try again.', 'error');
+                        return;
+                    }
+                }
                 await loadBranding();
                 var brand = STATE.branding || {};
                 var jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
@@ -10391,6 +10791,16 @@
                     uploadHotelImgFor(hotels[hotels.length - 1].id);
                 });
 
+                // Promo / Special Offer
+                var _promoInput = document.getElementById('promoText');
+                if (_promoInput) _promoInput.addEventListener('input', renderPromoPreview);
+                var _btnPromoUpload = document.getElementById('btnUploadPromoImage');
+                if (_btnPromoUpload) _btnPromoUpload.addEventListener('click', uploadPromoImage);
+                var _btnPromoPexels = document.getElementById('btnSearchPromoPexels');
+                if (_btnPromoPexels) _btnPromoPexels.addEventListener('click', searchPexelsForPromo);
+                var _btnPromoRemove = document.getElementById('btnRemovePromoImage');
+                if (_btnPromoRemove) _btnPromoRemove.addEventListener('click', removePromoImage);
+
                 // Transfers
                 document.getElementById('btnAddTransfer').addEventListener('click', function() {
                     addTransferToQuote({ pickupPoint: '', dropoffPoint: '', transferType: '',
@@ -10465,6 +10875,9 @@
                 q.expiryDate = _parseDateSmart(document.getElementById('expiryDate').value) || document.getElementById('expiryDate').value;
                 q.referenceNumber = document.getElementById('refNumber').value;
                 q.notes = document.getElementById('custNotes').value;
+                var _promoEl = document.getElementById('promoText');
+                if (_promoEl) q.promoText = _promoEl.value;
+                q.promoImage = q.promoImage || '';
                 q.totalPrice = parseFloat(document.getElementById('totalPrice').value) || 0;
                 q.deposit = parseFloat(document.getElementById('depositAmount').value) || 0;
                 q.balance = q.totalPrice - q.deposit;
@@ -10869,7 +11282,11 @@
 
             async function downloadAtolCert(cert) {
                 cert = cert || {};
-                if (!window.html2pdf) return showToast('PDF library is still loading. Please try again.', 'warning');
+                // PDF engine is fetched on first use (see phLoadPdfLibs).
+                if (typeof window.phLoadPdfLibs === 'function') {
+                    try { await window.phLoadPdfLibs(); } catch (_libErr) {}
+                }
+                if (!window.html2pdf) return showToast('Could not load the PDF engine. Check your connection and try again.', 'error');
                 // Build an offscreen container that is fully laid out in the normal document flow
                 // so html2canvas can measure and paint every page correctly. Using `position: fixed`
                 // previously produced blank PDFs because only the visible viewport slice was captured.
@@ -10947,10 +11364,15 @@
                 }
             }
 
-            function exportAtolHistory(list) {
+            async function exportAtolHistory(list) {
                 if (!isAdmin()) return showToast('Only admin can export ATOL history.', 'error');
                 list = list || [];
                 if (!list.length) return showToast('No ATOL certificates to export.', 'warning');
+                // SheetJS is fetched on first use (see phLoadXlsx); the CSV
+                // fallback below still covers the case where it can't load.
+                if (typeof XLSX === 'undefined' && typeof window.phLoadXlsx === 'function') {
+                    try { await window.phLoadXlsx(); } catch (_libErr) {}
+                }
                 var rows = list.map(function(c) {
                     return {
                         agentName: c.agentName || c.createdBy || '',
@@ -11339,14 +11761,18 @@
                 if(STATE.currentUser&&!isAdmin()){var cal=grid.querySelector('.dash-card[data-action="calendar"]'),tsk=grid.querySelector('.dash-card[data-action="tasks"]');if(cal)cal.style.display=hasPermission('canViewCalendar')?'block':'none';if(tsk)tsk.style.display=(hasPermission('canViewTaskHistory')||hasPermission('canCreateTasks'))?'block':'none';}if(typeof sortDashboardCardsAlphabetically==='function')sortDashboardCardsAlphabetically();}
                 catch(_){}}
             function ensureNotificationUI(){ensureMuleDashboardCards();/* Legacy second bell removed - the mr-new-theme #mrNotifyBtn is the single bell. */ try{var old=document.getElementById('chatTopNotifyBtn'); if(old && old.parentNode) old.parentNode.removeChild(old);}catch(_){}}
-            function _mrSetBadge(n){ensureNotificationUI();['chatNotifyBadge','chatCardNotifyBadge'].forEach(function(id){var e=document.getElementById(id);if(e){e.style.display=n?'inline-flex':'none';e.textContent=n}})}
+            function _mrSetBadge(n){ensureNotificationUI();['chatNotifyBadge','chatCardNotifyBadge'].forEach(function(id){var e=document.getElementById(id);if(!e)return;var d=n?'inline-flex':'none';if(e.style.display!==d)e.style.display=d;if(e.textContent!==String(n))e.textContent=n})}
             function _mrIncoming(all){var u=STATE.currentUser;if(!u)return[];return _mrVals(all).filter(function(m){if(!m||m.deleted||m.from===u.username)return false;if(m.groupId)return(m.members||[]).indexOf(u.username)!==-1&&!(m.readBy&&m.readBy[u.username]);return m.to===u.username&&!m.read})}
 
             function _chatMessageId(m){return m&&(m._key||m._id||m.id||'')}
             function _chatPairKey(a,b){return[String(a||''),String(b||'')].sort().join('__')}
             function _chatPrivateBetween(m,a,b){return m&&!m.groupId&&((m.from===a&&m.to===b)||(m.from===b&&m.to===a))}
             function _setChatInputLocked(locked,msg){var box=document.querySelector('.messenger-input'),input=document.getElementById('chatInput'),send=document.getElementById('chatSendBtn'),img=document.getElementById('chatImageBtn');if(box)box.classList.toggle('view-only',!!locked);if(input){input.disabled=!!locked;input.placeholder=locked?(msg||'View-only chat'):'Type a message, paste or drag an image...'}if(send)send.disabled=!!locked;if(img)img.disabled=!!locked}
-            async function _deleteSelectedChatMessages(){if(!isAdmin())return showToast('Admin access required.','error');var ids=Array.from(document.querySelectorAll('.chat-delete-check:checked')).map(function(c){return c.value});if(!ids.length)return showToast('Select message(s) to delete.','warning');if(!confirm('Delete '+ids.length+' selected message(s)?'))return;var all=await readData('chatMessages','ph_chat_messages',true)||{},changed=0,now=getNowISO(),admin=(STATE.currentUser&&STATE.currentUser.username)||'admin';function mark(m){if(!m||m.deleted)return;var id=_chatMessageId(m);if(ids.indexOf(id)!==-1){m.deleted=true;m.deletedAt=now;m.deletedBy=admin;changed++}}if(Array.isArray(all)){all.forEach(mark)}else{ids.forEach(function(id){if(all[id])mark(all[id])});Object.keys(all).forEach(function(k){if(ids.indexOf(k)===-1)mark(all[k])})}if(!changed)return showToast('Selected message(s) were not found.','warning');await writeData('chatMessages',all,'ph_chat_messages');showToast('Deleted '+changed+' message(s).','success');loadChatMessages()}
+            async function _deleteSelectedChatMessages(){if(!isAdmin())return showToast('Admin access required.','error');var ids=Array.from(document.querySelectorAll('.chat-delete-check:checked')).map(function(c){return c.value});
+                // Merge in the remembered selection so ticks made before a background
+                // refresh still count (see _mrChatSelectionMemory).
+                try{var _keep=window._mrChatSelection||{};Object.keys(_keep).forEach(function(k){if(_keep[k]&&ids.indexOf(k)===-1)ids.push(k);});}catch(_){}
+                if(!ids.length)return showToast('Select message(s) to delete.','warning');if(!confirm('Delete '+ids.length+' selected message(s)?'))return;var all=await readData('chatMessages','ph_chat_messages',true)||{},changed=0,now=getNowISO(),admin=(STATE.currentUser&&STATE.currentUser.username)||'admin';function mark(m){if(!m||m.deleted)return;var id=_chatMessageId(m);if(ids.indexOf(id)!==-1){m.deleted=true;m.deletedAt=now;m.deletedBy=admin;changed++}}if(Array.isArray(all)){all.forEach(mark)}else{ids.forEach(function(id){if(all[id])mark(all[id])});Object.keys(all).forEach(function(k){if(ids.indexOf(k)===-1)mark(all[k])})}if(!changed)return showToast('Selected message(s) were not found.','warning');await writeData('chatMessages',all,'ph_chat_messages');showToast('Deleted '+changed+' message(s).','success');try{window._mrClearChatSelection&&window._mrClearChatSelection()}catch(_){}loadChatMessages()}
             window._deleteSelectedChatMessages=_deleteSelectedChatMessages;
             attachRealtimeChatNotifications=function(){ensureNotificationUI();startTaskReminderLoop();if(!STATE.currentUser)return;_mrLastChat=Date.now();if(_mrChatRef&&_mrChatRef.off)try{_mrChatRef.off()}catch(_){};if(_mrChatPoll)clearInterval(_mrChatPoll);function h(data){var inc=_mrIncoming(data||{});_mrSetBadge(inc.length);var m=inc.sort(function(a,b){return new Date(b.timestamp||0)-new Date(a.timestamp||0)})[0];var ts=m?new Date(m.timestamp||0).getTime():0;if(m&&ts>_mrLastChat){_mrLastChat=Date.now();showToast('New message from '+(m.from||'user'),'info',7000);try{if('Notification'in window){if(Notification.permission==='default')Notification.requestPermission();if(Notification.permission==='granted')new Notification('New portal message',{body:(m.from||'User')+': '+(m.message||'[Image]')})}}catch(_){}}}if(firebaseConnected&&db){_mrChatRef=db.ref('chatMessages');_mrChatRef.on('value',function(s){h(s.val()||{})})}else{_mrChatPoll=setInterval(async function(){h(await readData('chatMessages','ph_chat_messages',true)||{})},6000);readData('chatMessages','ph_chat_messages',true).then(function(x){h(x||{})})}};
             sendChatMessage=async function(toUser,message,groupId,attachment){var u=STATE.currentUser;if(!u)return;var now=getNowISO(),g=groupId&&(STATE.chatGroups||{})[groupId],parts=groupId?[]:[u.username,toUser].sort();var data={from:u.username,to:groupId?'group':toUser,message:message||'',type:attachment?attachment.type:'text',attachment:attachment||null,timestamp:now,read:false,readBy:{},groupId:groupId||null,members:g&&g.members?g.members:null,participants:parts,conversationKey:groupId?'group_'+groupId:parts.join('__'),deleted:false};var key=await pushData('chatMessages',data,'ph_chat_messages');if(key&&toUser)await writeData('chatNotifications/'+toUser+'/'+key,{from:u.username,message:message||'',timestamp:now,read:false},null);showToast(attachment?'Image sent.':'Message sent.','success');if(STATE.activeChatUser||STATE.activeChatGroup)loadChatMessages();attachRealtimeChatNotifications()};
@@ -14231,7 +14657,8 @@
                     if(!b) return;
                     var me = (STATE.currentUser && STATE.currentUser.username) || '';
                     var n = Object.keys(_onlineAgents || {}).filter(function(k){ return k!==me && _isOnline(k); }).length;
-                    b.textContent = n;
+                    // Change-guarded to keep idle DOM churn down.
+                    if (b.textContent !== String(n)) b.textContent = n;
                 }
 
                 async function _refreshOnlineAgents(){
@@ -17775,7 +18202,9 @@
                 }
                 function _setNotificationBadge(n){
                     try { if(typeof ensureNotificationUI==='function') ensureNotificationUI(); } catch(_){}
-                    ['chatNotifyBadge','chatCardNotifyBadge'].forEach(function(id){ var e=document.getElementById(id); if(e){ e.style.display=n?'inline-flex':'none'; e.textContent=n; } });
+                    // Change-guarded (see _setBadge): avoids re-triggering the
+                    // #dashGrid observer on every poll tick.
+                    ['chatNotifyBadge','chatCardNotifyBadge'].forEach(function(id){ var e=document.getElementById(id); if(!e) return; var d=n?'inline-flex':'none'; if(e.style.display!==d) e.style.display=d; if(e.textContent!==String(n)) e.textContent=n; });
                 }
                 function _patchNotificationButton(){
                     try{
@@ -17906,6 +18335,17 @@
                     var me=_me(), visible=_vals(messages).filter(function(m){return m&&!m.deleted;});
                     var context=_context();
                     if(!visible.length){ c.innerHTML=context+'<div class="chat-empty"><i class="fas fa-comments" style="font-size:2rem;color:var(--primary);"></i><h4>No messages yet</h4><p>Full chat history will be saved here.</p></div>'; return; }
+                    // This runs from a 1.2s poll (and on every remote change), so bail
+                    // out when the conversation is byte-for-byte the same. Without this
+                    // the innerHTML below was rebuilt constantly, which wiped the admin's
+                    // delete-selection checkboxes about a second after ticking them and
+                    // yanked the scroll position around.
+                    var _sig=context+'|'+visible.map(function(m){
+                        return [_msgId(m),m.message||'',m.editedAt||'',m.timestamp||'',
+                                (m.attachment&&m.attachment.data)?'1':'0'].join('~');
+                    }).join(';');
+                    if(c.getAttribute('data-mrchatsig')===_sig && c.querySelector('.bubble-row')) return;
+                    c.setAttribute('data-mrchatsig',_sig);
                     c.innerHTML=context+visible.map(function(m){
                         var mine=m.from===me, sys=m.type==='system', mid=_msgId(m), sender=sys?'Group Notice':(mine?'You':_name(m.from));
                         var content=m.message?'<div>'+_esc(m.message)+'</div>':'';
@@ -17918,6 +18358,15 @@
                     }).join('');
                     Array.prototype.forEach.call(c.querySelectorAll('.chat-msg-edit-btn'),function(btn){btn.onclick=function(e){e.preventDefault();e.stopPropagation();window._mrEditOwnChatMessage(this.getAttribute('data-msg-id'));};});
                     Array.prototype.forEach.call(c.querySelectorAll('.chat-msg-delete-btn'),function(btn){btn.onclick=function(e){e.preventDefault();e.stopPropagation();window._mrDeleteChatMessage(this.getAttribute('data-msg-id'));};});
+                    // Re-apply the admin's ticked messages after a genuine re-render
+                    // (e.g. a new message arrived) so a multi-select is never lost
+                    // half-way through picking messages to delete.
+                    try{
+                        var keep=window._mrChatSelection||{};
+                        Array.prototype.forEach.call(c.querySelectorAll('.chat-delete-check'),function(cb){
+                            if(keep[cb.value]) cb.checked=true;
+                        });
+                    }catch(_){}
                     setTimeout(function(){ c.scrollTop=Math.max(0,c.scrollHeight-c.clientHeight); },40);
                 }
                 function _styles(){
@@ -17930,6 +18379,59 @@
                 if(typeof afterLogin==='function'&&!afterLogin.__mrCollapsedEditHistoryPatched){ var prev=afterLogin; afterLogin=async function(){ var r=await prev.apply(this,arguments); _install(); return r; }; afterLogin.__mrCollapsedEditHistoryPatched=true; }
                 _install();
                 document.addEventListener('DOMContentLoaded',function(){ setTimeout(_install,1800); });
+            })();
+
+
+            // Chat multi-select memory: remember which messages the admin has ticked
+            // for deletion, so a background refresh can never silently clear them.
+            // Delegated on document so it works for every chat renderer variant.
+            (function _mrChatSelectionMemory(){
+                if (window.__mrChatSelBound) return;
+                window.__mrChatSelBound = true;
+                window._mrChatSelection = window._mrChatSelection || {};
+
+                document.addEventListener('change', function(ev){
+                    var cb = ev.target;
+                    if (!cb || !cb.classList || !cb.classList.contains('chat-delete-check')) return;
+                    if (cb.checked) window._mrChatSelection[cb.value] = true;
+                    else delete window._mrChatSelection[cb.value];
+                    _paintCount();
+                }, true);
+
+                // Clicking the whole label/bubble row area should toggle reliably too.
+                function _paintCount(){
+                    try{
+                        var n = Object.keys(window._mrChatSelection || {}).length;
+                        var btns = document.querySelectorAll('[onclick*="_deleteSelectedChatMessages"]');
+                        Array.prototype.forEach.call(btns, function(b){
+                            var base = b.getAttribute('data-mrbase') || b.innerHTML;
+                            if (!b.getAttribute('data-mrbase')) b.setAttribute('data-mrbase', base);
+                            var want = n ? (base.replace(/Delete Selected.*$/, 'Delete Selected (' + n + ')')) : base;
+                            if (b.innerHTML !== want) b.innerHTML = want;
+                        });
+                    }catch(_){}
+                }
+                window._mrChatSelectionCount = function(){ return Object.keys(window._mrChatSelection||{}).length; };
+                window._mrClearChatSelection = function(){ window._mrChatSelection = {}; _paintCount(); };
+
+                // Drop the memory when the admin switches conversation or closes chat,
+                // so ticks never leak from one contact into another.
+                function _wrapReset(name){
+                    var orig = window[name];
+                    if (typeof orig !== 'function' || orig.__mrChatSelReset) return;
+                    window[name] = function(){
+                        window._mrChatSelection = {};
+                        setTimeout(_paintCount, 60);
+                        return orig.apply(this, arguments);
+                    };
+                    window[name].__mrChatSelReset = true;
+                }
+                function _install(){
+                    ['_selectChatContact','showChatUI','closeModal'].forEach(_wrapReset);
+                }
+                _install();
+                setTimeout(_install, 1500);
+                setTimeout(_install, 4000);
             })();
 
 
@@ -18515,7 +19017,13 @@
                     try { if (typeof ensureNotificationUI === 'function') ensureNotificationUI(); } catch (_) {}
                     ['chatNotifyBadge','chatCardNotifyBadge'].forEach(function(id){
                         var e = document.getElementById(id);
-                        if (e) { e.style.display = n ? 'inline-flex' : 'none'; e.textContent = n; }
+                        if (!e) return;
+                        // Change-guarded: chatCardNotifyBadge sits inside a dash-card,
+                        // so rewriting it on every poll re-triggered the #dashGrid
+                        // observer and rebuilt the whole sidebar a dozen times a second.
+                        var disp = n ? 'inline-flex' : 'none';
+                        if (e.style.display !== disp) e.style.display = disp;
+                        if (e.textContent !== String(n)) e.textContent = n;
                     });
                 }
                 function _cache(raw){
@@ -18980,6 +19488,10 @@
                     var all = await _readBookings();
                     var rows = _bookingExportRows(_values(all));
                     if (!rows.length) return showToast('No bookings to export.', 'warning');
+                    // SheetJS is fetched on first use (see phLoadXlsx).
+                    if (typeof XLSX === 'undefined' && typeof window.phLoadXlsx === 'function') {
+                        try { await window.phLoadXlsx(); } catch (_libErr) {}
+                    }
                     if (typeof XLSX === 'undefined') return showToast('Excel export library not loaded.', 'error');
                     var wb = XLSX.utils.book_new();
                     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Bookings');
@@ -19093,6 +19605,10 @@
                     var name = (file.name || '').toLowerCase();
                     if (name.endsWith('.json')) return JSON.parse(await file.text());
                     if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+                        // SheetJS is fetched on first use (see phLoadXlsx).
+                        if (typeof XLSX === 'undefined' && typeof window.phLoadXlsx === 'function') {
+                            try { await window.phLoadXlsx(); } catch (_libErr) {}
+                        }
                         if (typeof XLSX === 'undefined') throw new Error('Excel library not loaded.');
                         var buf = await file.arrayBuffer();
                         var wb = XLSX.read(buf, { type:'array' });
@@ -19156,7 +19672,7 @@
                             try {
                                 var pack = await collectBackupData(picks, from, to);
                                 if (fmt === 'json') downloadBlob(new Blob([JSON.stringify(pack, null, 2)], { type:'application/json' }), 'planholidays_backup_' + getToday() + '.json');
-                                else exportBackupToXlsx(pack, 'planholidays_backup_' + getToday() + '.xlsx');
+                                else await exportBackupToXlsx(pack, 'planholidays_backup_' + getToday() + '.xlsx');
                                 showToast('Backup downloaded.', 'success');
                             } catch(e) { showToast('Backup failed: ' + e.message, 'error'); }
                             showLoading(false);
@@ -19202,7 +19718,7 @@
                             if (files.length < 2) return showToast('Select multiple backup files first.', 'warning');
                             try {
                                 var merged = await _mergeBackupFiles(files);
-                                exportBackupToXlsx(merged, 'planholidays_merged_backups_' + getToday() + '.xlsx');
+                                await exportBackupToXlsx(merged, 'planholidays_merged_backups_' + getToday() + '.xlsx');
                                 showToast('Merged backup exported.', 'success');
                             } catch(e) { showToast('Merge failed: ' + e.message, 'error'); }
                         });
@@ -19303,7 +19819,13 @@
                         prevBackupXlsx(copy, filename);
                         if (copy === pack) pack.bookings = oldBookings;
                     };
-                    exportBackupToXlsx = function(pack, filename){
+                    exportBackupToXlsx = async function(pack, filename){
+                        // SheetJS is fetched on first use (see phLoadXlsx), otherwise
+                        // this override would hand off to the plain exporter and the
+                        // Bookings sheet would quietly go missing.
+                        if (typeof XLSX === 'undefined' && typeof window.phLoadXlsx === 'function') {
+                            try { await window.phLoadXlsx(); } catch (_libErr) {}
+                        }
                         if (typeof XLSX === 'undefined') return prevBackupXlsx.apply(this, arguments);
                         var wb = XLSX.utils.book_new();
                         function addSheet(name, rows) {
@@ -19427,7 +19949,21 @@
                 // if the original code hides the card, don't show it either
                 var hidden=(c.style.display==='none');
                 var icon=(c.querySelector('i')||{}).className||'fas fa-circle';
-                var title=((c.querySelector('h4')||{}).textContent||action).trim();
+                // Read the title WITHOUT any notification badge that lives inside the
+                // h4. The Chat card's h4 contains <span id="chatCardNotifyBadge">, so
+                // plain textContent produced labels like "Chat 0" / "Chat 50": the
+                // unread number was baked into the sidebar text, and every time the
+                // count changed the nav signature changed too, rebuilding the whole
+                // sidebar — that is the flicker. Cloning and stripping the badge keeps
+                // the label a stable "Chat" while the badge itself still updates.
+                var h4=c.querySelector('h4'), title;
+                if(h4){
+                    var cl=h4.cloneNode(true);
+                    Array.prototype.forEach.call(
+                        cl.querySelectorAll('.notification-dot,.notify-badge,.mini-badge,#chatCardNotifyBadge'),
+                        function(bd){ if(bd.parentNode) bd.parentNode.removeChild(bd); });
+                    title=(cl.textContent||action).replace(/\s+/g,' ').trim();
+                } else { title=action; }
                 items.push({action:action,label:title,icon:icon,card:c,hidden:hidden});
             });
             return items;
@@ -19480,6 +20016,14 @@
             var listHTML=items.filter(function(it){return !it.hidden;}).map(function(it){
                 return '<a class="mr-nav-item" data-mract="'+esc(it.action)+'" role="button" tabindex="0"><i class="'+esc(it.icon)+'"></i><span class="mr-nav-lbl">'+esc(it.label)+'</span></a>';
             }).join('');
+            // Skip the rebuild when the sidebar contents are unchanged. The
+            // #dashGrid observer calls this often, and a full innerHTML rewrite
+            // both churned the DOM and reset the highlighted row back to
+            // "Dashboard" while the user was on another page. Listeners from the
+            // previous render stay attached, so behaviour is identical.
+            var _sig=homeHTML+listHTML;
+            if(nav.getAttribute('data-mrsig')===_sig && nav.children.length) return;
+            nav.setAttribute('data-mrsig',_sig);
             nav.innerHTML=homeHTML+listHTML;
             // Home click
             var homeEl=nav.querySelector('[data-mrhome]');
@@ -20668,13 +21212,15 @@ body:not(.mr-new-theme) .ph-quote-acts button{ background:var(--input-bg,#eee); 
                 var wrap = document.getElementById('mrProfileWrap');
                 if(!wrap) return;
                 var nEl = wrap.querySelector('.mr-profile-name');
-                if(nEl) nEl.textContent = displayName();
+                // Only touch the DOM when the value actually changed: this runs
+                // every 1.5s and blind writes caused needless mutations.
+                if(nEl && nEl.textContent !== displayName()) nEl.textContent = displayName();
                 var av = wrap.querySelector('.mr-avatar');
                 if(av && !av.querySelector('img')){
                     var name = displayName();
                     var p = String(name).trim().split(/\s+/);
                     var ini = ((p[0]||'')[0]||'?').toUpperCase() + ((p.length>1 ? (p[p.length-1]||'')[0] : '')||'').toUpperCase();
-                    av.textContent = ini;
+                    if(av.textContent !== ini) av.textContent = ini;
                 }
             }catch(_){}
         }
@@ -20979,7 +21525,9 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
                 var name = me.name || me.username || 'User';
                 var photo = findPhoto(me);
                 var nEl = wrap.querySelector('.mr-profile-name');
-                if(nEl) nEl.textContent = name;
+                // Change-guarded: this runs every 1.2s, so writing the same
+                // name/initials again just churned the DOM for no reason.
+                if(nEl && nEl.textContent !== name) nEl.textContent = name;
                 var av = wrap.querySelector('.mr-avatar');
                 if(av){
                     if(photo){
@@ -20987,7 +21535,8 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
                         if(!img){ av.innerHTML = '<img alt="" />'; img = av.querySelector('img'); }
                         if(img.getAttribute('src') !== photo) img.setAttribute('src', photo);
                     } else {
-                        av.innerHTML = esc(initials(name));
+                        var _ini = esc(initials(name));
+                        if(av.innerHTML !== _ini) av.innerHTML = _ini;
                     }
                 }
             }catch(_){}
@@ -21067,10 +21616,22 @@ body:not(.mr-new-theme) .ph-shortcut i{color:var(--primary,#8b5cf6);}
                         window.STATE.users[uname].profileImage = pending;
                     }
                     try{
-                        if(typeof window.writeData==='function'){
-                            var all = (typeof window.readData==='function') ? (await window.readData('users','ph_users_list',true)||{}) : {};
-                            all[uname] = Object.assign({}, all[uname]||window.STATE.users[uname]||{}, {photo:pending, profileImage:pending});
-                            await window.writeData('users', all, 'ph_users_list');
+                        // Store against the real users key ('ph_users'). This used to
+                        // read/write 'ph_users_list', which does not exist anywhere else
+                        // in the portal: the read returned {} and writeData does a whole
+                        // node set(), so saving a photo could have replaced every account
+                        // with just this one. Write the single user's node instead of the
+                        // whole map, and only when the map really did load.
+                        if(typeof window.writeData==='function' && uname){
+                            var all = (typeof window.readData==='function') ? (await window.readData('users','ph_users',true)||null) : null;
+                            if(all && typeof all==='object' && Object.keys(all).length){
+                                all[uname] = Object.assign({}, all[uname]||{}, {photo:pending, profileImage:pending});
+                                await window.writeData('users', all, 'ph_users');
+                            } else {
+                                // Couldn't read the map — never clobber the whole node.
+                                var one = Object.assign({}, (window.STATE&&window.STATE.users&&window.STATE.users[uname])||{}, {photo:pending, profileImage:pending});
+                                await window.writeData('users/'+uname, one, 'ph_user_'+uname);
+                            }
                         }
                     }catch(_){}
                     try{ localStorage.setItem('ph_profile_photo_'+uname, pending); }catch(_){}
@@ -22785,10 +23346,6 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
 </script>
 <!-- ==== end PH-FIX v1 ==== -->
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <!-- ==== PH-FIX v2: minor targeted UI polish (agents online sticky+refresh, notifications trimmed, sidebar shortcuts, per-user theme persistence) ==== -->
 <style>
 /* Refresh button styling */
@@ -23785,13 +24342,6 @@ body.theme-custom .pdf-page tbody tr:nth-child(even){
 })();
 </script>
 <!-- ==== end PH-FIX v3 ==== -->
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <!-- ==== PH-FIX v3: topbar trimmed to user + bell; custom wallpaper applied portal-wide ==== -->
 <script>
 (function(){
@@ -23885,8 +24435,102 @@ body.theme-custom .pdf-page tbody tr:nth-child(even){
         if(!e || !e.key) return;
         if(e.key.indexOf('ph_theme') === 0 || e.key.indexOf('ph_custom_theme') === 0) tick();
     });
+
+    /* ---------- SIDEBAR HIGHLIGHT FOR THE "PROFILE" ROW ----------
+       Every other sidebar row highlights itself from the listener that
+       renderNav() attaches to the row. The Profile row never did, because
+       three capture-phase handlers intercept any [data-mract="profile"]
+       click and call stopPropagation() so the profile view opens instead of
+       the generic dash action. That also stops the event before the row's
+       own listener can move the highlight, so the previous page stayed lit.
+
+       Those handlers use stopPropagation (not stopImmediatePropagation), so
+       a sibling capture listener on document still runs. Move the highlight
+       here and leave the click routing completely untouched. */
+    document.addEventListener('click', function(e){
+        var row = e.target && e.target.closest && e.target.closest('#mrNav [data-mract="profile"]');
+        if(!row) return;
+        var nav = document.getElementById('mrNav'); if(!nav) return;
+        Array.prototype.forEach.call(nav.querySelectorAll('.mr-nav-item'), function(el){
+            el.classList.remove('active');
+        });
+        row.classList.add('active');
+    }, true);
+
+    /* ---------- CHAT UNREAD COUNT ON THE SIDEBAR ----------
+       readCardsAsNav() strips the badge out of the card title, so the sidebar
+       label is a stable "Chat" instead of the old "Chat 0" / "Chat 50" that
+       rebuilt the nav on every count change. The count itself is mirrored into
+       a badge of the row's own, below.
+
+       IMPORTANT — why this is observer-driven and not a poll: renderNav()
+       legitimately rebuilds the sidebar with nav.innerHTML when the card set
+       really does change (permissions settling, plugin cards arriving). That
+       wipes this badge along with everything else. A timer-based restore put
+       the badge back a fraction of a second later, which is exactly the
+       blink/refresh the user reported. A MutationObserver callback instead
+       runs at the microtask checkpoint straight after the rebuild — before
+       the browser paints — so the badge is never missing in a rendered frame.
+
+       The badge is only ever present when there are unread messages, and every
+       write is change-guarded, so an idle portal performs no DOM writes. */
+    var PH_BADGE_CSS = 'margin-left:auto;min-width:20px;height:20px;padding:0 6px;'+
+        'border-radius:999px;background:#e5484d;color:#fff;font-size:.7rem;font-weight:800;'+
+        'line-height:1;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;';
+
+    function phUnreadCount(){
+        var src = document.getElementById('chatCardNotifyBadge');
+        /* The app hides this element when nothing is unread. */
+        if(!src || src.style.display === 'none') return 0;
+        return parseInt((src.textContent || '0').replace(/\D/g, ''), 10) || 0;
+    }
+
+    function phSyncChatBadge(){
+        var row = document.querySelector('#mrNav [data-mract="chat"]');
+        if(!row) return;
+        var n = phUnreadCount();
+        var dot = row.querySelector('.ph-nav-chat-badge');
+        if(!n){
+            /* No new messages -> no badge at all. */
+            if(dot && dot.parentNode) dot.parentNode.removeChild(dot);
+            return;
+        }
+        if(!dot){
+            dot = document.createElement('span');
+            dot.className = 'ph-nav-chat-badge';
+            dot.setAttribute('style', PH_BADGE_CSS);
+            row.appendChild(dot);
+        }
+        var txt = n > 99 ? '99+' : String(n);
+        if(dot.textContent !== txt) dot.textContent = txt;
+    }
+
+    /* Restore synchronously whenever the sidebar is rebuilt, and follow the
+       source badge so a newly arrived message shows up at once. */
+    function phWatchChatBadge(){
+        var nav = document.getElementById('mrNav');
+        if(nav && !nav.__phBadgeWatch){
+            nav.__phBadgeWatch = true;
+            new MutationObserver(phSyncChatBadge).observe(nav, {childList:true});
+            phSyncChatBadge();
+        }
+        var src = document.getElementById('chatCardNotifyBadge');
+        if(src && !src.__phBadgeWatch){
+            src.__phBadgeWatch = true;
+            new MutationObserver(phSyncChatBadge).observe(src,
+                {childList:true, characterData:true, subtree:true,
+                 attributes:true, attributeFilter:['style']});
+            phSyncChatBadge();
+        }
+    }
+    /* Both elements are created after login, so keep looking for them. This
+       loop only ever attaches observers; it performs no DOM writes itself. */
+    setInterval(phWatchChatBadge, 1000);
+    phWatchChatBadge();
+    document.addEventListener('DOMContentLoaded', phWatchChatBadge);
 })();
 </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 </body>
 </html>
