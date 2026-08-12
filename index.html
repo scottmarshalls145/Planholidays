@@ -6290,12 +6290,15 @@
 
                 var activitiesHtml = buildActivitiesPDFHTML(quote);
 
-                var scheduleHtml = (quote.instalments || []).map(function(s) {
-                    return '<tr><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + s.instalment +
-                        '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + (s.dueDate ? formatDateDisplay(s.dueDate) : '') +
-                        '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' +
+                var scheduleHtml = (quote.instalments || []).map(function(s, _i) {
+                    var _rowBg = (_i % 2 === 0) ? '#ffffff' : '#f4f8fb';
+                    var _st = (s.status || 'Pending');
+                    var _stColor = (/paid|approved|received/i.test(_st)) ? '#0a7d0a' : (/overdue|declin|reject/i.test(_st) ? '#c33' : '#8b4a14');
+                    return '<tr style="background:' + _rowBg + ';"><td style="padding:6px 9px;border:1px solid #dbe5ec;font-weight:600;color:#12324a;">' + s.instalment +
+                        '</td><td style="padding:6px 9px;border:1px solid #dbe5ec;">' + (s.dueDate ? formatDateDisplay(s.dueDate) : '') +
+                        '</td><td style="padding:6px 9px;border:1px solid #dbe5ec;font-weight:700;color:#12324a;">' +
                         formatCurrency(s.amount, quote.currency || 'GBP') +
-                        '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + (s.status || 'Pending') +
+                        '</td><td style="padding:6px 9px;border:1px solid #dbe5ec;font-weight:600;color:' + _stColor + ';">' + _st +
                         '</td></tr>';
                 }).join('');
 
@@ -6317,20 +6320,31 @@
                 if (quote.agentName) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Agent:</td><td style="padding:4px 8px;">' + quote.agentName + '</td></tr>';
                 if (quote.referenceNumber) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Ref:</td><td style="padding:4px 8px;">' + quote.referenceNumber + '</td></tr>';
 
-                var flightsSection = flightsHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">✈️ Flights</h4>' + flightsHtml + '</div>' : '';
-                var itinerarySection = itineraryHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">🏨 Hotels &amp; Transfers</h4>' + itineraryHtml + '</div>' : '';
-                var activitiesSection = activitiesHtml ? '<div class="pdf-compact-section" style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">Other Activities</h4>' + activitiesHtml + '</div>' : '';
+                // Professional blue rectangular section-heading panel (white text)
+                var _secHead = 'font-size:1rem;margin:0 0 6px;color:#ffffff;background:linear-gradient(135deg,#12324a,#1c5a7d);padding:7px 13px;border-radius:8px;box-shadow:0 2px 6px rgba(18,50,74,0.28);letter-spacing:0.4px;font-weight:700;';
+                var flightsSection = flightsHtml ? '<div style="margin-bottom:5px;"><h4 style="' + _secHead + '">✈️ Flights</h4>' + flightsHtml + '</div>' : '';
+                var itinerarySection = itineraryHtml ? '<div style="margin-bottom:5px;"><h4 style="' + _secHead + '">🏨 Hotels &amp; Transfers</h4>' + itineraryHtml + '</div>' : '';
+                var activitiesSection = activitiesHtml ? '<div class="pdf-compact-section" style="margin-bottom:5px;"><h4 style="' + _secHead + '">Other Activities</h4>' + activitiesHtml + '</div>' : '';
 
-                var paymentBits = '';
-                if (total > 0) paymentBits += '<span><strong>Total:</strong> ' + formatCurrency(total, quote.currency || 'GBP') + '</span>';
-                if (deposit > 0) paymentBits += '<span><strong>Deposit:</strong> ' + formatCurrency(deposit, quote.currency || 'GBP') + '</span>';
-                if (pricePerPerson > 0) paymentBits += '<span><strong>Price Per Person:</strong> ' + formatCurrency(pricePerPerson, quote.currency || 'GBP') + '</span>';
-                if (balance > 0) paymentBits += '<span><strong>Balance:</strong> ' + formatCurrency(balance, quote.currency || 'GBP') + '</span>';
+                // Prominent, professional payment summary cards
+                var _payCur = quote.currency || 'GBP';
+                function _payCard(label, value, accent) {
+                    accent = accent || '#12324a';
+                    return '<div style="flex:1;min-width:118px;padding:9px 11px;background:#ffffff;border:1px solid #d8e3ea;border-top:3px solid ' + accent + ';border-radius:9px;text-align:center;box-shadow:0 2px 5px rgba(18,50,74,0.08);">' +
+                        '<div style="font-size:0.68rem;color:#5b7183;text-transform:uppercase;letter-spacing:1px;font-weight:600;">' + label + '</div>' +
+                        '<div style="font-size:1.18rem;font-weight:800;color:' + accent + ';margin-top:3px;">' + value + '</div></div>';
+                }
+                var paymentCards = '';
+                if (total > 0) paymentCards += _payCard('Total', formatCurrency(total, _payCur), '#12324a');
+                if (pricePerPerson > 0) paymentCards += _payCard('Per Person', formatCurrency(pricePerPerson, _payCur), '#1c5a7d');
+                if (deposit > 0) paymentCards += _payCard('Deposit', formatCurrency(deposit, _payCur), '#0f766e');
+                if (balance > 0) paymentCards += _payCard('Balance', formatCurrency(balance, _payCur), '#b8860b');
 
-                var paymentSection = (paymentBits || scheduleHtml) ?
-                    '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">💳 Payment Plan</h4>' +
-                    (paymentBits ? '<div style="display:flex;gap:10px 16px;flex-wrap:wrap;margin:3px 0 5px;font-size:0.9rem;">' + paymentBits + '</div>' : '') +
-                    (scheduleHtml ? '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;border:1px solid #dbe5ec;"><thead><tr style="background:#eaf1f6;"><th style="padding:5px 8px;border:1px solid #dbe5ec;">#</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Due Date</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Amount</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Status</th></tr></thead><tbody>' + scheduleHtml + '</tbody></table>' : '') +
+                var paymentSection = (paymentCards || scheduleHtml) ?
+                    '<div style="margin-bottom:6px;padding:11px 13px;background:linear-gradient(135deg,#f4f8fb,#eaf1f6);border:1px solid #d8e3ea;border-left:5px solid #12324a;border-radius:11px;box-shadow:0 3px 10px rgba(18,50,74,0.10);">' +
+                    '<h4 style="font-size:1.05rem;margin:0 0 8px;color:#ffffff;background:linear-gradient(135deg,#12324a,#1c5a7d);padding:8px 14px;border-radius:8px;box-shadow:0 2px 6px rgba(18,50,74,0.28);letter-spacing:0.4px;font-weight:700;">💳 Payment Plan</h4>' +
+                    (paymentCards ? '<div style="display:flex;gap:9px;flex-wrap:wrap;margin:0 0 8px;">' + paymentCards + '</div>' : '') +
+                    (scheduleHtml ? '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;border:1px solid #cdd9e2;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(18,50,74,0.08);"><thead><tr style="background:linear-gradient(135deg,#12324a,#1c5a7d);color:#ffffff;"><th style="padding:7px 9px;border:1px solid #1c5a7d;text-align:left;letter-spacing:0.4px;">#</th><th style="padding:7px 9px;border:1px solid #1c5a7d;text-align:left;letter-spacing:0.4px;">Due Date</th><th style="padding:7px 9px;border:1px solid #1c5a7d;text-align:left;letter-spacing:0.4px;">Amount</th><th style="padding:7px 9px;border:1px solid #1c5a7d;text-align:left;letter-spacing:0.4px;">Status</th></tr></thead><tbody>' + scheduleHtml + '</tbody></table>' : '') +
                     '</div>' : '';
 
                 // Professional, colourful quote palette (readable dark text on light panels)
@@ -24530,6 +24544,7 @@ body.theme-custom .pdf-page tbody tr:nth-child(even){
     document.addEventListener('DOMContentLoaded', phWatchChatBadge);
 })();
 </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 </body>
