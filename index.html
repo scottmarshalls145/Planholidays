@@ -241,6 +241,31 @@
         .serif {
             font-family: var(--font-serif);
         }
+        /* AUTOSAVE STATUS */
+        .autosave-status {
+            font-size: .75rem;
+            font-weight: 500;
+            color: var(--text2);
+            margin-left: 10px;
+            opacity: .9;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            vertical-align: middle;
+            letter-spacing: .2px;
+        }
+        .autosave-status:empty {
+            display: none;
+        }
+        .autosave-status.ok {
+            color: var(--success);
+        }
+        .autosave-status.warn {
+            color: var(--warning);
+        }
+        .autosave-status.saving {
+            color: var(--info);
+        }
         /* TOASTS */
         #toast-container {
             position: fixed;
@@ -2959,7 +2984,7 @@
         <!-- QUOTE BUILDER -->
         <section id="quoteBuilder">
             <div class="quote-header">
-                <h2><i class="fas fa-file-pen" style="color:var(--primary);"></i> <span id="quoteBuilderTitle">New Quote</span></h2>
+                <h2><i class="fas fa-file-pen" style="color:var(--primary);"></i> <span id="quoteBuilderTitle">New Quote</span> <span id="autosaveStatus" class="autosave-status" aria-live="polite"></span></h2>
                 <div class="quote-actions">
                     <button id="btnSaveQuote" class="btn-primary"><i class="fas fa-save"></i> Save Quote</button>
                     <button id="btnPreviewPDF" class="btn-success"><i class="fas fa-eye"></i> Preview PDF</button>
@@ -3207,6 +3232,7 @@
                 editingQuoteId: null,
                 editingInvoiceId: null,
                 isNewQuote: true,
+                autosaveEnabled: false,
                 darkMode: false,
                 activeAgentShift: null,
                 proBackgrounds: {},
@@ -4145,6 +4171,7 @@
             }
 
             async function deleteQuote(id) {
+                _forgetDraftIfDeleted([id]);
                 var allQuotes = await readData('quotes', 'ph_quotes_list', true) || {};
                 if (!allQuotes[id]) { showToast('Quote not found.', 'error'); return false; }
                 delete allQuotes[id];
@@ -4158,6 +4185,7 @@
 
             async function deleteMultipleQuotes(ids) {
                 if (!ids || !ids.length) { showToast('No quotes selected.', 'warning'); return; }
+                _forgetDraftIfDeleted(ids);
                 var allQuotes = await readData('quotes', 'ph_quotes_list', true) || {};
                 var deleted = 0;
                 for (var i = 0; i < ids.length; i++) {
@@ -6290,15 +6318,12 @@
 
                 var activitiesHtml = buildActivitiesPDFHTML(quote);
 
-                var scheduleHtml = (quote.instalments || []).map(function(s, _i) {
-                    var _rowBg = (_i % 2 === 0) ? '#ffffff' : '#f4f8fb';
-                    var _st = (s.status || 'Pending');
-                    var _stColor = (/paid|approved|received/i.test(_st)) ? '#0a7d0a' : (/overdue|declin|reject/i.test(_st) ? '#c33' : '#8b4a14');
-                    return '<tr style="background:' + _rowBg + ';"><td style="padding:6px 9px;border:1px solid #dbe5ec;font-weight:600;color:#12324a;">' + s.instalment +
-                        '</td><td style="padding:6px 9px;border:1px solid #dbe5ec;">' + (s.dueDate ? formatDateDisplay(s.dueDate) : '') +
-                        '</td><td style="padding:6px 9px;border:1px solid #dbe5ec;font-weight:700;color:#12324a;">' +
+                var scheduleHtml = (quote.instalments || []).map(function(s) {
+                    return '<tr><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + s.instalment +
+                        '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + (s.dueDate ? formatDateDisplay(s.dueDate) : '') +
+                        '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' +
                         formatCurrency(s.amount, quote.currency || 'GBP') +
-                        '</td><td style="padding:6px 9px;border:1px solid #dbe5ec;font-weight:600;color:' + _stColor + ';">' + _st +
+                        '</td><td style="padding:4px 7px;border:1px solid #dbe5ec;">' + (s.status || 'Pending') +
                         '</td></tr>';
                 }).join('');
 
@@ -6320,31 +6345,20 @@
                 if (quote.agentName) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Agent:</td><td style="padding:4px 8px;">' + quote.agentName + '</td></tr>';
                 if (quote.referenceNumber) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Ref:</td><td style="padding:4px 8px;">' + quote.referenceNumber + '</td></tr>';
 
-                // Professional blue rectangular section-heading panel (white text)
-                var _secHead = 'font-size:1rem;margin:0 0 6px;color:#ffffff;background:linear-gradient(135deg,#12324a,#1c5a7d);padding:7px 13px;border-radius:8px;box-shadow:0 2px 6px rgba(18,50,74,0.28);letter-spacing:0.4px;font-weight:700;';
-                var flightsSection = flightsHtml ? '<div style="margin-bottom:5px;"><h4 style="' + _secHead + '">✈️ Flights</h4>' + flightsHtml + '</div>' : '';
-                var itinerarySection = itineraryHtml ? '<div style="margin-bottom:5px;"><h4 style="' + _secHead + '">🏨 Hotels &amp; Transfers</h4>' + itineraryHtml + '</div>' : '';
-                var activitiesSection = activitiesHtml ? '<div class="pdf-compact-section" style="margin-bottom:5px;"><h4 style="' + _secHead + '">Other Activities</h4>' + activitiesHtml + '</div>' : '';
+                var flightsSection = flightsHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">✈️ Flights</h4>' + flightsHtml + '</div>' : '';
+                var itinerarySection = itineraryHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">🏨 Hotels &amp; Transfers</h4>' + itineraryHtml + '</div>' : '';
+                var activitiesSection = activitiesHtml ? '<div class="pdf-compact-section" style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">Other Activities</h4>' + activitiesHtml + '</div>' : '';
 
-                // Prominent, professional payment summary cards
-                var _payCur = quote.currency || 'GBP';
-                function _payCard(label, value, accent) {
-                    accent = accent || '#12324a';
-                    return '<div style="flex:1;min-width:118px;padding:9px 11px;background:#ffffff;border:1px solid #d8e3ea;border-top:3px solid ' + accent + ';border-radius:9px;text-align:center;box-shadow:0 2px 5px rgba(18,50,74,0.08);">' +
-                        '<div style="font-size:0.68rem;color:#5b7183;text-transform:uppercase;letter-spacing:1px;font-weight:600;">' + label + '</div>' +
-                        '<div style="font-size:1.18rem;font-weight:800;color:' + accent + ';margin-top:3px;">' + value + '</div></div>';
-                }
-                var paymentCards = '';
-                if (total > 0) paymentCards += _payCard('Total', formatCurrency(total, _payCur), '#12324a');
-                if (pricePerPerson > 0) paymentCards += _payCard('Per Person', formatCurrency(pricePerPerson, _payCur), '#1c5a7d');
-                if (deposit > 0) paymentCards += _payCard('Deposit', formatCurrency(deposit, _payCur), '#0f766e');
-                if (balance > 0) paymentCards += _payCard('Balance', formatCurrency(balance, _payCur), '#b8860b');
+                var paymentBits = '';
+                if (total > 0) paymentBits += '<span><strong>Total:</strong> ' + formatCurrency(total, quote.currency || 'GBP') + '</span>';
+                if (deposit > 0) paymentBits += '<span><strong>Deposit:</strong> ' + formatCurrency(deposit, quote.currency || 'GBP') + '</span>';
+                if (pricePerPerson > 0) paymentBits += '<span><strong>Price Per Person:</strong> ' + formatCurrency(pricePerPerson, quote.currency || 'GBP') + '</span>';
+                if (balance > 0) paymentBits += '<span><strong>Balance:</strong> ' + formatCurrency(balance, quote.currency || 'GBP') + '</span>';
 
-                var paymentSection = (paymentCards || scheduleHtml) ?
-                    '<div style="margin-bottom:6px;padding:11px 13px;background:linear-gradient(135deg,#f4f8fb,#eaf1f6);border:1px solid #d8e3ea;border-left:5px solid #12324a;border-radius:11px;box-shadow:0 3px 10px rgba(18,50,74,0.10);">' +
-                    '<h4 style="font-size:1.05rem;margin:0 0 8px;color:#ffffff;background:linear-gradient(135deg,#12324a,#1c5a7d);padding:8px 14px;border-radius:8px;box-shadow:0 2px 6px rgba(18,50,74,0.28);letter-spacing:0.4px;font-weight:700;">💳 Payment Plan</h4>' +
-                    (paymentCards ? '<div style="display:flex;gap:9px;flex-wrap:wrap;margin:0 0 8px;">' + paymentCards + '</div>' : '') +
-                    (scheduleHtml ? '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;border:1px solid #cdd9e2;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(18,50,74,0.08);"><thead><tr style="background:linear-gradient(135deg,#12324a,#1c5a7d);color:#ffffff;"><th style="padding:7px 9px;border:1px solid #1c5a7d;text-align:left;letter-spacing:0.4px;">#</th><th style="padding:7px 9px;border:1px solid #1c5a7d;text-align:left;letter-spacing:0.4px;">Due Date</th><th style="padding:7px 9px;border:1px solid #1c5a7d;text-align:left;letter-spacing:0.4px;">Amount</th><th style="padding:7px 9px;border:1px solid #1c5a7d;text-align:left;letter-spacing:0.4px;">Status</th></tr></thead><tbody>' + scheduleHtml + '</tbody></table>' : '') +
+                var paymentSection = (paymentBits || scheduleHtml) ?
+                    '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">💳 Payment Plan</h4>' +
+                    (paymentBits ? '<div style="display:flex;gap:10px 16px;flex-wrap:wrap;margin:3px 0 5px;font-size:0.9rem;">' + paymentBits + '</div>' : '') +
+                    (scheduleHtml ? '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;border:1px solid #dbe5ec;"><thead><tr style="background:#eaf1f6;"><th style="padding:5px 8px;border:1px solid #dbe5ec;">#</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Due Date</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Amount</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Status</th></tr></thead><tbody>' + scheduleHtml + '</tbody></table>' : '') +
                     '</div>' : '';
 
                 // Professional, colourful quote palette (readable dark text on light panels)
@@ -7267,6 +7281,8 @@
             }
 
             function showDashboard(skipAutoLoad) {
+                stopAutosave();
+                _setAutosaveStatus('');
                 ensureAtolDashboardCard();
                 ensureHotelVoucherDashboardCards();
                 sortDashboardCardsAlphabetically();
@@ -7274,7 +7290,7 @@
                 document.getElementById('quoteBuilder').classList.remove('visible');
                 document.getElementById('quoteBuilder').style.display = 'none';
                 if (!skipAutoLoad) {
-                    loadQuotes();
+                    loadQuotes().then(function() { recoverQuoteDraft(); });
                     loadInvoices();
                     loadAgentTimes();
                     loadInquiries();
@@ -7487,7 +7503,7 @@
                     return '<tr><td class="checkbox-cell">' + ((isAdmin() || hasPermission(
                         'canDeleteQuotes')) ? '<input type="checkbox" class="quote-checkbox" value="' + q
                         .id + '" />' : '') +
-                        '</td><td><strong>' + q.quoteNumber + '</strong></td><td>' + (q.customerName || '') +
+                        '</td><td><strong>' + q.quoteNumber + '</strong>' + (q.status === 'draft' ? ' <span class="inq-status status-in-progress" title="Autosaved draft — still being worked on" style="font-size:.62rem;padding:2px 7px;">DRAFT</span>' : '') + '</td><td>' + (q.customerName || '') +
                         '</td><td>' + (q.passengerNames || '') + '</td><td>' + (q.agentName || '') +
                         '</td><td>' + formatCurrency(q.totalPrice || 0) + '</td><td>' + (typeof formatDateDisplay === 'function' ? formatDateDisplay(q.quoteDate || '') : (q.quoteDate || '')) +
                         '</td><td><div class="actions-cell"><button class="btn btn-sm btn-primary" onclick="window._viewQuote(\'' +
@@ -8427,6 +8443,7 @@
                 renderActivities();
                 document.getElementById('paymentScheduleBody').innerHTML =
                     '<tr><td colspan="4" class="text-muted text-center">Generate schedule.</td></tr>';
+                startAutosave();
                 showToast('New quote started.', 'info');
             }
 
@@ -8481,6 +8498,7 @@
                 populateQuoteForm(q);
                 switchTab('tabCustomer');
                 showQuoteBuilder();
+                startAutosave();
                 showToast('Editing quote.', 'info');
             }
 
@@ -8525,6 +8543,7 @@
                 populateQuoteForm(copy);
                 switchTab('tabCustomer');
                 showQuoteBuilder();
+                startAutosave();
                 showToast('Quote duplicated.', 'success');
             }
 
@@ -10718,9 +10737,13 @@
                     } catch (_) {}
                 });
 
-                // Close quote builder
+                // Close quote builder — progress is autosaved as a draft, so it
+                // stays recoverable in Quote History rather than being lost.
                 document.getElementById('btnCloseQuote').addEventListener('click', function() {
-                    if (confirm('Close quote builder? Unsaved changes will be lost.')) showDashboard();
+                    if (confirm('Close quote builder? Your progress is autosaved as a draft in Quote History.')) {
+                        autosaveLocalOnly();
+                        showDashboard();
+                    }
                 });
 
                 // Save quote
@@ -10732,7 +10755,22 @@
                         STATE.currentQuote = saved;
                         STATE.isNewQuote = false;
                         document.getElementById('quoteNumber').value = saved.quoteNumber;
+                        // The quote is now permanently saved; drop the local draft
+                        // backup and re-arm autosave from the saved state.
+                        clearQuoteDraftBackup();
+                        _setAutosaveStatus('Saved ' + getLocalTimeValue(), 'ok');
                         await loadQuotes();
+                    }
+                });
+
+                // Flush the current draft when the tab/window is closing or hidden
+                // (crash / accidental close protection). localStorage writes are
+                // synchronous so they complete even during unload.
+                window.addEventListener('beforeunload', function() { autosaveLocalOnly(); });
+                document.addEventListener('visibilitychange', function() {
+                    if (document.visibilityState === 'hidden') {
+                        autosaveLocalOnly();
+                        autosaveQuoteDraft();
                     }
                 });
 
@@ -10900,6 +10938,206 @@
                 return q;
             }
 
+            // --------------------------------------------------------------
+            // QUOTE AUTOSAVE — crash-safe drafts
+            // Continuously saves the quote being built so nothing is lost if the
+            // browser/tab/system closes. Drafts appear in Quote History so the
+            // agent can re-open and finish them later.
+            // --------------------------------------------------------------
+            var _autosaveTimer = null;
+            var _autosaveLastSnapshot = '';
+            var _autosaveSyncing = false;
+            var AUTOSAVE_INTERVAL_MS = 5000;
+
+            function _quoteDraftKey() {
+                var u = STATE.currentUser;
+                return 'ph_quote_draft_' + (u && u.username ? u.username : 'anon');
+            }
+
+            function _quoteBuilderIsOpen() {
+                var b = document.getElementById('quoteBuilder');
+                return !!(b && b.style.display !== 'none' && document.getElementById('custName'));
+            }
+
+            function _quoteHasContent(q) {
+                if (!q) return false;
+                return !!(
+                    (q.customerName && q.customerName.trim()) ||
+                    (q.route && q.route.trim()) ||
+                    (q.passengerNames && q.passengerNames.trim()) ||
+                    (q.flights && q.flights.length) ||
+                    (q.hotels && q.hotels.length) ||
+                    (q.transfers && q.transfers.length) ||
+                    (q.activities && q.activities.length)
+                );
+            }
+
+            function _setAutosaveStatus(text, cls) {
+                var el = document.getElementById('autosaveStatus');
+                if (!el) return;
+                el.textContent = text || '';
+                el.className = 'autosave-status' + (cls ? ' ' + cls : '');
+            }
+
+            // Stable fingerprint of the quote used to detect real edits. Volatile
+            // bookkeeping fields are excluded so autosave does not loop forever.
+            function _autosaveSnapshot(data) {
+                var clone = Object.assign({}, data);
+                delete clone.updatedAt;
+                delete clone.autosavedAt;
+                delete clone.createdAt;
+                return JSON.stringify(clone);
+            }
+
+            // Ensure a brand-new quote gets a stable id so every autosave updates
+            // the SAME history record instead of creating duplicates.
+            function _ensureDraftIdentity(data) {
+                var now = getNowISO();
+                if (!data.id) {
+                    data.id = genId();
+                    data.createdAt = data.createdAt || now;
+                    data.createdBy = data.createdBy || (STATE.currentUser ? STATE.currentUser.username || '' : '');
+                    if (!data.quoteNumber) data.quoteNumber = generateQuoteNumber();
+                    if (!data.status) data.status = 'draft';
+                    STATE.currentQuote.id = data.id;
+                    STATE.editingQuoteId = data.id;
+                    STATE.isNewQuote = false;
+                    var qnEl = document.getElementById('quoteNumber');
+                    if (qnEl && !qnEl.value) qnEl.value = data.quoteNumber;
+                }
+                data.updatedAt = now;
+                data.autosavedAt = now;
+                return data;
+            }
+
+            function _reflectQuoteInList(data) {
+                var copy = JSON.parse(JSON.stringify(data));
+                var idx = STATE.quotes.findIndex(function(x) { return x.id === data.id; });
+                if (idx >= 0) STATE.quotes[idx] = copy;
+                else STATE.quotes.push(copy);
+                updateQuoteCount();
+            }
+
+            // Synchronous, local-only save — safe to call from beforeunload where
+            // async Firebase writes would never finish. This is the real crash net.
+            function autosaveLocalOnly() {
+                try {
+                    if (!STATE.autosaveEnabled || STATE.isInvoiceMode) return;
+                    if (!STATE.currentUser || !_quoteBuilderIsOpen()) return;
+                    var data = collectQuoteFormData();
+                    if (!_quoteHasContent(data)) return;
+                    _ensureDraftIdentity(data);
+                    _reflectQuoteInList(data);
+                    localStorage.setItem(_quoteDraftKey(), JSON.stringify(data));
+                } catch (_) {}
+            }
+
+            // Full autosave: local backup + silent Firebase sync so the draft is
+            // visible in Quote History on any other device / after a reload.
+            async function autosaveQuoteDraft() {
+                try {
+                    if (!STATE.autosaveEnabled || STATE.isInvoiceMode) return;
+                    if (!STATE.currentUser || !_quoteBuilderIsOpen()) return;
+                    var data = collectQuoteFormData();
+                    if (!_quoteHasContent(data)) return;
+
+                    var snapshot = _autosaveSnapshot(data);
+                    if (snapshot === _autosaveLastSnapshot) return; // nothing changed
+
+                    _ensureDraftIdentity(data);
+
+                    // Instant local backup (survives crash / offline before sync).
+                    try { localStorage.setItem(_quoteDraftKey(), JSON.stringify(data)); } catch (_) {}
+
+                    // Show it in history immediately.
+                    _reflectQuoteInList(data);
+
+                    if (_autosaveSyncing) return; // a sync is already in flight; retry next tick
+                    _autosaveSyncing = true;
+                    _setAutosaveStatus('Saving…', 'saving');
+                    var didSync = false;
+                    try {
+                        await writeData('quotes/' + data.id, data, 'ph_quotes');
+                        var allQuotes = await readData('quotes', 'ph_quotes_list', true) || {};
+                        allQuotes[data.id] = data;
+                        await writeData('quotes', allQuotes, 'ph_quotes_list');
+                        STATE.quotes = Object.values(allQuotes);
+                        updateQuoteCount();
+                        didSync = true;
+                    } catch (_) {}
+                    _autosaveSyncing = false;
+
+                    if (didSync) {
+                        _autosaveLastSnapshot = snapshot;
+                        _setAutosaveStatus('Draft autosaved ' + getLocalTimeValue(), 'ok');
+                    } else {
+                        // keep the local copy; do NOT freeze the snapshot so we retry
+                        _setAutosaveStatus('Saved on this device', 'warn');
+                    }
+                } catch (_) {}
+            }
+
+            function startAutosave() {
+                STATE.autosaveEnabled = true;
+                _autosaveLastSnapshot = '';
+                stopAutosave(true);
+                _autosaveTimer = setInterval(autosaveQuoteDraft, AUTOSAVE_INTERVAL_MS);
+            }
+
+            function stopAutosave(keepEnabled) {
+                if (_autosaveTimer) { clearInterval(_autosaveTimer); _autosaveTimer = null; }
+                if (!keepEnabled) STATE.autosaveEnabled = false;
+            }
+
+            function clearQuoteDraftBackup() {
+                try { localStorage.removeItem(_quoteDraftKey()); } catch (_) {}
+                _autosaveLastSnapshot = '';
+            }
+
+            // Drop the local draft backup if the quote it points to was deleted,
+            // so a removed draft is never resurrected on the next load.
+            function _forgetDraftIfDeleted(ids) {
+                try {
+                    if (!ids || !ids.length) return;
+                    var raw = localStorage.getItem(_quoteDraftKey());
+                    if (!raw) return;
+                    var draft = JSON.parse(raw);
+                    if (draft && draft.id && ids.indexOf(draft.id) !== -1) {
+                        localStorage.removeItem(_quoteDraftKey());
+                        if (STATE.currentQuote && STATE.currentQuote.id === draft.id) _autosaveLastSnapshot = '';
+                    }
+                } catch (_) {}
+            }
+
+            // On load, recover a draft that was never synced (crash before the
+            // first Firebase write, or fully offline session) and surface it in
+            // Quote History so the agent can continue editing.
+            async function recoverQuoteDraft() {
+                try {
+                    if (!STATE.currentUser) return;
+                    var raw = localStorage.getItem(_quoteDraftKey());
+                    if (!raw) return;
+                    var draft = JSON.parse(raw);
+                    if (!draft || !draft.id || !_quoteHasContent(draft)) {
+                        localStorage.removeItem(_quoteDraftKey());
+                        return;
+                    }
+                    var exists = STATE.quotes.some(function(x) { return x.id === draft.id; });
+                    if (exists) return; // already in history, nothing to recover
+                    draft.status = draft.status || 'draft';
+                    STATE.quotes.push(draft);
+                    updateQuoteCount();
+                    try {
+                        await writeData('quotes/' + draft.id, draft, 'ph_quotes');
+                        var allQuotes = await readData('quotes', 'ph_quotes_list', true) || {};
+                        allQuotes[draft.id] = draft;
+                        await writeData('quotes', allQuotes, 'ph_quotes_list');
+                        STATE.quotes = Object.values(allQuotes);
+                        updateQuoteCount();
+                    } catch (_) {}
+                    showToast('Recovered an unsaved quote draft — find it in Quote History.', 'warning');
+                } catch (_) {}
+            }
 
             // --------------------------------------------------------------
             // MuleRun requested feature patch: activities, accounts, ATOL, calendar, export, logs
@@ -16744,7 +16982,7 @@
                         { name: 'Travel', icon: '🚗', emojis: unique(cpRange(0x1F680,0x1F6FF).concat(cpRange(0x1F300,0x1F320), words('⌚ ⌛ ⏩ ⏪ ⏫ ⏬ ⏰ ⏱️ ⏲️ 🕰️ 🗺️ 🗿 🛕 🛖 🛻 🛞 🛟 🛝 🛤️ 🛣️ 🏔️ 🏕️ 🏖️ 🏜️ 🏝️ 🏞️ 🏟️ 🏛️ 🏗️ 🏘️ 🏚️ 🏠 🏡 🏢 🏣 🏤 🏥 🏦 🏨 🏩 🏪 🏫 🏬 🏭 🏯 🏰 💒 🗼 🗽 ⛪ 🕌 🛐 🕍 ⛩️ 🕋 ⛲ ⛺ 🌋 🌁 🌃 🌄 🌅 🌆 🌇 🌉 ♨️ 🎠 🎡 🎢 💈 🎪 🚂 🚃 🚄 🚅 🚆 🚇 🚈 🚉 🚊 🚝 🚞 🚋 🚌 🚍 🚎 🚐 🚑 🚒 🚓 🚔 🚕 🚖 🚗 🚘 🚙 🚚 🚛 🚜 🏎️ 🏍️ 🛵 🦽 🦼 🛺 🚲 🛴 🛹 🛼 🚏 ⛽ 🛢️ 🚨 🚥 🚦 🛑 🚧 ⚓ ⛵ 🛶 🚤 🛳️ ⛴️ 🚢 ✈️ 🛩️ 🛫 🛬 🪂 💺 🚁 🚟 🚠 🚡 🛰️ 🚀 🛸')))},
                         { name: 'Activities', icon: '⚽', emojis: unique(cpRange(0x1F380,0x1F3FF).concat(words('⚽ ⚾ 🥎 🏀 🏐 🏈 🏉 🎾 🥏 🎳 🏏 🏑 🏒 🥍 🏓 🏸 🥊 🥋 🥅 ⛳ ⛸️ 🎣 🤿 🎽 🎿 🛷 🥌 🎯 🪀 🪁 🔫 🎱 🔮 🪄 🎮 🕹️ 🎰 🎲 🧩 🧸 🪅 🪩 🪆 ♠️ ♥️ ♦️ ♣️ ♟️ 🃏 🀄 🎴 🎭 🖼️ 🎨 🧵 🪡 🧶 🪢')))},
                         { name: 'Objects', icon: '💡', emojis: unique(cpRange(0x1F4A0,0x1F5FF).concat(words('🪬 🧿 🪧 🪪 🩼 🩺 🩻 🪮 🪭 🧰 🧲 🧪 🧫 🧬 🧯 🧴 🧵 🧶 🧷 🧹 🧺 🧻 🧼 🧽 🧾 🧸 🪆 🪔 🪄 🪅 🪩 🪫 🪙 🪃 🪚 🪛 🪝 🪜 🪠 🪤 🪞 🪟 🪑 🪒 🪓 🪦 🪧 🛒 🛍️ 🛎️ 🛏️ 🛋️ 🚪 🪵 🪨 🛗 🪥 🪣 🪄')))},
-                        { name: 'Symbols', icon: '❤️', emojis: unique(cpRange(0x2600,0x27BF).concat(cpRange(0x1F7E0,0x1F7FF), words('❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 ❤️‍🔥 ❤️‍🩹 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ☮️ ✝️ ☪️ 🕉️ ☸️ ✡️ 🔯 🕎 ☯️ ☦️ 🛐 ⛎ ♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓ 🆔 ⚛️ 🉑 ☢️ ☣️ 📴 📳 🈶 🈚 🈸 🈺 🈷️ ✴️ 🆚 💮 🉐 ㊙️ ㊗️ 🈴 🈵 🈹 🈲 🅰️ 🅱️ 🆎 🆑 🅾️ 🆘 ❌ ⭕ 🛑 ⛔ 📛 🚫 💯 💢 ♨️ 🚷 🚯 🚳 🚱 🔞 📵 🚭 ❗ ❕ ❓ ❔ ‼️ ⁉️ 🔅 🔆 〽️ ⚠️ 🚸 🔱 ⚜️ 🔰 ♻️ ✅ 🈯 💹 ❇️ ✳️ ❎ 🌐 💠 Ⓜ️ 🌀 💤 🏧 🚾 ♿ 🅿️ 🛗 🈳 🈂️ 🛂 🛃 🛄 🛅 🚹 🚺 🚼 ⚧️ 🚻 🚮 🎦 📶 🈁 🔣 ℹ️ 🔤 🔡 🔠 🆖 🆗 🆙 🆒 🆕 🆓 0️⃣ 1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ 6️⃣ 7️⃣ 8️⃣ 9️⃣ 🔟 🔢 #️⃣ *️⃣ ▶️ ⏸️ ⏯️ ⏹️ ⏺️ ⏭️ ⏮️ ⏩ ⏪ 🔀 🔁 🔂 ◀️ 🔼 🔽 ⏫ ⏬ ➡️ ⬅️ ⬆️ ⬇️ ↗️ ↘️ ↙️ ↖️ ↕️ ↔️ ↪️ ↩️ ⤴️ ⤵️ 🔃 🔄 🔙 🔚 🔛 🔜 🔝 🛐 ⚕️ ♾️ ✔️ ➕ ➖ ➗ ✖️ 🟰 💲 💱 ™️ ©️ ®️ 〰️ ➰ ➿ 🔘 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ 🟤 🔺 🔻 🔸 🔹 🔶 🔷 🔳 🔲 ▪️ ▫️ ◾ ◽ ◼️ ◻️ 🟥 🟧 🟨 🟩 🟦 🟪 ⬛ ⬜ 🟫')))},
+                        { name: 'Symbols', icon: '❤️', emojis: unique(cpRange(0x2600,0x27BF).concat(cpRange(0x1F7E0,0x1F7FF), words('❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 ❤️‍🔥 ❤️‍🩹 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ☮️ ✝️ ☪️ 🕉️ ☸️ ✡️ 🔯 🕎 ☯️ ☦️ 🛐 ⛎ ♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓ 🆔 ⚛️ 🉑 ☢️ ☣️ 📴 📳 🈶 🈚 🈸 🈺 🈷️ ✴️ 🆚 💮 🉐 ㊙️ ㊗️ 🈴 🈵 🈹 🈲 🅰️ 🅱️ 🆎 🆑 🅾️ 🆘 ❌ ⭕ 🛑 ⛔ 📛 🚫 💯 💢 ♨️ 🚷 🚯 🚳 🚱 🔞 📵 🚭 ❗ ❕ ❓ ❔ ‼️ ⁉️ 🔅 🔆 〽️ ⚠️ 🚸 🔱 ⚜️ 🔰 ♻️ ✅ 🈯 💹 ❇️ ✳️ ❎ 🌐 💠 Ⓜ️ 🌀 💤 🏧 🚾 ♿ 🅿️ 🛗 🈳 🈂️ 🛂 🛃 🛄 🛅 🚹 🚺 🚼 ⚧️ 🚻 🚮 🎦 📶 🈁 🔣 ℹ️ 🔤 🔡 🔠 🆖 🆗 🆙 🆒 🆕 🆓 0️⃣ 1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ 6️⃣ 7️⃣ 8️⃣ 9️⃣ 🔟 🔢 #️⃣ *️⃣ ▶️ ⏸️ ⏯️ ⏹️ ⏺️ ⏭️ ⏮️ ⏩ ⏪ 🔀 🔁 🔂 ◀️ 🔼 🔽 ⏫ ⏬ ➡️ ⬅️ ⬆️ ⬇️ ↗️ ↘️ ↙️ ↖️ ↕️ ↔️ ↪️ ↩️ ⤴️ ⤵️ 🔃 🔄 🔙 🔚 🔛 🔜 🔝 🛐 ⚕️ ♾️ ✔️ ➕ ➖ ➗ ✖️ 🟰 💲 💱 ™�� ©️ ®️ 〰️ ➰ ➿ 🔘 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ 🟤 🔺 🔻 🔸 🔹 🔶 🔷 🔳 🔲 ▪️ ▫️ ◾ ◽ ◼️ ◻️ 🟥 🟧 🟨 🟩 🟦 🟪 ⬛ ⬜ 🟫')))},
                         { name: 'Flags', icon: '🏳️', emojis: unique(allFlags())}
                     ];
                     return categories;
@@ -24544,7 +24782,6 @@ body.theme-custom .pdf-page tbody tr:nth-child(even){
     document.addEventListener('DOMContentLoaded', phWatchChatBadge);
 })();
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 </body>
