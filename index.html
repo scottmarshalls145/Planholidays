@@ -1131,8 +1131,17 @@
             transform: translateY(-50%);
             color: var(--primary);
             font-size: .9rem;
-            pointer-events: none;
-            z-index: 1;
+            pointer-events: auto;
+            cursor: pointer;
+            z-index: 2;
+            padding: 4px;
+            margin: -4px;
+            border-radius: 6px;
+            transition: color .15s ease, background .15s ease;
+        }
+        .date-input-wrap .date-icon:hover {
+            color: var(--primary2);
+            background: rgba(184, 134, 11, .12);
         }
         .date-input-wrap input.smart-date {
             padding-left: 34px !important;
@@ -4149,18 +4158,40 @@
                     data.status = 'saved';
                 }
                 try {
-                    await writeData('quotes/' + data.id, data, 'ph_quotes');
-                    var allQuotes = await readData('quotes', 'ph_quotes_list', true) || {};
-                    allQuotes[data.id] = data;
-                    await writeData('quotes', allQuotes, 'ph_quotes_list');
-                    STATE.quotes = Object.values(allQuotes);
-                    updateQuoteCount();
+                    // Non-destructive per-child save. We NEVER rewrite the whole
+                    // "quotes" node anymore, so two agents saving at the same time
+                    // can no longer wipe each other's quotes (this was the cause of
+                    // vanishing quotes and the admin history missing agents' work),
+                    // and a single quote save no longer re-uploads the entire DB.
+                    await _upsertQuoteChild(data);
                     showToast('Quote saved successfully.', 'success');
                     return data;
                 } catch (e) {
                     showToast('Failed to save quote: ' + e.message, 'error');
                     return null;
                 }
+            }
+
+            // Safe upsert of ONE quote. Writes only quotes/<id> in Firebase (a
+            // child write that leaves every other quote untouched) and keeps the
+            // local list / cache / STATE in sync for instant + offline reads.
+            // Returns true when the Firebase sync succeeded.
+            async function _upsertQuoteChild(data) {
+                var fbOk = false;
+                if (firebaseConnected && db) {
+                    try { await db.ref('quotes/' + data.id).set(data); fbOk = true; }
+                    catch (e) { console.warn('[v0] quote child write failed:', e); }
+                }
+                var list = STATE._cache['quotes_ph_quotes_list'];
+                if (!list || typeof list !== 'object') {
+                    try { list = JSON.parse(localStorage.getItem('ph_quotes_list') || '{}'); } catch (_) { list = {}; }
+                }
+                list[data.id] = data;
+                STATE._cache['quotes_ph_quotes_list'] = list;
+                try { localStorage.setItem('ph_quotes_list', JSON.stringify(list)); } catch (_) {}
+                STATE.quotes = Object.values(list);
+                updateQuoteCount();
+                return fbOk;
             }
 
             async function loadQuotes(bypassCache) {
@@ -4174,9 +4205,12 @@
                 _forgetDraftIfDeleted([id]);
                 var allQuotes = await readData('quotes', 'ph_quotes_list', true) || {};
                 if (!allQuotes[id]) { showToast('Quote not found.', 'error'); return false; }
-                delete allQuotes[id];
-                await writeData('quotes', allQuotes, 'ph_quotes_list');
+                // Remove ONLY this child in Firebase (non-destructive to siblings)
+                // then reconcile the local list.
                 await removeData('quotes/' + id, null);
+                delete allQuotes[id];
+                STATE._cache['quotes_ph_quotes_list'] = allQuotes;
+                try { localStorage.setItem('ph_quotes_list', JSON.stringify(allQuotes)); } catch (_) {}
                 STATE.quotes = Object.values(allQuotes);
                 updateQuoteCount();
                 showToast('Quote deleted.', 'success');
@@ -4191,12 +4225,13 @@
                 for (var i = 0; i < ids.length; i++) {
                     var id = ids[i];
                     if (allQuotes[id]) {
-                        delete allQuotes[id];
                         await removeData('quotes/' + id, null);
+                        delete allQuotes[id];
                         deleted++;
                     }
                 }
-                await writeData('quotes', allQuotes, 'ph_quotes_list');
+                STATE._cache['quotes_ph_quotes_list'] = allQuotes;
+                try { localStorage.setItem('ph_quotes_list', JSON.stringify(allQuotes)); } catch (_) {}
                 STATE.quotes = Object.values(allQuotes);
                 updateQuoteCount();
                 showToast('Deleted ' + deleted + ' quote(s).', 'success');
@@ -4230,12 +4265,10 @@
                     }
                 }
                 try {
-                    await writeData('invoices/' + data.id, data, 'ph_invoices');
-                    var allInvoices = await readData('invoices', 'ph_invoices_list') || {};
-                    allInvoices[data.id] = data;
-                    await writeData('invoices', allInvoices, 'ph_invoices_list');
-                    STATE.invoices = Object.values(allInvoices);
-                    updateInvoiceCount();
+                    // Per-child write only — same non-destructive strategy as
+                    // quotes so concurrent invoice edits (accounts, margins,
+                    // payments) never overwrite each other.
+                    await _upsertInvoiceChild(data);
                     showToast('Invoice saved successfully.', 'success');
                     return data;
                 } catch (e) {
@@ -4244,19 +4277,40 @@
                 }
             }
 
+            async function _upsertInvoiceChild(data) {
+                var fbOk = false;
+                if (firebaseConnected && db) {
+                    try { await db.ref('invoices/' + data.id).set(data); fbOk = true; }
+                    catch (e) { console.warn('[v0] invoice child write failed:', e); }
+                }
+                var list = STATE._cache['invoices_ph_invoices_list'];
+                if (!list || typeof list !== 'object') {
+                    try { list = JSON.parse(localStorage.getItem('ph_invoices_list') || '{}'); } catch (_) { list = {}; }
+                }
+                list[data.id] = data;
+                STATE._cache['invoices_ph_invoices_list'] = list;
+                try { localStorage.setItem('ph_invoices_list', JSON.stringify(list)); } catch (_) {}
+                STATE.invoices = Object.values(list);
+                updateInvoiceCount();
+                return fbOk;
+            }
+
             async function loadInvoices() {
-                var allInvoices = await readData('invoices', 'ph_invoices_list') || {};
+                // Always read fresh so every agent's invoices are visible (admin
+                // accounts/margins views depend on a complete list).
+                var allInvoices = await readData('invoices', 'ph_invoices_list', true) || {};
                 STATE.invoices = Object.values(allInvoices);
                 updateInvoiceCount();
                 return STATE.invoices;
             }
 
             async function deleteInvoice(id) {
-                var allInvoices = await readData('invoices', 'ph_invoices_list') || {};
+                var allInvoices = await readData('invoices', 'ph_invoices_list', true) || {};
                 if (!allInvoices[id]) { showToast('Invoice not found.', 'error'); return false; }
-                delete allInvoices[id];
-                await writeData('invoices', allInvoices, 'ph_invoices_list');
                 await removeData('invoices/' + id, null);
+                delete allInvoices[id];
+                STATE._cache['invoices_ph_invoices_list'] = allInvoices;
+                try { localStorage.setItem('ph_invoices_list', JSON.stringify(allInvoices)); } catch (_) {}
                 STATE.invoices = Object.values(allInvoices);
                 updateInvoiceCount();
                 showToast('Invoice deleted.', 'success');
@@ -4265,17 +4319,18 @@
 
             async function deleteMultipleInvoices(ids) {
                 if (!ids || !ids.length) { showToast('No invoices selected.', 'warning'); return; }
-                var allInvoices = await readData('invoices', 'ph_invoices_list') || {};
+                var allInvoices = await readData('invoices', 'ph_invoices_list', true) || {};
                 var deleted = 0;
                 for (var i = 0; i < ids.length; i++) {
                     var id = ids[i];
                     if (allInvoices[id]) {
-                        delete allInvoices[id];
                         await removeData('invoices/' + id, null);
+                        delete allInvoices[id];
                         deleted++;
                     }
                 }
-                await writeData('invoices', allInvoices, 'ph_invoices_list');
+                STATE._cache['invoices_ph_invoices_list'] = allInvoices;
+                try { localStorage.setItem('ph_invoices_list', JSON.stringify(allInvoices)); } catch (_) {}
                 STATE.invoices = Object.values(allInvoices);
                 updateInvoiceCount();
                 showToast('Deleted ' + deleted + ' invoice(s).', 'success');
@@ -4705,6 +4760,10 @@
                 window._updateFlightField = updateFlightField;
                 window._formatFlightTime12 = function(v){var s=String(v||'').trim();var m=s.match(/^(\d{1,2}):(\d{2})/);if(!m)return '';var h=parseInt(m[1],10);var suf=h>=12?'PM':'AM';var h12=h%12||12;return String(h12).padStart(2,'0')+':'+m[2]+' '+suf;};
                 window._updateFlightTimePreview = function(id,v){var el=document.getElementById(id);if(el)el.textContent=window._formatFlightTime12(v);};
+                // CRITICAL: wire the flight date fields so manual typing AND the
+                // calendar icon commit the date. Without this the departure/arrival
+                // dates were never stored, so they came out blank on the PDF.
+                _wireSmartDateInputs(container);
             }
 
             function parseGDS(text) {
@@ -5310,6 +5369,42 @@
                     inp.addEventListener('keydown', function(e) {
                         if (e.key === 'Enter') { inp.blur(); }
                     });
+
+                    // Make the calendar icon open a real date picker. A tiny hidden
+                    // native <input type="date"> is used purely as the picker; the
+                    // visible field still supports manual DD-MM-YYYY typing.
+                    var wrap = inp.closest('.date-input-wrap');
+                    var icon = wrap ? wrap.querySelector('.date-icon') : null;
+                    if (wrap && icon && !icon._pickerWired) {
+                        icon._pickerWired = true;
+                        icon.style.cursor = 'pointer';
+                        icon.setAttribute('role', 'button');
+                        icon.setAttribute('tabindex', '0');
+                        icon.setAttribute('aria-label', 'Open calendar');
+                        if (getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
+                        var picker = document.createElement('input');
+                        picker.type = 'date';
+                        picker.className = 'smart-date-native-picker';
+                        picker.tabIndex = -1;
+                        picker.setAttribute('aria-hidden', 'true');
+                        picker.style.cssText = 'position:absolute;left:0;bottom:0;width:1px;height:1px;padding:0;margin:0;border:0;opacity:0;pointer-events:none;';
+                        wrap.appendChild(picker);
+                        picker.addEventListener('change', function() {
+                            if (!picker.value) return;
+                            inp.classList.remove('date-invalid');
+                            _commitSmartDate(inp, picker.value); // picker.value is ISO yyyy-mm-dd
+                        });
+                        var openPicker = function() {
+                            var iso = _parseDateSmart(inp.value) || '';
+                            if (iso) { try { picker.value = iso; } catch (_) {} }
+                            try { picker.showPicker(); }
+                            catch (_) { try { picker.focus(); picker.click(); } catch (__) {} }
+                        };
+                        icon.addEventListener('click', openPicker);
+                        icon.addEventListener('keydown', function(e) {
+                            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker(); }
+                        });
+                    }
                 });
             }
             // Wire standalone smart-date inputs anywhere in the document (quoteDate, expiryDate etc.)
@@ -6173,7 +6268,11 @@
                         '</span></div>' + imgHtml + '</div>';
                 }
 
-                return '<div style="border:1px solid #b8c7d8;border-radius:9px;margin:5px 0;background:#fff;overflow:hidden;page-break-inside:avoid;">' +
+                return '<div style="border:1px solid #0b3f8a;border-radius:9px;margin:5px 0;background:#fff;overflow:hidden;page-break-inside:avoid;">' +
+                    '<div style="background:#0b3f8a;color:#ffffff;padding:7px 13px;display:flex;justify-content:space-between;align-items:center;font-weight:700;">' +
+                    '<span style="font-size:0.95rem;">✈ ' + airline + ' ' + flightNo + '</span>' +
+                    '<span style="font-size:0.86rem;color:#ffffff;opacity:.95;">' + escapeHTML(f.origin || '') + ' → ' + escapeHTML(f.destination || '') + '</span>' +
+                    '</div>' +
                     '<div style="display:grid;grid-template-columns:23% 38.5% 38.5%;min-height:104px;">' +
                     '<div style="padding:12px 12px;border-right:1px solid #d6e0ea;display:flex;flex-direction:column;justify-content:center;">' +
                     '<div style="font-size:0.72rem;color:#6b7280;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px;">Airline</div>' +
@@ -6286,13 +6385,15 @@
                     if (coStr) rows += '<div><strong>Check-out Date:</strong> ' + coStr + '</div>';
                     if (nights) rows += '<div><strong>Total Nights:</strong> ' + nights + '</div>';
                     if (passStr) rows += '<div><strong>Passengers:</strong> ' + passStr + '</div>';
-                    return '<div style="padding:5px 7px;border:1px solid #dbe5ec;border-radius:8px;margin:3px 0;background:#f8fafc;">' +
-                        (h.destination ? '<h5 style="margin:0 0 4px;font-size:1.15rem;color:#12324a;font-family:\'Playfair Display\',serif;">' + h.destination + '</h5>' : '') +
-                        (h.hotelName ? '<div style="font-size:0.98rem;font-weight:700;margin-bottom:3px;">' + h.hotelName + (h.hotelCategory ? ' <span style="font-weight:400;color:#666;">(' + h.hotelCategory + ')</span>' : '') + '</div>' : '') +
+                    var hotelTitle = h.destination || h.hotelName || 'Hotel';
+                    return '<div style="border:1px solid #0b3f8a;border-radius:8px;margin:3px 0;background:#fff;overflow:hidden;page-break-inside:avoid;">' +
+                        '<div style="background:#0b3f8a;color:#ffffff;padding:6px 11px;font-weight:700;font-family:\'Playfair Display\',serif;font-size:1rem;">🏨 ' + hotelTitle + '</div>' +
+                        '<div style="padding:6px 9px;">' +
+                        (h.hotelName && h.destination ? '<div style="font-size:0.98rem;font-weight:700;margin-bottom:3px;color:#12324a;">' + h.hotelName + (h.hotelCategory ? ' <span style="font-weight:400;color:#666;">(' + h.hotelCategory + ')</span>' : '') + '</div>' : '') +
                         (rows ? '<div style="font-size:0.85rem;line-height:1.45;color:#333;">' + rows + '</div>' : '') +
                         (imgs ? '<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">' + imgs + '</div>' : '') +
                         (h.specialRequests ? '<div style="font-size:0.8rem;color:#888;margin-top:6px;"><strong>Requests:</strong> ' + h.specialRequests + '</div>' : '') +
-                        '</div>';
+                        '</div></div>';
                 }
 
                 function _quoteTransferCard(t) {
@@ -6306,7 +6407,9 @@
                     if (t.pickupTime) rows += '<div><strong>Pickup Time:</strong> ' + t.pickupTime + '</div>';
                     if (t.driverNotes) rows += '<div><strong>Notes:</strong> ' + t.driverNotes + '</div>';
                     if (!rows) return '';
-                    return '<div style="padding:7px 10px;border:1px solid #dbe5ec;border-radius:8px;margin:3px 0;background:#f8fafc;font-size:0.84rem;line-height:1.45;">' + rows + '</div>';
+                    return '<div style="border:1px solid #0b3f8a;border-radius:8px;margin:3px 0;background:#fff;overflow:hidden;page-break-inside:avoid;">' +
+                        '<div style="background:#0b3f8a;color:#ffffff;padding:6px 11px;font-weight:700;font-family:\'Playfair Display\',serif;font-size:0.98rem;">🚗 Transfer</div>' +
+                        '<div style="padding:7px 10px;font-size:0.84rem;line-height:1.45;color:#333;">' + rows + '</div></div>';
                 }
 
                 var hotelsHtml = (quote.hotels || []).map(_quoteHotelCard).join('');
@@ -6345,21 +6448,44 @@
                 if (quote.agentName) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Agent:</td><td style="padding:4px 8px;">' + quote.agentName + '</td></tr>';
                 if (quote.referenceNumber) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Ref:</td><td style="padding:4px 8px;">' + quote.referenceNumber + '</td></tr>';
 
-                var flightsSection = flightsHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">✈️ Flights</h4>' + flightsHtml + '</div>' : '';
-                var itinerarySection = itineraryHtml ? '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">🏨 Hotels &amp; Transfers</h4>' + itineraryHtml + '</div>' : '';
-                var activitiesSection = activitiesHtml ? '<div class="pdf-compact-section" style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">Other Activities</h4>' + activitiesHtml + '</div>' : '';
+                // Section header bar: white text on a professional blue background.
+                var SECBLUE = '#0b3f8a';
+                var secHead = function(label) {
+                    return '<h4 style="font-size:1.02rem;margin:0 0 6px;color:#ffffff;background:' + SECBLUE + ';padding:8px 13px;border-radius:8px;font-family:\'Playfair Display\',serif;letter-spacing:.4px;box-shadow:0 3px 8px rgba(11,63,138,0.2);">' + label + '</h4>';
+                };
 
-                var paymentBits = '';
-                if (total > 0) paymentBits += '<span><strong>Total:</strong> ' + formatCurrency(total, quote.currency || 'GBP') + '</span>';
-                if (deposit > 0) paymentBits += '<span><strong>Deposit:</strong> ' + formatCurrency(deposit, quote.currency || 'GBP') + '</span>';
-                if (pricePerPerson > 0) paymentBits += '<span><strong>Price Per Person:</strong> ' + formatCurrency(pricePerPerson, quote.currency || 'GBP') + '</span>';
-                if (balance > 0) paymentBits += '<span><strong>Balance:</strong> ' + formatCurrency(balance, quote.currency || 'GBP') + '</span>';
+                var flightsSection = flightsHtml ? '<div style="margin-bottom:7px;">' + secHead('✈️ Flights') + flightsHtml + '</div>' : '';
+                var itinerarySection = itineraryHtml ? '<div style="margin-bottom:7px;">' + secHead('🏨 Hotels &amp; Transfers') + itineraryHtml + '</div>' : '';
+                var activitiesSection = activitiesHtml ? '<div class="pdf-compact-section" style="margin-bottom:7px;">' + secHead('Other Activities') + activitiesHtml + '</div>' : '';
 
-                var paymentSection = (paymentBits || scheduleHtml) ?
-                    '<div style="margin-bottom:5px;"><h4 style="font-size:1rem;margin:0 0 4px;color:#12324a;border-bottom:1px solid #dbe5ec;padding-bottom:4px;">💳 Payment Plan</h4>' +
-                    (paymentBits ? '<div style="display:flex;gap:10px 16px;flex-wrap:wrap;margin:3px 0 5px;font-size:0.9rem;">' + paymentBits + '</div>' : '') +
-                    (scheduleHtml ? '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;border:1px solid #dbe5ec;"><thead><tr style="background:#eaf1f6;"><th style="padding:5px 8px;border:1px solid #dbe5ec;">#</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Due Date</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Amount</th><th style="padding:5px 8px;border:1px solid #dbe5ec;">Status</th></tr></thead><tbody>' + scheduleHtml + '</tbody></table>' : '') +
-                    '</div>' : '';
+                // Prominent payment details — big highlighted figures. The Total and
+                // Balance are emphasised in solid blue; deposit / per-person are shown
+                // in soft blue supporting chips.
+                var payChip = function(label, val, strong) {
+                    // The inner label/value divs MUST carry their own inline colour.
+                    // The .pdf-safe / #pdfContent readability rules force
+                    // color:#1a1a1a !important on any descendant WITHOUT an inline
+                    // colour, so without this the text on the solid blue chips came
+                    // out near-black and unreadable in both preview and PDF.
+                    var chipText = strong ? '#ffffff' : '#0b3f8a';
+                    return '<div style="flex:1;min-width:120px;background:' + (strong ? SECBLUE : '#eaf1f9') + ';color:' + chipText + ';border-radius:10px;padding:10px 14px;text-align:center;border:1px solid ' + (strong ? SECBLUE : '#c9dbef') + ';">' +
+                        '<div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:.7px;opacity:.85;color:' + chipText + ';margin-bottom:3px;">' + label + '</div>' +
+                        '<div style="font-size:1.25rem;font-weight:800;line-height:1.1;color:' + chipText + ';">' + val + '</div></div>';
+                };
+                var payCur = quote.currency || 'GBP';
+                var payChips = '';
+                if (total > 0) payChips += payChip('Total Price', formatCurrency(total, payCur), true);
+                if (deposit > 0) payChips += payChip('Deposit', formatCurrency(deposit, payCur), false);
+                if (pricePerPerson > 0) payChips += payChip('Price Per Person', formatCurrency(pricePerPerson, payCur), false);
+                if (balance > 0) payChips += payChip('Balance Due', formatCurrency(balance, payCur), true);
+
+                var paymentSection = (payChips || scheduleHtml) ?
+                    '<div style="margin-bottom:7px;border:2px solid ' + SECBLUE + ';border-radius:11px;overflow:hidden;box-shadow:0 5px 16px rgba(11,63,138,0.16);">' +
+                    '<h4 style="font-size:1.08rem;margin:0;color:#ffffff;background:' + SECBLUE + ';padding:10px 14px;font-family:\'Playfair Display\',serif;letter-spacing:.4px;">💳 Payment Details</h4>' +
+                    '<div style="padding:11px 13px;background:#ffffff;">' +
+                    (payChips ? '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:' + (scheduleHtml ? '9px' : '0') + ';">' + payChips + '</div>' : '') +
+                    (scheduleHtml ? '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;border:1px solid #c9dbef;"><thead><tr style="background:' + SECBLUE + ';color:#fff;"><th style="padding:6px 8px;border:1px solid #c9dbef;color:#ffffff;">#</th><th style="padding:6px 8px;border:1px solid #c9dbef;color:#ffffff;">Due Date</th><th style="padding:6px 8px;border:1px solid #c9dbef;color:#ffffff;">Amount</th><th style="padding:6px 8px;border:1px solid #c9dbef;color:#ffffff;">Status</th></tr></thead><tbody>' + scheduleHtml + '</tbody></table>' : '') +
+                    '</div></div>' : '';
 
                 // Professional, colourful quote palette (readable dark text on light panels)
                 var ACC2 = '#12324a', ACC = '#0f766e', GOLD = '#b8860b';
@@ -11057,13 +11183,11 @@
                     _setAutosaveStatus('Saving…', 'saving');
                     var didSync = false;
                     try {
-                        await writeData('quotes/' + data.id, data, 'ph_quotes');
-                        var allQuotes = await readData('quotes', 'ph_quotes_list', true) || {};
-                        allQuotes[data.id] = data;
-                        await writeData('quotes', allQuotes, 'ph_quotes_list');
-                        STATE.quotes = Object.values(allQuotes);
-                        updateQuoteCount();
-                        didSync = true;
+                        // Per-child write only — cheap and non-destructive, so the
+                        // 5s autosave no longer re-uploads the whole quote DB
+                        // (which made the builder stuck/slow) and can never wipe
+                        // another agent's quote.
+                        didSync = await _upsertQuoteChild(data);
                     } catch (_) {}
                     _autosaveSyncing = false;
 
@@ -11128,12 +11252,7 @@
                     STATE.quotes.push(draft);
                     updateQuoteCount();
                     try {
-                        await writeData('quotes/' + draft.id, draft, 'ph_quotes');
-                        var allQuotes = await readData('quotes', 'ph_quotes_list', true) || {};
-                        allQuotes[draft.id] = draft;
-                        await writeData('quotes', allQuotes, 'ph_quotes_list');
-                        STATE.quotes = Object.values(allQuotes);
-                        updateQuoteCount();
+                        await _upsertQuoteChild(draft);
                     } catch (_) {}
                     showToast('Recovered an unsaved quote draft — find it in Quote History.', 'warning');
                 } catch (_) {}
@@ -24782,6 +24901,7 @@ body.theme-custom .pdf-page tbody tr:nth-child(even){
     document.addEventListener('DOMContentLoaded', phWatchChatBadge);
 })();
 </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 </body>
