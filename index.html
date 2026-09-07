@@ -3037,12 +3037,12 @@
 
                 <!-- ===== DEAL ===== -->
                 <div class="form-card">
-                    <h3><i class="fas fa-bullhorn"></i> Deal <span class="text-muted text-sm" style="font-weight:400;">— appears inside the Holiday Quotation box on the quotation PDF</span></h3>
-                    <p class="text-muted text-sm mb-16">Type the deal for this quote. It is shown directly below the "Holiday Quotation" title in the same box, highlighted with stars before and after the text.</p>
+                    <h3><i class="fas fa-star"></i> Deal <span class="text-muted text-sm" style="font-weight:400;">— shown directly under the "Holiday Quotation" heading on the PDF</span></h3>
+                    <p class="text-muted text-sm mb-16">Whatever you type here is printed inside the quotation title box, in large highlighted text with a star before and after it. Leave it empty to hide it completely.</p>
                     <div class="form-row">
                         <div class="form-group full">
                             <label>Deal</label>
-                            <textarea id="dealText" rows="3" placeholder="e.g. Free Half Board Upgrade + Kids Stay Free"></textarea>
+                            <textarea id="dealText" rows="3" placeholder="e.g. Free Room Upgrade &amp; Half Board Included"></textarea>
                         </div>
                     </div>
                 </div>
@@ -4170,6 +4170,16 @@
                 } else {
                     data.status = 'saved';
                 }
+                // Stamp the authoring agent's contact details onto the record so
+                // the quote/invoice keeps showing the right email + phone even if
+                // the agent later edits their profile or the quote is transferred.
+                try {
+                    if (!data.agentEmail || !data.agentPhone) {
+                        var _qc = _phAgentContact(data);
+                        if (!data.agentEmail && _qc.email) data.agentEmail = _qc.email;
+                        if (!data.agentPhone && _qc.phone) data.agentPhone = _qc.phone;
+                    }
+                } catch (_) {}
                 try {
                     // Non-destructive per-child save. We NEVER rewrite the whole
                     // "quotes" node anymore, so two agents saving at the same time
@@ -4277,6 +4287,17 @@
                         data.accountsLocked = true;
                     }
                 }
+                // Carry the generating agent's contact details on the invoice.
+                // Resolved from the ORIGINAL record (invoiceData) so an admin
+                // opening an agent's invoice does not rewrite it with their own
+                // details, and so the values survive later profile edits.
+                try {
+                    if (!data.agentEmail || !data.agentPhone) {
+                        var _ic = _phAgentContact(invoiceData || data);
+                        if (!data.agentEmail && _ic.email) data.agentEmail = _ic.email;
+                        if (!data.agentPhone && _ic.phone) data.agentPhone = _ic.phone;
+                    }
+                } catch (_) {}
                 try {
                     // Per-child write only — same non-destructive strategy as
                     // quotes so concurrent invoice edits (accounts, margins,
@@ -6366,6 +6387,72 @@
                 return hotels.map(hotelFn).join('') + transfers.map(transferFn).join('');
             }
 
+            // ----------------------------------------------------------------
+            // Quote paper colour policy + agent contact resolution
+            // ----------------------------------------------------------------
+            // White is the DEFAULT, not a rule: when the agent has no quote
+            // background selected the sheet prints on plain white so the body
+            // text can never sit on a dark/busy picture. As soon as a picture
+            // IS selected it must be shown, so pass the candidate image in and
+            // white is forced only when there isn't one.
+            function _phForceWhiteQuote(bgUrl) {
+                if (arguments.length) return !bgUrl;
+                try {
+                    if (typeof agentQuoteBgBlank === 'function' && agentQuoteBgBlank()) return true;
+                    if (typeof getAgentQuoteBg === 'function' && getAgentQuoteBg()) return false;
+                } catch (_) {}
+                return true;
+            }
+
+            // Resolve the email + telephone of the agent responsible for a
+            // quote/invoice. Priority:
+            //   1. values already stored on the record (historical accuracy)
+            //   2. that agent's Profile entry in the users store
+            //   3. the logged-in user's own profile (brand-new unsaved document)
+            // Exposed on window because the PDF builders live inside this IIFE
+            // while later patch layers also need the same resolution.
+            function _phAgentContact(doc) {
+                var out = { email: '', phone: '' };
+                try {
+                    doc = doc || {};
+                    if (doc.agentEmail || doc.agentPhone) {
+                        out.email = doc.agentEmail || '';
+                        out.phone = doc.agentPhone || '';
+                        if (out.email && out.phone) return out;
+                    }
+                    var users = (STATE && STATE.users) || {};
+                    var cur = (STATE && STATE.currentUser) || {};
+                    // The username that owns the document, not the display name.
+                    var keys = [doc.createdBy, doc.agentUsername, doc.assignedTo, doc.agentName];
+                    var rec = null;
+                    for (var i = 0; i < keys.length && !rec; i++) {
+                        var k = keys[i];
+                        if (k && users[k]) rec = users[k];
+                    }
+                    // agentName may hold a display name — match it against profiles.
+                    if (!rec && doc.agentName) {
+                        var want = String(doc.agentName).trim().toLowerCase();
+                        Object.keys(users).forEach(function(u) {
+                            if (rec) return;
+                            var x = users[u] || {};
+                            var nm = String(x.name || ((x.firstName || '') + ' ' + (x.lastName || '')) || u).trim().toLowerCase();
+                            if (nm && nm === want) rec = x;
+                        });
+                    }
+                    // Nothing identified the author: only fall back to the current
+                    // user when the document has no author at all (a fresh quote).
+                    if (!rec) {
+                        var authored = doc.createdBy || doc.agentUsername || doc.agentName;
+                        if (!authored || authored === cur.username) rec = users[cur.username] || cur;
+                    }
+                    rec = rec || {};
+                    out.email = out.email || rec.email || '';
+                    out.phone = out.phone || rec.telephone || rec.phone || '';
+                } catch (_) {}
+                return out;
+            }
+            try { window._phAgentContact = _phAgentContact; } catch (_) {}
+
             // Quote PDF — larger logo (120px) and beautiful borders
             function buildQuotePDFHTML(quote, branding, conditions) {
                 var logoHtml = branding && branding.logo ?
@@ -6459,6 +6546,13 @@
                 if (passengerTypeSummary) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Passenger Types:</td><td style="padding:4px 8px;">' + passengerTypeSummary + '</td></tr>';
                 if (routeDisplay) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Route:</td><td style="padding:4px 8px;font-weight:600;color:#0f766e;">' + routeDisplay + '</td></tr>';
                 if (quote.agentName) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Agent:</td><td style="padding:4px 8px;">' + quote.agentName + '</td></tr>';
+                // Contact details of the agent who actually built this quote, read
+                // from that agent's own Profile (email + telephone). Falls back to
+                // any values already stamped on the record so historical documents
+                // keep showing the details captured at creation time.
+                var _phQAC = (typeof window._phAgentContact === 'function') ? window._phAgentContact(quote) : {};
+                if (_phQAC.email) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Agent Email:</td><td style="padding:4px 8px;">' + escapeHTML(_phQAC.email) + '</td></tr>';
+                if (_phQAC.phone) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Agent Phone:</td><td style="padding:4px 8px;">' + escapeHTML(_phQAC.phone) + '</td></tr>';
                 if (quote.referenceNumber) custRows += '<tr><td style="padding:4px 8px;font-weight:600;">Ref:</td><td style="padding:4px 8px;">' + quote.referenceNumber + '</td></tr>';
 
                 // Section header bar: white text on a professional blue background.
@@ -6514,25 +6608,20 @@
                         .telephone || '') + ' · ' + (branding && branding.email || '') +
                     '</div></div></div>';
 
-                // Deal — shown inside the Holiday Quotation box, directly below the
-                // title, wrapped in stars so it stands out on the PDF.
+                // Deal — printed inside the title box, directly beneath the
+                // "Holiday Quotation" heading, wrapped in stars and made prominent.
                 var _dealRaw = (quote.dealText == null ? '' : String(quote.dealText)).trim();
-                var dealHtml = '';
-                if (_dealRaw) {
-                    var _dealSafe = escapeHTML(_dealRaw).replace(/\n/g, '<br>');
-                    var _star = '<span style="color:#fbbf24;">&#9733;</span>';
-                    dealHtml = '<div style="margin:11px auto 2px;max-width:92%;background:rgba(255,255,255,0.14);border:1.5px solid rgba(251,191,36,0.75);border-radius:11px;padding:11px 16px;">' +
-                        '<div style="font-size:0.68rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#fbbf24;margin-bottom:5px;">Deal</div>' +
-                        '<div style="font-size:1.32rem;font-weight:800;line-height:1.35;color:#ffffff;letter-spacing:.3px;white-space:pre-wrap;word-break:break-word;text-shadow:0 1px 3px rgba(0,0,0,0.32);">' +
-                        _star + ' ' + _dealSafe + ' ' + _star +
-                        '</div></div>';
-                }
+                var dealHtml = _dealRaw ?
+                    '<div style="margin:9px auto 2px;max-width:96%;background:rgba(255,255,255,0.16);border:2px solid #fbbf24;border-radius:12px;padding:12px 18px;box-shadow:0 4px 14px rgba(0,0,0,0.20);">' +
+                    '<div style="font-family:\'Playfair Display\',serif;font-size:1.32rem;font-weight:800;color:#ffffff;line-height:1.4;letter-spacing:.4px;white-space:pre-wrap;word-break:break-word;text-shadow:0 2px 4px rgba(0,0,0,0.28);">' +
+                    '<span style="color:#fbbf24;">&#9733;</span> ' + escapeHTML(_dealRaw).replace(/\n/g, '<br>') + ' <span style="color:#fbbf24;">&#9733;</span>' +
+                    '</div></div>' : '';
 
-                var titleHtml = '<div style="text-align:center;margin:4px 0 10px;background:linear-gradient(135deg,' + ACC2 + ',' + ACC + ');border-radius:12px;padding:' + (_dealRaw ? '16px 12px 14px' : '11px 8px') + ';box-shadow:0 6px 18px rgba(15,118,110,0.22);">' +
+                var titleHtml = '<div style="text-align:center;margin:4px 0 10px;background:linear-gradient(135deg,' + ACC2 + ',' + ACC + ');border-radius:12px;padding:' + (dealHtml ? '14px 10px 12px' : '11px 8px') + ';box-shadow:0 6px 18px rgba(15,118,110,0.22);">' +
                     '<h2 style="font-family:\'Playfair Display\',serif;font-size:2rem;color:#ffffff;margin:0;letter-spacing:1px;">Holiday Quotation</h2>' +
-                    '<div style="font-size:0.9rem;color:rgba(255,255,255,0.92);">Quote #' +
-                    (quote.quoteNumber || 'N/A') + (quote.quoteDate ? ' · ' + formatDateDisplay(quote.quoteDate) : '') + '</div>' +
-                    dealHtml + '</div>';
+                    dealHtml +
+                    '<div style="font-size:0.9rem;color:rgba(255,255,255,0.92);' + (dealHtml ? 'margin-top:7px;' : '') + '">Quote #' +
+                    (quote.quoteNumber || 'N/A') + (quote.quoteDate ? ' · ' + formatDateDisplay(quote.quoteDate) : '') + '</div></div>';
 
                 var custBlock = (custRows ? '<div style="background:#eef7f5;padding:9px 12px;border-radius:10px;margin-bottom:6px;border-left:4px solid ' + ACC + ';"><table style="width:100%;border-collapse:collapse;font-size:0.9rem;">' + custRows + '</table></div>' : '');
 
@@ -6553,7 +6642,11 @@
                     flightsSection + itinerarySection + activitiesSection + paymentSection +
                     promoBlock + conditionsBlock + footerHtml;
 
-                if (proBg) {
+                // The quote prints on a WHITE sheet when no background picture is
+                // selected, so the text is guaranteed readable. When the agent HAS
+                // chosen a professional background it is shown, with the body sitting
+                // on a translucent white panel to keep the text legible over it.
+                if (proBg && !_phForceWhiteQuote(proBg)) {
                     // Full-bleed A4 background repeated on every page. The wrapper is
                     // sized in exact mm to match the A4 page (210 x 297mm) with zero
                     // margin/border so html2canvas rasterises edge-to-edge — no white
@@ -6570,8 +6663,12 @@
                 // A deliberate "Remove" wins over the company-wide brand background,
                 // so the page is plain white.
                 var _blankBg = (typeof agentQuoteBgBlank === 'function') && agentQuoteBgBlank();
-                var quoteBgStyle = (!_blankBg && branding && branding.bgImage) ? 'background:#fff url(' + branding.bgImage + ') center/cover no-repeat;' : 'background:#fff;';
-                return '<div style="font-family:Inter,sans-serif;width:190mm;max-width:190mm;margin:0 auto;padding:8mm;' + quoteBgStyle + 'color:#1f2933;font-size:11.5px;line-height:1.42;border:1px solid #d7e0e8;border-radius:12px;box-shadow:none;box-sizing:border-box;overflow:hidden;">' +
+                var _brandBg = (!_blankBg && branding && branding.bgImage) ? branding.bgImage : '';
+                var _useBrandBg = _brandBg && !_phForceWhiteQuote(_brandBg);
+                var quoteBgStyle = _useBrandBg ? 'background:#fff url(' + _brandBg + ') center/cover no-repeat;' : 'background:#ffffff;';
+                // ph-quote-white keeps the CSS "force white" rules scoped to the
+                // plain sheet, so they cannot wipe out a chosen background image.
+                return '<div class="ph-quote-paper' + (_useBrandBg ? '' : ' ph-quote-white') + '" style="font-family:Inter,sans-serif;width:190mm;max-width:190mm;margin:0 auto;padding:8mm;' + quoteBgStyle + 'color:#1f2933;font-size:11.5px;line-height:1.42;border:1px solid #d7e0e8;border-radius:12px;box-shadow:none;box-sizing:border-box;overflow:hidden;">' +
                     bodyHtml + '</div>';
             }
 
@@ -6683,6 +6780,11 @@
                 if (passengerTypeSummary) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Passenger Types:</td><td style="padding:4px 8px;">' + passengerTypeSummary + '</td></tr>';
                 if (quote.agentName) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Agent:</td><td style="padding:4px 8px;">' + quote.agentName + '</td></tr>';
                 if (quote.assignedTo || quote.agentName) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Assigned To:</td><td style="padding:4px 8px;">' + (quote.assignedTo || quote.agentName) + '</td></tr>';
+                // Contact details of the agent who generated this invoice, taken
+                // from that agent's Profile (email + telephone).
+                var _phIAC = (typeof window._phAgentContact === 'function') ? window._phAgentContact(quote) : {};
+                if (_phIAC.email) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Agent Email:</td><td style="padding:4px 8px;">' + escapeHTML(_phIAC.email) + '</td></tr>';
+                if (_phIAC.phone) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Agent Phone:</td><td style="padding:4px 8px;">' + escapeHTML(_phIAC.phone) + '</td></tr>';
                 if (deadline) custRows += '<tr><td style="padding:4px 8px;font-weight:600;color:#0f766e;">Balance Deadline:</td><td style="padding:4px 8px;color:#c33;font-weight:600;">' + (typeof formatDateDisplay === 'function' ? formatDateDisplay(deadline) : deadline) + '</td></tr>';
 
                 var invBgStyle = (branding && branding.bgImage) ? 'background:#fff url(' + branding.bgImage + ') center/cover no-repeat;' : 'background:#fff;';
@@ -24937,6 +25039,1649 @@ body.theme-custom .pdf-page tbody tr:nth-child(even){
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v3d52b47920f24c319d37e2661827c42b1787588026925" integrity="sha512-d9sL6GJLXn6fInD1+TVXhTcQOsmxeHfmHAvwGDIxp5TO+uo1fiWW7mHomMj4MLRlCsJDTqXzWLHJFFlPCEIj/A==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+
+<style id="ph-v5-css">
+/* ==================================================================
+   PH-V5 — requested changes, styles only.
+   1. Quote History month accordions
+   2. Gradient sweep hover on tabs / cards / shortcuts / nav
+   3. Chat message selection made sticky & obvious
+   4. Shift timer pill
+   5. White quote paper with auto-contrast text
+   ================================================================== */
+
+/* ---------- 1. QUOTE HISTORY MONTH ACCORDIONS ---------- */
+.ph-qmonth{
+    border:1px solid var(--card-border,rgba(0,0,0,.12));
+    border-radius:14px;
+    margin:10px 0;
+    overflow:hidden;
+    background:var(--card,rgba(255,255,255,.04));
+}
+.ph-qmonth-head{
+    display:flex;align-items:center;gap:10px;
+    width:100%;
+    padding:12px 14px;
+    cursor:pointer;
+    user-select:none;
+    font-weight:700;
+    font-size:.92rem;
+    color:var(--text,inherit);
+    background:linear-gradient(135deg,rgba(184,134,11,.10),rgba(184,134,11,.03));
+    border:0;
+    text-align:left;
+    font-family:inherit;
+    transition:background .2s ease;
+}
+.ph-qmonth-head:hover{background:linear-gradient(135deg,rgba(184,134,11,.20),rgba(184,134,11,.07));}
+.ph-qmonth-caret{
+    flex:0 0 auto;
+    width:18px;text-align:center;
+    transition:transform .22s ease;
+    color:var(--primary,#b8860b);
+}
+.ph-qmonth.open > .ph-qmonth-head .ph-qmonth-caret{transform:rotate(90deg);}
+.ph-qmonth-title{flex:1;min-width:0;}
+.ph-qmonth-count{
+    flex:0 0 auto;
+    font-size:.72rem;font-weight:800;
+    padding:3px 10px;border-radius:999px;
+    background:rgba(184,134,11,.18);
+    color:var(--primary,#b8860b);
+}
+.ph-qmonth-total{flex:0 0 auto;font-size:.78rem;opacity:.85;font-weight:700;}
+/* Collapsed by default; only .open shows the body. */
+.ph-qmonth-body{display:none;padding:0 6px 8px;}
+.ph-qmonth.open > .ph-qmonth-body{display:block;}
+.ph-qmonth-body .history-table-wrap{margin:0;}
+.ph-qmonth-body table{width:100%;border-collapse:collapse;}
+.ph-qmonth-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0;}
+.ph-qmonth-empty{padding:14px;opacity:.7;font-size:.85rem;}
+
+/* ---------- 2. GRADIENT SWEEP HOVER ---------- */
+/* A moving gradient sheen that follows the pointer across any tab, option,
+   dashboard card, sidebar item or desktop shortcut. Purely decorative:
+   pointer-events:none so clicks always reach the real control. */
+.ph-gradhover{position:relative;isolation:isolate;}
+/* z-index:-1 keeps the sheen above the element's own background but below its
+   text/icons, so nothing needs re-stacking and badges are never clipped. */
+.ph-gradhover::after{
+    content:"";
+    position:absolute;
+    top:0;left:0;right:0;bottom:0;
+    border-radius:inherit;
+    pointer-events:none;
+    z-index:-1;
+    opacity:0;
+    transition:opacity .28s ease;
+    background:
+        radial-gradient(240px circle at var(--ph-mx,50%) var(--ph-my,50%),
+            rgba(255,255,255,.30), rgba(255,255,255,.10) 38%, transparent 66%),
+        linear-gradient(115deg,
+            rgba(255,92,173,.32) 0%,
+            rgba(139,92,246,.30) 34%,
+            rgba(56,189,248,.28) 66%,
+            rgba(255,92,173,.32) 100%);
+    background-size:auto, 260% 260%;
+    background-position:center, var(--ph-bp,0% 50%);
+}
+.ph-gradhover:hover::after,
+.ph-gradhover:focus-visible::after{
+    opacity:1;
+    animation:phGradSweep 5s linear infinite;
+}
+@keyframes phGradSweep{
+    0%{background-position:center,0% 50%;}
+    50%{background-position:center,100% 50%;}
+    100%{background-position:center,0% 50%;}
+}
+/* Light themes need a softer sheen so text stays readable. */
+body.mr-light .ph-gradhover::after,
+body:not(.mr-new-theme):not(.dark) .ph-gradhover::after{
+    background:
+        radial-gradient(240px circle at var(--ph-mx,50%) var(--ph-my,50%),
+            rgba(255,255,255,.55), rgba(255,255,255,.18) 38%, transparent 66%),
+        linear-gradient(115deg,
+            rgba(255,92,173,.20) 0%,
+            rgba(139,92,246,.18) 34%,
+            rgba(56,189,248,.16) 66%,
+            rgba(255,92,173,.20) 100%);
+    background-size:auto, 260% 260%;
+}
+/* The active tab already has a solid brand fill — keep the sweep subtle. */
+.tab-btn.active.ph-gradhover::after{opacity:0;}
+.tab-btn.active.ph-gradhover:hover::after{opacity:.55;}
+/* Respect reduced-motion: show a static tint instead of an animation. */
+@media (prefers-reduced-motion:reduce){
+    .ph-gradhover:hover::after{animation:none;}
+}
+/* Some hover targets legitimately clip their own children (avatars, image
+   tiles). Opt those out so the sheen cannot spill outside a rounded corner. */
+.ph-gradhover.ph-gradclip{overflow:hidden;}
+
+/* Requirement: the animation must also work when no background/theme image is
+   selected. These surfaces are transparent by default, so give the sheen a
+   faint base to sit on, otherwise there is nothing to tint. */
+.ph-gradhover.ph-noimg::after{
+    background-color:rgba(139,92,246,.06);
+}
+/* Keep the sheen off disabled controls. */
+.ph-gradhover[disabled]::after,
+.ph-gradhover.disabled::after{opacity:0 !important;animation:none !important;}
+
+/* ---------- 3. CHAT SELECTION ---------- */
+/* The tick box must stay visible and clearly "on" once the admin selects a
+   message; previously a background re-render appeared to clear it. */
+.chat-delete-select{
+    align-self:center;
+    display:inline-flex;align-items:center;justify-content:center;
+    width:26px;height:26px;border-radius:999px;
+    background:var(--input-bg,rgba(255,255,255,.1));
+    border:1px solid var(--card-border,rgba(255,255,255,.25));
+    cursor:pointer;flex:0 0 auto;
+    transition:background .18s ease,border-color .18s ease,transform .18s ease;
+}
+.chat-delete-select:hover{transform:scale(1.08);border-color:var(--danger,#c0392b);}
+.chat-delete-check{width:15px;height:15px;accent-color:var(--danger,#c0392b);cursor:pointer;margin:0;}
+/* Selected state: highlight the whole bubble row so the choice is unmistakable. */
+.bubble-row.ph-msg-selected .chat-delete-select{
+    background:var(--danger,#c0392b);
+    border-color:var(--danger,#c0392b);
+    box-shadow:0 0 0 4px rgba(192,57,43,.22);
+}
+.bubble-row.ph-msg-selected .bubble{
+    outline:2px solid var(--danger,#c0392b);
+    outline-offset:2px;
+}
+.ph-chatsel-pill{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:4px 11px;border-radius:999px;
+    background:rgba(192,57,43,.16);
+    color:#e06055;font-weight:800;font-size:.74rem;
+    margin-left:6px;
+}
+
+/* ---------- 4. SHIFT TIMER PILL ---------- */
+.ph-shift-timer{
+    display:inline-flex;align-items:center;gap:6px;
+    margin-left:6px;padding:2px 9px;
+    border-radius:999px;
+    background:rgba(39,174,96,.18);
+    color:#2ecc71;
+    font-weight:800;font-size:.72rem;
+    font-variant-numeric:tabular-nums;
+    letter-spacing:.4px;
+}
+.ph-shift-timer.paused{background:rgba(243,156,18,.18);color:#f39c12;}
+.agent-time-badge.off .ph-shift-timer{display:none;}
+
+/* ---------- 5. WHITE QUOTE PAPER, AUTO-CONTRAST TEXT ---------- */
+/* White is the DEFAULT sheet, not a rule. Everything here is scoped to
+   .ph-quote-white, which the builder only adds when NO background picture is
+   selected. If the agent picks a background it keeps the plain .ph-quote-paper
+   class, so these !important rules can never wipe the picture out. */
+.ph-quote-white{background:#ffffff !important;background-image:none !important;color:#1f2933 !important;}
+.ph-quote-white :not([style*="color"]){color:#1a1a1a !important;}
+.ph-quote-white *{text-shadow:none !important;}
+/* Preview surface inside the modal: keep the plain paper white on every theme. */
+.pdf-safe .ph-quote-white,
+body.theme-custom .ph-quote-white{
+    background:#ffffff !important;
+    background-image:none !important;
+}
+
+/* ---------- 6. TRANSFER OWNERSHIP DIALOG ---------- */
+.ph-transfer-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin:12px 0;}
+.ph-transfer-field{display:flex;flex-direction:column;gap:5px;}
+.ph-transfer-field label{font-size:.78rem;font-weight:700;opacity:.85;}
+.ph-transfer-field select,
+.ph-transfer-field input{
+    padding:9px 12px;border-radius:10px;
+    border:1px solid var(--card-border,rgba(0,0,0,.15));
+    background:var(--input-bg,#fff);color:var(--text,inherit);
+    font-family:inherit;font-size:.88rem;
+}
+.ph-transfer-summary{
+    padding:10px 12px;border-radius:12px;
+    background:rgba(41,128,185,.12);
+    border:1px solid rgba(41,128,185,.26);
+    font-size:.82rem;line-height:1.45;margin:8px 0 4px;
+}
+.ph-transfer-count{font-weight:800;}
+</style>
+
+<script id="ph-v5-js">
+/* ==================================================================
+   PH-V5 — requested behaviour changes. Loaded LAST so it wins over
+   every earlier override layer in this file.
+
+   1. Quote History grouped into collapsible month accordions
+   2. Permanent quote deletion for admin AND agents
+   3. Admin transfer of quote / invoice / booking / accounts to an agent
+   4. Shift timer that survives an accidental portal close
+   5. Chat message selection that no longer clears itself
+   6. Gradient sweep hover on tabs / options / cards / shortcuts
+   ================================================================== */
+(function(){
+    'use strict';
+    if (window.__PH_V5_INSTALLED) return;
+    window.__PH_V5_INSTALLED = true;
+
+    /* ---------------- shared helpers ---------------- */
+    function S(){ return window.STATE || {}; }
+    function me(){ return (S().currentUser) || {}; }
+    function esc(s){
+        if (typeof window.escapeHTML === 'function') return window.escapeHTML(s);
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+            return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+        });
+    }
+    function isAdminNow(){
+        try { return typeof window.isAdmin === 'function' ? !!window.isAdmin() : me().role === 'admin'; }
+        catch(_){ return false; }
+    }
+    function perm(p){
+        try { return typeof window.hasPermission === 'function' ? !!window.hasPermission(p) : false; }
+        catch(_){ return false; }
+    }
+    function toast(m,t){ try{ if(typeof window.showToast==='function') window.showToast(m,t||'info'); }catch(_){} }
+    function vals(o){
+        if (!o) return [];
+        if (Array.isArray(o)) return o.slice();
+        return Object.keys(o).map(function(k){ var v=o[k]; if(v&&typeof v==='object'&&!v._key) v._key=k; return v; });
+    }
+    function ready(fn){
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+        else fn();
+    }
+    // formatCurrency lives inside the app's IIFE and is not exported, so keep a
+    // matching fallback for the few places this layer prints money.
+    function curSymbol(code){
+        switch (String(code || 'GBP').toUpperCase()) {
+            case 'GBP': return '\u00A3';
+            case 'USD': return '$';
+            case 'EUR': return '\u20AC';
+            case 'INR': return '\u20B9';
+            case 'AED': return 'AED ';
+            default: return '';
+        }
+    }
+
+    /* ==============================================================
+       1. PERMANENT QUOTE DELETION (admin + agents)
+       ==============================================================
+       Why deletes appeared not to work before:
+         a) removeData('quotes/<id>', null) only removed the Firebase child.
+            When Firebase was unreachable it returned false and the quote
+            stayed in localStorage['ph_quotes_list'], so it came straight
+            back on the next read.
+         b) The autosave draft (ph_quote_draft_<user>) and the in-memory
+            STATE._cache could still hold the deleted quote and re-upsert it
+            (recoverQuoteDraft / _reflectQuoteInList), resurrecting it.
+         c) Agents were blocked whenever canDeleteQuotes was unset even for
+            quotes they created themselves.
+       This module removes the quote from EVERY store (Firebase child, the
+       whole-list mirror, localStorage, cache, STATE, drafts) and adds a
+       tombstone so any late realtime echo cannot bring it back.
+    */
+    var TOMB_KEY = 'ph_deleted_quote_ids';
+
+    function tombstones(){
+        try { return JSON.parse(localStorage.getItem(TOMB_KEY) || '[]') || []; }
+        catch(_){ return []; }
+    }
+    function addTombstones(ids){
+        try {
+            var t = tombstones();
+            ids.forEach(function(id){ if(id && t.indexOf(id) === -1) t.push(id); });
+            // Keep the list bounded — only recent deletions matter.
+            if (t.length > 400) t = t.slice(t.length - 400);
+            localStorage.setItem(TOMB_KEY, JSON.stringify(t));
+        } catch(_){}
+    }
+    window._phQuoteTombstoned = function(id){ return tombstones().indexOf(id) !== -1; };
+
+    // Can the current user delete this specific quote?
+    // Admin: anything. Agent: quotes they created, or when granted the
+    // explicit canDeleteQuotes permission.
+    function canDeleteQuote(q){
+        if (isAdminNow()) return true;
+        if (perm('canDeleteQuotes')) return true;
+        if (!q) return false;
+        var u = me().username;
+        return !!u && (q.createdBy === u || q.agentUsername === u);
+    }
+    window._phCanDeleteQuote = canDeleteQuote;
+
+    // Hard-delete a set of quote ids from every persistence layer.
+    async function purgeQuotes(ids){
+        ids = (ids || []).filter(Boolean);
+        if (!ids.length) return 0;
+        addTombstones(ids);
+
+        var db = null, connected = false;
+        try { db = window.firebase && window.firebase.apps && window.firebase.apps.length ? window.firebase.database() : null; } catch(_){}
+        try { connected = !!db; } catch(_){}
+
+        // 1. Firebase: remove each child individually (never the whole node).
+        if (db) {
+            for (var i = 0; i < ids.length; i++) {
+                try { await db.ref('quotes/' + ids[i]).remove(); } catch(_){}
+            }
+        }
+
+        // 2. localStorage whole-list mirror.
+        try {
+            var raw = localStorage.getItem('ph_quotes_list');
+            if (raw) {
+                var list = JSON.parse(raw) || {};
+                ids.forEach(function(id){ delete list[id]; });
+                localStorage.setItem('ph_quotes_list', JSON.stringify(list));
+            }
+        } catch(_){}
+
+        // 3. Any other cached quote blobs (older keys / per-user mirrors).
+        try {
+            for (var k = 0; k < localStorage.length; k++) {
+                var key = localStorage.key(k);
+                if (!key) continue;
+                if (key.indexOf('ph_quote') !== 0) continue;
+                if (key === 'ph_quotes_list' || key === TOMB_KEY) continue;
+                var v = localStorage.getItem(key);
+                if (!v) continue;
+                // Drop a single-quote draft that points at a deleted quote.
+                var hit = ids.some(function(id){ return v.indexOf('"' + id + '"') !== -1 || v.indexOf(id) !== -1; });
+                if (!hit) continue;
+                try {
+                    var parsed = JSON.parse(v);
+                    if (parsed && parsed.id && ids.indexOf(parsed.id) !== -1) { localStorage.removeItem(key); continue; }
+                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                        var touched = false;
+                        ids.forEach(function(id){ if (parsed[id]) { delete parsed[id]; touched = true; } });
+                        if (touched) localStorage.setItem(key, JSON.stringify(parsed));
+                    }
+                } catch(_){}
+            }
+        } catch(_){}
+
+        // 4. In-memory cache used by readData().
+        try {
+            var st = S();
+            if (st._cache) {
+                Object.keys(st._cache).forEach(function(ck){
+                    if (ck.indexOf('quotes') !== 0) return;
+                    var blob = st._cache[ck];
+                    if (blob && typeof blob === 'object') ids.forEach(function(id){ delete blob[id]; });
+                });
+            }
+            // 5. STATE list itself.
+            if (Array.isArray(st.quotes)) {
+                st.quotes = st.quotes.filter(function(q){ return q && ids.indexOf(q.id) === -1; });
+            }
+            // 6. If the builder currently holds a deleted quote, detach it so
+            //    autosave cannot write it back.
+            if (st.currentQuote && ids.indexOf(st.currentQuote.id) !== -1) {
+                st.autosaveEnabled = false;
+                try { st.currentQuote.id = null; } catch(_){}
+            }
+        } catch(_){}
+
+        // 7. Drop the autosave draft when it points at a deleted quote.
+        try {
+            var u = me().username || 'guest';
+            ['ph_quote_draft_' + u, 'ph_quote_draft', 'ph_quote_backup_' + u].forEach(function(dk){
+                var dv = localStorage.getItem(dk);
+                if (!dv) return;
+                try {
+                    var d = JSON.parse(dv);
+                    if (d && d.id && ids.indexOf(d.id) !== -1) localStorage.removeItem(dk);
+                } catch(_){}
+            });
+        } catch(_){}
+
+        try { if (typeof window.updateQuoteCount === 'function') window.updateQuoteCount(); } catch(_){}
+        return ids.length;
+    }
+    window._phPurgeQuotes = purgeQuotes;
+
+    // Filter tombstoned quotes out of any list we are about to display, so a
+    // stale Firebase echo or another tab's cache cannot resurrect them.
+    function stripDeleted(list){
+        var t = tombstones();
+        if (!t.length) return list;
+        if (Array.isArray(list)) return list.filter(function(q){ return !q || t.indexOf(q.id) === -1; });
+        return list;
+    }
+    window._phStripDeletedQuotes = stripDeleted;
+
+    // Keep STATE.quotes clean after every refresh.
+    function installLoadGuard(){
+        if (typeof window.loadQuotes !== 'function' || window.loadQuotes.__phV5) {
+            // loadQuotes lives inside the app IIFE and may not be exported;
+            // in that case the periodic sweep below is the safety net.
+            return;
+        }
+        var prev = window.loadQuotes;
+        window.loadQuotes = async function(){
+            var r = await prev.apply(this, arguments);
+            try {
+                var st = S();
+                if (Array.isArray(st.quotes)) st.quotes = stripDeleted(st.quotes);
+            } catch(_){}
+            return Array.isArray(r) ? stripDeleted(r) : r;
+        };
+        window.loadQuotes.__phV5 = true;
+    }
+    installLoadGuard();
+    // Sweep: if any layer re-adds a tombstoned quote, remove it again.
+    setInterval(function(){
+        try {
+            var t = tombstones();
+            if (!t.length) return;
+            var st = S();
+            if (!Array.isArray(st.quotes)) return;
+            var before = st.quotes.length;
+            st.quotes = st.quotes.filter(function(q){ return !q || t.indexOf(q.id) === -1; });
+            if (st.quotes.length !== before && typeof window.updateQuoteCount === 'function') window.updateQuoteCount();
+        } catch(_){}
+    }, 4000);
+
+    /* Public delete entry points — these replace the app's handlers. */
+    window._deleteQuote = async function(id){
+        if (!id) return;
+        var q = (S().quotes || []).find(function(x){ return x && x.id === id; });
+        if (!canDeleteQuote(q)) return toast('You do not have permission to delete this quote.','error');
+        if (!window.confirm('Delete this quote permanently? This cannot be undone.')) return;
+        await purgeQuotes([id]);
+        toast('Quote deleted permanently.','success');
+        try { if (typeof window.showQuoteHistory === 'function') { window.closeModal(); window.showQuoteHistory(); } }
+        catch(_){}
+    };
+
+    window._deleteSelectedQuotes = async function(){
+        var boxes = document.querySelectorAll('.quote-checkbox:checked, .ph-qcheck:checked');
+        var ids = Array.prototype.map.call(boxes, function(cb){ return cb.value; }).filter(Boolean);
+        // De-duplicate (a quote can appear in more than one rendered list).
+        ids = ids.filter(function(v,i){ return ids.indexOf(v) === i; });
+        if (!ids.length) return toast('No quotes selected.','warning');
+
+        var quotes = S().quotes || [];
+        var allowed = [], denied = 0;
+        ids.forEach(function(id){
+            var q = quotes.find(function(x){ return x && x.id === id; });
+            if (canDeleteQuote(q)) allowed.push(id); else denied++;
+        });
+        if (!allowed.length) return toast('You do not have permission to delete the selected quote(s).','error');
+        if (!window.confirm('Delete ' + allowed.length + ' quote(s) permanently? This cannot be undone.')) return;
+
+        await purgeQuotes(allowed);
+        toast('Deleted ' + allowed.length + ' quote(s) permanently.' + (denied ? ' ' + denied + ' skipped (no permission).' : ''), 'success');
+        try { if (typeof window.showQuoteHistory === 'function') { window.closeModal(); window.showQuoteHistory(); } }
+        catch(_){}
+    };
+
+    /* ==============================================================
+       2. QUOTE HISTORY GROUPED BY MONTH (collapsible)
+       ==============================================================
+       We do not rewrite showQuoteHistory (many layers wrap it). Instead we
+       let it render its normal table, then regroup the existing <tr> rows
+       into one accordion per month, newest month first. Because we move the
+       real rows, every existing button/checkbox keeps working untouched.
+       The newest month starts expanded; older months start collapsed.
+    */
+    var MONTH_NAMES = ['January','February','March','April','May','June',
+                       'July','August','September','October','November','December'];
+
+    // Parse the date shown in the row (DD-MM-YYYY) or fall back to the
+    // quote record's own date fields.
+    function rowDate(tr, quotesById){
+        var id = null;
+        var cb = tr.querySelector('input[type=checkbox]');
+        if (cb && cb.value) id = cb.value;
+        if (!id) {
+            var btn = tr.querySelector('[onclick*="_viewQuote"],[onclick*="_editQuote"],[onclick*="_deleteQuote"]');
+            if (btn) {
+                var m = (btn.getAttribute('onclick') || '').match(/'([^']+)'/);
+                if (m) id = m[1];
+            }
+        }
+        var q = id && quotesById[id];
+        if (q) {
+            var iso = q.quoteDate || q.createdAt || q.updatedAt;
+            var d = iso ? new Date(iso) : null;
+            if (d && !isNaN(d.getTime())) return d;
+        }
+        // Fall back to scanning the row's cells for a DD-MM-YYYY value.
+        var cells = tr.querySelectorAll('td');
+        for (var i = cells.length - 1; i >= 0; i--) {
+            var txt = (cells[i].textContent || '').trim();
+            var mm = txt.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+            if (mm) return new Date(+mm[3], +mm[2] - 1, +mm[1]);
+            var iso2 = txt.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (iso2) return new Date(+iso2[1], +iso2[2] - 1, +iso2[3]);
+        }
+        return null;
+    }
+
+    function groupQuoteHistory(){
+        var tbody = document.getElementById('quoteTableBody');
+        if (!tbody) return;
+        var table = tbody.closest('table');
+        var wrap = table && table.closest('.history-table-wrap');
+        if (!table || !wrap) return;
+
+        var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+        // Ignore the "no results" placeholder row.
+        rows = rows.filter(function(tr){ return !tr.querySelector('td[colspan]'); });
+        if (!rows.length) {
+            // Nothing to group — make sure a previous accordion is cleared.
+            var oldEmpty = wrap.parentNode && wrap.parentNode.querySelector('.ph-qmonth-host');
+            if (oldEmpty) oldEmpty.innerHTML = '<div class="ph-qmonth-empty">No quotes match your search.</div>';
+            return;
+        }
+
+        var quotesById = {};
+        (S().quotes || []).forEach(function(q){ if (q && q.id) quotesById[q.id] = q; });
+
+        // Bucket rows by year-month.
+        var buckets = {}, order = [];
+        rows.forEach(function(tr){
+            var d = rowDate(tr, quotesById);
+            var key = d ? (d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2,'0')) : 'unknown';
+            if (!buckets[key]) { buckets[key] = { key:key, date:d, rows:[] }; order.push(key); }
+            buckets[key].rows.push(tr);
+        });
+
+        // Newest month first; "unknown" always last.
+        order.sort(function(a,b){
+            if (a === 'unknown') return 1;
+            if (b === 'unknown') return -1;
+            return a < b ? 1 : (a > b ? -1 : 0);
+        });
+
+        // Remember which months the user had open, so re-renders (search,
+        // sort, delete) do not collapse everything again.
+        var openState = window.__phQMonthOpen || (window.__phQMonthOpen = {});
+        var firstRender = !wrap.__phGrouped;
+
+        // Host element that replaces the flat table wrapper.
+        var host = wrap.parentNode.querySelector('.ph-qmonth-host');
+        if (!host) {
+            host = document.createElement('div');
+            host.className = 'ph-qmonth-host';
+            wrap.parentNode.insertBefore(host, wrap);
+        }
+        host.innerHTML = '';
+        // Keep the original wrapper in the DOM (hidden) so any code that
+        // queries #quoteTableBody still finds it.
+        wrap.style.display = 'none';
+        wrap.__phGrouped = true;
+
+        var theadHtml = table.querySelector('thead') ? table.querySelector('thead').outerHTML : '';
+        var currency = null;
+        try { currency = (S().branding && S().branding.currency) || 'GBP'; } catch(_){}
+
+        order.forEach(function(key, idx){
+            var b = buckets[key];
+            var label = key === 'unknown'
+                ? 'Undated'
+                : MONTH_NAMES[b.date.getMonth()] + ' ' + b.date.getFullYear();
+
+            // Month total, read from the quote records (not the DOM).
+            var total = 0, haveTotal = false;
+            b.rows.forEach(function(tr){
+                var cb = tr.querySelector('input[type=checkbox]');
+                var q = cb && quotesById[cb.value];
+                if (!q) return;
+                var amt = q.totalPrice;
+                if (amt == null || amt === '') amt = q.totalAmount;
+                if (amt == null || amt === '') amt = q.grandTotal;
+                if (amt == null || amt === '') amt = q.total;
+                if (amt != null && amt !== '') {
+                    total += parseFloat(amt) || 0;
+                    haveTotal = true;
+                    if (q.currency) currency = q.currency;
+                }
+            });
+            var totalTxt = '';
+            if (haveTotal) {
+                try {
+                    totalTxt = (typeof window.formatCurrency === 'function')
+                        ? window.formatCurrency(total, currency)
+                        : (curSymbol(currency) + total.toFixed(2));
+                } catch(_){ totalTxt = curSymbol(currency) + total.toFixed(2); }
+            }
+
+            // Default: newest month open, the rest closed. After the first
+            // render, honour whatever the user has toggled.
+            var isOpen = firstRender ? (idx === 0) : !!openState[key];
+            if (firstRender) openState[key] = (idx === 0);
+
+            var sec = document.createElement('div');
+            sec.className = 'ph-qmonth' + (isOpen ? ' open' : '');
+            sec.setAttribute('data-month', key);
+            sec.innerHTML =
+                '<button type="button" class="ph-qmonth-head ph-gradhover" aria-expanded="' + (isOpen ? 'true' : 'false') + '">' +
+                    '<span class="ph-qmonth-caret"><i class="fas fa-chevron-right"></i></span>' +
+                    '<span class="ph-qmonth-title">' + esc(label) + '</span>' +
+                    (totalTxt ? '<span class="ph-qmonth-total">' + esc(totalTxt) + '</span>' : '') +
+                    '<span class="ph-qmonth-count">' + b.rows.length + '</span>' +
+                '</button>' +
+                '<div class="ph-qmonth-body"><div class="history-table-wrap"><table>' + theadHtml +
+                '<tbody></tbody></table></div></div>';
+
+            var body = sec.querySelector('tbody');
+            // MOVE the original rows in — all their handlers stay intact.
+            b.rows.forEach(function(tr){ body.appendChild(tr); });
+            host.appendChild(sec);
+        });
+
+        // Toggle behaviour (one delegated listener per host).
+        if (!host.__phBound) {
+            host.__phBound = true;
+            host.addEventListener('click', function(ev){
+                var head = ev.target && ev.target.closest && ev.target.closest('.ph-qmonth-head');
+                if (!head) return;
+                var sec = head.closest('.ph-qmonth');
+                if (!sec) return;
+                var nowOpen = !sec.classList.contains('open');
+                sec.classList.toggle('open', nowOpen);
+                head.setAttribute('aria-expanded', nowOpen ? 'true' : 'false');
+                try { (window.__phQMonthOpen || {})[sec.getAttribute('data-month')] = nowOpen; } catch(_){}
+            });
+        }
+    }
+    window._phGroupQuoteHistory = groupQuoteHistory;
+
+    // Run the grouping after the history modal renders, and again after any
+    // filter/sort re-render (which replaces #quoteTableBody's innerHTML).
+    function watchQuoteHistory(){
+        var mo = new MutationObserver(function(){
+            var tb = document.getElementById('quoteTableBody');
+            if (!tb) return;
+            // Rows sitting directly in the original tbody = a fresh render.
+            if (tb.querySelector('tr')) {
+                clearTimeout(window.__phQMonthTimer);
+                window.__phQMonthTimer = setTimeout(groupQuoteHistory, 40);
+            }
+        });
+        mo.observe(document.body, { childList:true, subtree:true });
+    }
+    ready(watchQuoteHistory);
+
+    // Also hook the known re-render entry points directly.
+    ready(function(){
+        setTimeout(function(){
+            ['showQuoteHistory','_filterQuotes','_resetQuoteSearch'].forEach(function(name){
+                var fn = window[name];
+                if (typeof fn !== 'function' || fn.__phQMonth) return;
+                window[name] = function(){
+                    var r = fn.apply(this, arguments);
+                    if (r && typeof r.then === 'function') {
+                        return r.then(function(v){ setTimeout(groupQuoteHistory, 60); return v; });
+                    }
+                    setTimeout(groupQuoteHistory, 60);
+                    return r;
+                };
+                window[name].__phQMonth = true;
+            });
+        }, 1200);
+    });
+
+    /* ==============================================================
+       3. ADMIN → TRANSFER OWNERSHIP TO ANOTHER AGENT
+       ==============================================================
+       The portal previously only had "Assign selected invoices" (which set
+       invoice.assignedTo). There was no way to move a QUOTE, a BOOKING or an
+       ACCOUNT to a different agent, and assigning did not change ownership
+       (createdBy / agentName), so the record still showed the old agent and
+       still counted against them.
+       This adds a single admin-only "Transfer to Agent" action that works for
+       quotes, invoices, bookings and accounts, rewrites ownership properly,
+       and records an audit trail on the record.
+    */
+    function agentOptions(selected){
+        var users = S().users || {};
+        return Object.keys(users).map(function(k){
+            var u = users[k] || {};
+            var label = (u.name || k) + ' (@' + k + ')' + (u.role ? ' · ' + u.role : '');
+            return '<option value="' + esc(k) + '"' + (k === selected ? ' selected' : '') + '>' + esc(label) + '</option>';
+        }).join('');
+    }
+
+    // Apply the ownership change to one record object.
+    function applyOwnership(rec, toUser){
+        var users = S().users || {};
+        var target = users[toUser] || {};
+        var display = target.name || toUser;
+        var before = { createdBy: rec.createdBy || '', agentName: rec.agentName || '', assignedTo: rec.assignedTo || '' };
+
+        rec.createdBy = toUser;
+        rec.agentUsername = toUser;
+        rec.agentName = display;
+        rec.assignedTo = toUser;
+        // Re-point the printed contact details at the new owner.
+        rec.agentEmail = target.email || '';
+        rec.agentPhone = target.telephone || target.phone || '';
+        // Audit trail.
+        rec.transferHistory = rec.transferHistory || [];
+        rec.transferHistory.push({
+            at: (typeof window.getNowISO === 'function') ? window.getNowISO() : new Date().toISOString(),
+            by: me().username || 'admin',
+            from: before,
+            to: toUser
+        });
+        rec.transferredAt = rec.transferHistory[rec.transferHistory.length - 1].at;
+        rec.transferredBy = me().username || 'admin';
+        // A transferred invoice must be editable by its new owner.
+        if (rec.lockedForAgent) rec.lockedForAgent = false;
+        if (rec.accountsLocked) rec.accountsLocked = false;
+        return rec;
+    }
+
+    function fbDb(){
+        try { return (window.firebase && window.firebase.apps && window.firebase.apps.length) ? window.firebase.database() : null; }
+        catch(_){ return null; }
+    }
+
+    // Persist a record back to its collection (child write + local mirror).
+    async function persist(kind, rec){
+        var map = {
+            quote:   { node:'quotes',   key:'ph_quotes_list',   state:'quotes' },
+            invoice: { node:'invoices', key:'ph_invoices_list',  state:'invoices' },
+            booking: { node:'bookings', key:'ph_bookings',       state:'bookings' }
+        };
+        var cfg = map[kind];
+        if (!cfg) return false;
+        var ok = false;
+        var db = fbDb();
+        if (db) {
+            try { await db.ref(cfg.node + '/' + rec.id).set(rec); ok = true; } catch(_){}
+        }
+        try {
+            var raw = localStorage.getItem(cfg.key);
+            var list = raw ? (JSON.parse(raw) || {}) : {};
+            if (Array.isArray(list)) {
+                var i = list.findIndex(function(x){ return x && x.id === rec.id; });
+                if (i >= 0) list[i] = rec; else list.push(rec);
+            } else {
+                list[rec.id] = rec;
+            }
+            localStorage.setItem(cfg.key, JSON.stringify(list));
+            ok = true;
+        } catch(_){}
+        try {
+            var st = S();
+            if (st._cache) {
+                Object.keys(st._cache).forEach(function(ck){
+                    if (ck.indexOf(cfg.node) !== 0) return;
+                    var blob = st._cache[ck];
+                    if (blob && typeof blob === 'object' && !Array.isArray(blob)) blob[rec.id] = rec;
+                });
+            }
+            var arr = st[cfg.state];
+            if (Array.isArray(arr)) {
+                var j = arr.findIndex(function(x){ return x && x.id === rec.id; });
+                if (j >= 0) arr[j] = rec; else arr.push(rec);
+            }
+        } catch(_){}
+        return ok;
+    }
+
+    function collection(kind){
+        var st = S();
+        if (kind === 'quote')   return st.quotes   || [];
+        if (kind === 'invoice') return st.invoices || [];
+        if (kind === 'booking') return vals(st.bookings || []);
+        return [];
+    }
+
+    function labelOf(kind, r){
+        if (kind === 'quote')   return (r.quoteNumber || r.id) + ' · ' + (r.customerName || 'No customer');
+        if (kind === 'invoice') return (r.invoiceNumber || r.id) + ' · ' + (r.customerName || 'No customer');
+        return (r.bookingRef || r.invoiceNumber || r.id) + ' · ' + (r.passengerName || r.customerName || '');
+    }
+
+    // Open the transfer dialog. `preset` optionally locks it to one record.
+    window.showTransferOwnership = function(kind, id){
+        if (!isAdminNow()) return toast('Admin access required to transfer records.','error');
+        if (typeof window.showModal !== 'function') return;
+        kind = kind || 'quote';
+
+        function optionsFor(k){
+            var items = collection(k);
+            if (!items.length) return '';
+            return items.slice().sort(function(a,b){
+                return new Date(b.createdAt || b.quoteDate || 0) - new Date(a.createdAt || a.quoteDate || 0);
+            }).map(function(r){
+                var owner = r.agentName || r.createdBy || 'unassigned';
+                return '<option value="' + esc(r.id) + '"' + (r.id === id ? ' selected' : '') + '>' +
+                       esc(labelOf(k, r) + '  —  currently: ' + owner) + '</option>';
+            }).join('');
+        }
+
+        window.showModal(
+            '<h3><i class="fas fa-people-arrows"></i> Transfer to Another Agent</h3>' +
+            '<p class="text-muted text-sm">Move a quote, invoice, booking or its accounts to a different agent. ' +
+            'Ownership, the agent name and the contact details printed on the document are all updated, and the ' +
+            'record is unlocked for its new owner.</p>' +
+            '<div class="ph-transfer-grid">' +
+                '<div class="ph-transfer-field"><label>What do you want to transfer?</label>' +
+                    '<select id="phTrKind">' +
+                        '<option value="quote"' + (kind==='quote'?' selected':'') + '>Quote</option>' +
+                        '<option value="invoice"' + (kind==='invoice'?' selected':'') + '>Invoice (includes its accounts)</option>' +
+                        '<option value="booking"' + (kind==='booking'?' selected':'') + '>Booking</option>' +
+                    '</select></div>' +
+                '<div class="ph-transfer-field"><label>Record</label>' +
+                    '<select id="phTrRecord"></select></div>' +
+                '<div class="ph-transfer-field"><label>Transfer to agent</label>' +
+                    '<select id="phTrAgent">' + agentOptions(null) + '</select></div>' +
+            '</div>' +
+            '<div class="ph-transfer-summary" id="phTrSummary"></div>' +
+            '<div class="modal-actions">' +
+                '<button class="btn btn-close-modal" data-close-modal>Cancel</button>' +
+                '<button class="btn btn-primary" id="phTrGo"><i class="fas fa-people-arrows"></i> Transfer</button>' +
+            '</div>'
+        );
+
+        var kindEl = document.getElementById('phTrKind');
+        var recEl  = document.getElementById('phTrRecord');
+        var sumEl  = document.getElementById('phTrSummary');
+
+        function refresh(){
+            var k = kindEl.value;
+            var html = optionsFor(k);
+            recEl.innerHTML = html || '<option value="">No records available</option>';
+            var items = collection(k);
+            sumEl.innerHTML = items.length
+                ? '<span class="ph-transfer-count">' + items.length + '</span> ' + k + '(s) available. ' +
+                  (k === 'invoice' ? 'Transferring an invoice also moves its flight/hotel/transfer accounts and unlocks them for the new owner.' : '')
+                : 'There are no ' + k + 's to transfer yet.';
+        }
+        kindEl.addEventListener('change', refresh);
+        refresh();
+
+        document.getElementById('phTrGo').addEventListener('click', async function(){
+            var k = kindEl.value, rid = recEl.value, to = document.getElementById('phTrAgent').value;
+            if (!rid) return toast('Select a record to transfer.','warning');
+            if (!to)  return toast('Select the agent to transfer to.','warning');
+            var rec = collection(k).find(function(x){ return x && x.id === rid; });
+            if (!rec) return toast('Record not found.','error');
+            var users = S().users || {};
+            var display = (users[to] && users[to].name) || to;
+            if (!window.confirm('Transfer this ' + k + ' to ' + display + '?\n\nThe ' + k +
+                ' will belong to them, and their email/phone will appear on the document.')) return;
+
+            applyOwnership(rec, to);
+            var ok = await persist(k, rec);
+            toast(ok ? (k.charAt(0).toUpperCase() + k.slice(1)) + ' transferred to ' + display + '.'
+                     : 'Transferred locally — will sync when the connection returns.',
+                  ok ? 'success' : 'warning');
+            try { window.closeModal(); } catch(_){}
+            // Refresh whichever history view is relevant.
+            try {
+                if (k === 'quote'   && typeof window.showQuoteHistory   === 'function') window.showQuoteHistory();
+                if (k === 'invoice' && typeof window.showInvoiceHistory === 'function') window.showInvoiceHistory();
+            } catch(_){}
+        });
+    };
+
+    // Add a "Transfer to Agent" button into the quote/invoice history toolbars
+    // and a dashboard entry point, for admins only.
+    function injectTransferButtons(){
+        if (!isAdminNow()) return;
+        // Quote / invoice history bulk bars.
+        document.querySelectorAll('.bulk-actions').forEach(function(bar){
+            if (bar.querySelector('.ph-tr-btn')) return;
+            var isInvoice = !!document.getElementById('invoiceTableBody');
+            var kind = document.getElementById('quoteTableBody') ? 'quote' : (isInvoice ? 'invoice' : 'quote');
+            var b = document.createElement('button');
+            b.className = 'btn btn-sm btn-outline ph-tr-btn ph-gradhover';
+            b.innerHTML = '<i class="fas fa-people-arrows"></i> Transfer to Agent';
+            b.addEventListener('click', function(){ window.showTransferOwnership(kind, null); });
+            bar.appendChild(b);
+        });
+    }
+    setInterval(injectTransferButtons, 1500);
+
+    // Route a dashboard/sidebar action if one exists.
+    ready(function(){
+        setTimeout(function(){
+            var prev = window.handleDashAction;
+            if (typeof prev !== 'function' || prev.__phTransfer) return;
+            window.handleDashAction = function(action){
+                if (action === 'transferOwnership') return window.showTransferOwnership('quote', null);
+                return prev.apply(this, arguments);
+            };
+            window.handleDashAction.__phTransfer = true;
+        }, 1500);
+    });
+
+    /* ==============================================================
+       4. PERSISTENT SHIFT TIMER
+       ==============================================================
+       Requirements:
+         - The timer starts automatically as soon as the agent logs in.
+         - The agent is NEVER logged out automatically; only an explicit
+           logout / check-out ends the shift.
+         - If the portal is closed by accident and reopened the SAME shift
+           continues, but the time it was closed is not counted: elapsed
+           time only accumulates while the portal is actually open.
+
+       What was stopping this before:
+         a) A `beforeunload` handler wrote checkOut on the open shift, so
+            closing the tab ended the shift for good.
+         b) autoCloseOpenShiftForUser() + forceLogout() ran after 15 minutes
+            of inactivity and closed both the session and the shift.
+         c) Nothing tracked "open periods", so a reopened shift would have
+            counted the whole wall-clock gap.
+
+       Approach: keep the app's own shift record (so the admin reports keep
+       working) and add an `activeMs` accumulator plus a heartbeat. Every
+       few seconds while the portal is open we add the elapsed slice to
+       activeMs; when the portal is closed nothing is added, so the gap is
+       automatically excluded.
+    */
+    var SHIFT_TICK_MS = 1000;        // pill refresh
+    var SHIFT_FLUSH_MS = 15000;      // how often the accumulator is persisted
+    // A single slice is never credited with more than this. Background tabs get
+    // their timers throttled to roughly one tick per minute, so the cap has to
+    // sit comfortably above 60s while still limiting the damage if the machine
+    // sleeps with the portal open.
+    var SHIFT_MAX_SLICE_MS = 5 * 60 * 1000;
+    // Identifies this page load. Time is only credited when the heartbeat that
+    // recorded lastBeat came from THIS run — i.e. the portal was demonstrably
+    // open the whole time. After a close/reopen the run id differs, so the gap
+    // is skipped instead of being counted.
+    var RUN_ID = 'r' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+
+    function localShiftKey(u){ return 'ph_shift_active_' + (u || 'anon'); }
+
+    function loadLocalShift(username){
+        try { return JSON.parse(localStorage.getItem(localShiftKey(username)) || 'null'); }
+        catch(_){ return null; }
+    }
+    function saveLocalShift(username, rec){
+        try {
+            if (!rec) localStorage.removeItem(localShiftKey(username));
+            else localStorage.setItem(localShiftKey(username), JSON.stringify(rec));
+        } catch(_){}
+    }
+
+    function isShiftRole(u){
+        u = u || me();
+        return !!u && (u.role === 'agent' || u.role === 'manager');
+    }
+
+    function fmtHMS(ms){
+        ms = Math.max(0, Math.floor(ms / 1000));
+        var h = Math.floor(ms / 3600), m = Math.floor((ms % 3600) / 60), s = ms % 60;
+        function p(n){ return (n < 10 ? '0' : '') + n; }
+        return p(h) + ':' + p(m) + ':' + p(s);
+    }
+
+    /* ---- Neutralise the automatic shift closers ---- */
+
+    // (a) beforeunload auto-checkout. The original handler is already bound
+    //     and cannot be unbound, so instead we make its work harmless: the
+    //     handler looks the shift up in STATE.agentTimes by
+    //     (agentName, date, !checkOut). We flag the record so our own
+    //     reconciliation on the next load restores the open state, and we
+    //     remember the accumulated time locally, which is the value the pill
+    //     and the reports are rebuilt from.
+    var _closing = false;
+    window.addEventListener('beforeunload', function(){
+        _closing = true;
+        try { flushActive(true); } catch(_){}
+    });
+    // pagehide fires on mobile/Safari where beforeunload may not.
+    window.addEventListener('pagehide', function(){
+        _closing = true;
+        try { flushActive(true); } catch(_){}
+    });
+
+    // (b) Idle logout. The app schedules forceLogout() on a 15 minute idle
+    //     timer. The user asked to stay logged in until they log out
+    //     themselves, so we keep the session record fresh instead of
+    //     removing the timer (which lives in a closure we cannot reach).
+    function keepSessionAlive(){
+        try {
+            var raw = localStorage.getItem('ph_session');
+            if (!raw) return;
+            var s = JSON.parse(raw) || {};
+            if (!s.user) return;
+            var now = Date.now();
+            s.lastActivity = now;
+            // Push the expiry far into the future so scheduleSessionExpiry()
+            // can never fire while the portal is open.
+            s.expiresAt = now + 365 * 24 * 60 * 60 * 1000;
+            localStorage.setItem('ph_session', JSON.stringify(s));
+        } catch(_){}
+    }
+    setInterval(keepSessionAlive, 20000);
+    keepSessionAlive();
+
+    // Also stop a queued idle logout from tearing the UI down. forceLogout is
+    // an inner function, but every path that hides the shell goes through the
+    // same two elements, so we re-assert the session and reopen the shell if
+    // it is hidden while a user is still signed in and did not click logout.
+    var _explicitLogout = false;
+    ready(function(){
+        var btn = document.getElementById('btnLogout');
+        if (btn) btn.addEventListener('click', function(){ _explicitLogout = true; }, true);
+    });
+    setInterval(function(){
+        try {
+            if (_explicitLogout || _closing) return;
+            if (!me().username) return;
+            var shell = document.getElementById('appShell');
+            var login = document.getElementById('loginPage');
+            if (!shell || !login) return;
+            var hidden = shell.style.display === 'none' || !shell.classList.contains('visible');
+            if (hidden && login.style.display !== 'none') {
+                // An automatic logout slipped through — undo it.
+                keepSessionAlive();
+                shell.style.display = 'flex';
+                shell.classList.add('visible');
+                login.style.display = 'none';
+            }
+        } catch(_){}
+    }, 4000);
+
+    /* ---- The accumulator ---- */
+
+    function currentShiftRecord(){
+        var u = me();
+        if (!u.username) return null;
+        var list = vals(S().agentTimes);
+        var open = null;
+        for (var i = 0; i < list.length; i++) {
+            var t = list[i];
+            if (t && t.agentName === u.username && !t.checkOut) {
+                if (!open || new Date(t.checkIn || 0) > new Date(open.checkIn || 0)) open = t;
+            }
+        }
+        return open;
+    }
+
+    function localState(){
+        var u = me();
+        if (!u.username) return null;
+        var rec = loadLocalShift(u.username);
+        if (!rec || !rec.shiftId) return null;
+        return rec;
+    }
+
+    function beginLocal(shift){
+        var u = me();
+        if (!u.username || !shift) return;
+        var prev = loadLocalShift(u.username);
+        if (prev && prev.shiftId === shift.id) {
+            // Re-attaching after a reopen: reset the clock to now and claim the
+            // run, so the time the portal was shut is never credited.
+            prev.lastBeat = Date.now();
+            prev.runId = RUN_ID;
+            prev.paused = false;
+            saveLocalShift(u.username, prev);
+            return prev;
+        }
+        var rec = {
+            shiftId: shift.id,
+            username: u.username,
+            date: shift.date,
+            startedAt: shift.checkIn || new Date().toISOString(),
+            activeMs: Number(shift.activeMs) || 0,
+            lastBeat: Date.now(),
+            runId: RUN_ID,
+            paused: false
+        };
+        saveLocalShift(u.username, rec);
+        return rec;
+    }
+
+    function endLocal(){
+        var u = me();
+        if (u.username) saveLocalShift(u.username, null);
+    }
+
+    var _lastFlush = 0;
+    function flushActive(force){
+        var rec = localState();
+        if (!rec) return null;
+        var now = Date.now();
+        var slice = now - (rec.lastBeat || now);
+        // Credit the slice only when the previous heartbeat came from this same
+        // page load. A different runId means the portal was closed in between,
+        // so that whole gap is skipped — the pause-while-closed rule. The cap
+        // guards against a machine sleeping with the portal left open.
+        var sameRun = rec.runId === RUN_ID;
+        if (sameRun && slice > 0) {
+            rec.activeMs = (rec.activeMs || 0) + Math.min(slice, SHIFT_MAX_SLICE_MS);
+        }
+        rec.runId = RUN_ID;
+        rec.lastBeat = now;
+        saveLocalShift(rec.username, rec);
+
+        if (force || now - _lastFlush > SHIFT_FLUSH_MS) {
+            _lastFlush = now;
+            persistActive(rec);
+        }
+        return rec;
+    }
+
+    // Mirror activeMs onto the shift record so the admin's Agent Times report
+    // shows worked time rather than wall-clock time.
+    function persistActive(rec){
+        try {
+            var shift = currentShiftRecord();
+            if (!shift || shift.id !== rec.shiftId) return;
+            shift.activeMs = rec.activeMs;
+            shift.activeHours = Math.round((rec.activeMs / 3600000) * 100) / 100;
+            shift.lastSeenAt = new Date().toISOString();
+            shift.status = 'on';
+            if (typeof window.writeData === 'function') {
+                window.writeData('agentTimes/' + shift.id, shift, 'ph_agent_times');
+                // Keep the whole-list mirror in step for offline reads.
+                Promise.resolve(window.readData('agentTimes', 'ph_agent_times_list', true))
+                    .then(function(all){
+                        all = all || {};
+                        all[shift.id] = shift;
+                        return window.writeData('agentTimes', all, 'ph_agent_times_list');
+                    }).catch(function(){});
+            }
+        } catch(_){}
+    }
+
+    /* ---- The pill ---- */
+
+    function renderPill(){
+        var badge = document.getElementById('agentTimeBadge');
+        if (!badge) return;
+        if (!isShiftRole()) { var old = badge.querySelector('.ph-shift-timer'); if (old) old.remove(); return; }
+        var pill = badge.querySelector('.ph-shift-timer');
+        var rec = localState();
+        if (!rec) { if (pill) pill.remove(); return; }
+        if (!pill) {
+            pill = document.createElement('span');
+            pill.className = 'ph-shift-timer';
+            pill.title = 'Time worked this shift (paused while the portal is closed)';
+            badge.appendChild(pill);
+        }
+        pill.textContent = fmtHMS(rec.activeMs || 0);
+    }
+
+    /* ---- Auto start on login, reconcile on reload ---- */
+
+    var _startingShift = false;
+    async function ensureShift(){
+        try {
+            var u = me();
+            if (!u.username || !isShiftRole(u)) return;
+            if (_startingShift) return;
+            _startingShift = true;
+
+            if (typeof window.loadAgentTimes === 'function') {
+                try { await window.loadAgentTimes(); } catch(_){}
+            }
+            var shift = currentShiftRecord();
+            var stored = loadLocalShift(u.username);
+
+            // Reopen a shift the beforeunload safety-net closed while the
+            // portal was shut. The agent never clicked check-out, so per the
+            // requirement the shift must continue.
+            if (!shift && stored && stored.shiftId && !stored.endedByUser) {
+                var list = vals(S().agentTimes);
+                var prior = null;
+                for (var i = 0; i < list.length; i++) {
+                    if (list[i] && list[i].id === stored.shiftId) { prior = list[i]; break; }
+                }
+                if (prior && prior.autoClosed) {
+                    prior.checkOut = null;
+                    prior.checkOutLocal = '';
+                    prior.checkOutTimeLocal = '';
+                    prior.autoClosed = false;
+                    prior.status = 'on';
+                    prior.reopened = true;
+                    prior.activeMs = Math.max(Number(prior.activeMs) || 0, stored.activeMs || 0);
+                    try {
+                        if (typeof window.writeData === 'function') {
+                            await window.writeData('agentTimes/' + prior.id, prior, 'ph_agent_times');
+                            var all = (await window.readData('agentTimes', 'ph_agent_times_list', true)) || {};
+                            all[prior.id] = prior;
+                            await window.writeData('agentTimes', all, 'ph_agent_times_list');
+                        }
+                    } catch(_){}
+                    shift = prior;
+                }
+            }
+
+            // Nothing open at all — start the shift automatically.
+            if (!shift && typeof window.checkInAgent === 'function') {
+                try { await window.checkInAgent(); } catch(_){}
+                shift = currentShiftRecord();
+            }
+            if (shift) {
+                S().activeAgentShift = shift;
+                beginLocal(shift);
+                if (typeof window.updateAgentTimeBadge === 'function') {
+                    try { window.updateAgentTimeBadge(); } catch(_){}
+                }
+                renderPill();
+            }
+        } catch(_){
+        } finally { _startingShift = false; }
+    }
+
+    // Wait for a signed-in user, then start / resume the shift.
+    var _shiftWatch = setInterval(function(){
+        if (!me().username) return;
+        if (!isShiftRole()) return;
+        if (localState()) return;
+        ensureShift();
+    }, 3000);
+
+    ready(function(){ setTimeout(function(){ if (me().username) ensureShift(); }, 2500); });
+
+    // Explicit check-out (badge click or logout) must clear the local record
+    // so the timer does not resume on the next login.
+    ready(function(){
+        setTimeout(function(){
+            var origToggle = window.toggleAgentShift;
+            if (typeof origToggle === 'function' && !origToggle.__phV5) {
+                var wrapped = async function(){
+                    var had = !!currentShiftRecord();
+                    if (had) { try { flushActive(true); } catch(_){} }
+                    var r = await origToggle.apply(this, arguments);
+                    if (had) {
+                        // The agent turned the shift off deliberately.
+                        var u = me();
+                        var stored = loadLocalShift(u.username);
+                        if (stored) { stored.endedByUser = true; saveLocalShift(u.username, stored); }
+                        endLocal();
+                        renderPill();
+                    } else {
+                        setTimeout(ensureShift, 400);
+                    }
+                    return r;
+                };
+                wrapped.__phV5 = true;
+                window.toggleAgentShift = wrapped;
+            }
+            var btn = document.getElementById('btnLogout');
+            if (btn && !btn.__phV5) {
+                btn.__phV5 = true;
+                btn.addEventListener('click', function(){
+                    try { flushActive(true); } catch(_){}
+                    var u = me();
+                    var stored = u.username ? loadLocalShift(u.username) : null;
+                    if (stored) { stored.endedByUser = true; saveLocalShift(u.username, stored); }
+                    setTimeout(endLocal, 1200);
+                }, true);
+            }
+        }, 2000);
+    });
+
+    // Heartbeat: accumulate while open, repaint the pill.
+    setInterval(function(){
+        if (!me().username || !isShiftRole()) return;
+        flushActive(false);
+        renderPill();
+    }, SHIFT_TICK_MS);
+
+    // A tab regaining focus after the machine slept should not back-date time.
+    document.addEventListener('visibilitychange', function(){
+        var rec = localState();
+        if (!rec) return;
+        if (document.hidden) { flushActive(true); }
+        else { rec.lastBeat = Date.now(); rec.runId = RUN_ID; saveLocalShift(rec.username, rec); }
+    });
+
+
+    /* ==============================================================
+       5. CHAT MESSAGE SELECTION THAT STAYS SELECTED
+       ==============================================================
+       Why the tick vanished a moment after clicking it:
+         a) Chat messages are re-rendered from a ~1.2s poll and from the
+            Firebase listener. Several renderer variants rebuild the
+            container with innerHTML, which throws the checkbox DOM away.
+            Only one of those variants re-applied the remembered ticks.
+         b) window._mrChatSelection was reset to {} by wrappers on
+            closeModal / showChatUI / _selectChatContact. closeModal fires
+            for any modal, so an in-progress multi-select was wiped.
+       Fix: own the selection store behind an accessor so a background
+       reset cannot clear it, re-apply ticks after every repaint, and clear
+       only when the admin really switches conversation or after a delete.
+    */
+    var _selStore = (window._mrChatSelection && typeof window._mrChatSelection === 'object')
+        ? window._mrChatSelection : {};
+    var _allowClear = false;
+    var _selConvo = null;
+
+    try {
+        Object.defineProperty(window, '_mrChatSelection', {
+            configurable: true,
+            get: function(){ return _selStore; },
+            set: function(v){
+                // Ignore background resets — only our own API may clear.
+                if (!_allowClear) return;
+                _selStore = (v && typeof v === 'object') ? v : {};
+            }
+        });
+    } catch(_){ window._mrChatSelection = _selStore; }
+
+    function selIds(){ return Object.keys(_selStore).filter(function(k){ return _selStore[k]; }); }
+
+    function clearSel(){
+        _allowClear = true;
+        _selStore = {};
+        _allowClear = false;
+        paintSel();
+    }
+    window._mrClearChatSelection = clearSel;
+    window._mrChatSelectionCount = function(){ return selIds().length; };
+
+    function convoKey(){
+        var s = S();
+        return String(s.activeChatPair || s.activeChatUser || s.activeChatGroup || '');
+    }
+
+    // Re-apply ticks + the row highlight, and keep the Delete button counter
+    // in step. Cheap enough to run on a short interval.
+    function paintSel(){
+        var c = document.getElementById('chatMessagesContainer');
+        if (c) {
+            var boxes = c.querySelectorAll('.chat-delete-check');
+            for (var i = 0; i < boxes.length; i++) {
+                var cb = boxes[i];
+                var want = !!_selStore[cb.value];
+                if (cb.checked !== want) cb.checked = want;
+                var row = cb.closest ? cb.closest('.bubble-row') : null;
+                if (row) row.classList.toggle('ph-msg-selected', want);
+            }
+        }
+        var n = selIds().length;
+        var btns = document.querySelectorAll('[onclick*="_deleteSelectedChatMessages"]');
+        Array.prototype.forEach.call(btns, function(b){
+            var base = b.getAttribute('data-phbase');
+            if (!base) { base = b.innerHTML; b.setAttribute('data-phbase', base); }
+            var want = n ? base.replace(/(Delete Selected)(\s*\(\d+\))?/, '$1 (' + n + ')') : base;
+            if (b.innerHTML !== want) b.innerHTML = want;
+        });
+        // A small pill next to the chat tools so the admin can see the count
+        // even when the button label is icon-only.
+        var tools = document.querySelector('.chat-history-tools');
+        if (tools && isAdminNow()) {
+            var pill = tools.querySelector('.ph-chatsel-pill');
+            if (n > 0) {
+                if (!pill) {
+                    pill = document.createElement('span');
+                    pill.className = 'ph-chatsel-pill';
+                    tools.appendChild(pill);
+                }
+                pill.innerHTML = '<i class="fas fa-check-double"></i> ' + n + ' selected';
+            } else if (pill) { pill.remove(); }
+        }
+    }
+
+    function record(cb){
+        if (!cb || !cb.value) return;
+        if (cb.checked) _selStore[cb.value] = true;
+        else delete _selStore[cb.value];
+        _selConvo = convoKey();
+        paintSel();
+    }
+
+    // Delegated, capture-phase so no earlier handler can swallow it.
+    document.addEventListener('change', function(ev){
+        var cb = ev.target;
+        if (!cb || !cb.classList || !cb.classList.contains('chat-delete-check')) return;
+        record(cb);
+    }, true);
+
+    // Clicking the pill/label: let the browser toggle the input first, then read it.
+    document.addEventListener('click', function(ev){
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        var wrap = t.closest('.chat-delete-select');
+        if (!wrap) return;
+        ev.stopPropagation();   // don't let the bubble's own handlers fire
+        setTimeout(function(){
+            var cb = wrap.querySelector('.chat-delete-check');
+            if (cb) record(cb);
+        }, 0);
+    }, true);
+
+    // Repaint after any renderer rebuilds the container.
+    function watchChat(){
+        var c = document.getElementById('chatMessagesContainer');
+        if (!c || c.__phSelWatch) return;
+        c.__phSelWatch = true;
+        try {
+            // childList only: toggling a class must not re-trigger the observer.
+            new MutationObserver(function(){ paintSel(); })
+                .observe(c, { childList: true, subtree: true });
+        } catch(_){}
+    }
+    setInterval(function(){
+        watchChat();
+        // Drop the selection only when the conversation genuinely changes.
+        var k = convoKey();
+        if (_selConvo !== null && k && k !== _selConvo && selIds().length) {
+            clearSel();
+        }
+        _selConvo = k || _selConvo;
+        if (selIds().length) paintSel();
+    }, 700);
+
+    // Wrap the renderer last so ticks are restored right after a repaint.
+    function wrapRenderer(){
+        var orig = window.renderChatMessages;
+        if (typeof orig !== 'function' || orig.__phSelWrap) return;
+        var wrapped = function(){
+            var r = orig.apply(this, arguments);
+            paintSel();
+            setTimeout(paintSel, 30);
+            return r;
+        };
+        wrapped.__phSelWrap = true;
+        window.renderChatMessages = wrapped;
+    }
+    wrapRenderer();
+    setInterval(wrapRenderer, 1200);
+
+    // Delete: use the remembered ids even if the DOM was rebuilt, then clear
+    // the selection. Replaces the earlier implementation outright (see below).
+    function installChatDelete(){
+        var cur = window._deleteSelectedChatMessages;
+        if (typeof cur === 'function' && cur.__phSelWrap) return;
+        var wrapped = async function(){
+                if (!isAdminNow()) { toast('Admin access required.', 'error'); return; }
+                var ids = selIds();
+                var c = document.getElementById('chatMessagesContainer');
+                if (c) {
+                    Array.prototype.forEach.call(c.querySelectorAll('.chat-delete-check:checked'), function(cb){
+                        if (ids.indexOf(cb.value) === -1) ids.push(cb.value);
+                    });
+                }
+                if (!ids.length) { toast('Select message(s) to delete first.', 'warning'); return; }
+                if (!confirm('Delete ' + ids.length + ' selected message(s)?')) return;
+
+                // Do the delete here rather than delegating. The original
+                // matched ids against the raw store, where the Firebase push
+                // key lives on the object KEY and not on the record, so a
+                // localStorage-backed conversation matched nothing and silently
+                // deleted zero messages. Match on every id shape the renderers
+                // use: the map key, _key, _id and id.
+                var all = null;
+                try { all = await window.readData('chatMessages', 'ph_chat_messages', true); } catch(_){}
+                all = all || {};
+                var now = (typeof window.getNowISO === 'function') ? window.getNowISO() : new Date().toISOString();
+                var admin = me().username || 'admin';
+                var changed = 0;
+
+                function markIfSelected(msg, mapKey){
+                    if (!msg || msg.deleted) return;
+                    var cands = [mapKey, msg._key, msg._id, msg.id];
+                    for (var i = 0; i < cands.length; i++) {
+                        if (cands[i] && ids.indexOf(String(cands[i])) !== -1) {
+                            msg.deleted = true;
+                            msg.deletedAt = now;
+                            msg.deletedBy = admin;
+                            changed++;
+                            return;
+                        }
+                    }
+                }
+
+                if (Array.isArray(all)) {
+                    all.forEach(function(m, i){ markIfSelected(m, String(i)); });
+                } else {
+                    Object.keys(all).forEach(function(k){ markIfSelected(all[k], k); });
+                }
+
+                if (!changed) { toast('Selected message(s) could not be found.', 'warning'); return; }
+                try { await window.writeData('chatMessages', all, 'ph_chat_messages'); } catch(_){}
+                toast('Deleted ' + changed + ' message(s).', 'success');
+                clearSel();
+                try {
+                    if (typeof window.loadChatMessages === 'function') await window.loadChatMessages();
+                } catch(_){}
+                return true;
+        };
+        wrapped.__phSelWrap = true;
+        window._deleteSelectedChatMessages = wrapped;
+    }
+    // Install now and keep re-installing: later layers reassign this global.
+    installChatDelete();
+    setInterval(installChatDelete, 1500);
+
+    /* ==============================================================
+       6. GRADIENT MOVE HOVER ANIMATION
+       ==============================================================
+       Applies a moving gradient sheen to every tab, option, dashboard card,
+       sidebar nav item, desktop shortcut and modal button. The sheen follows
+       the pointer (--ph-mx / --ph-my) and sweeps continuously while hovered.
+       It also works when no background image / theme picture is selected:
+       those surfaces get .ph-noimg so the sheen has something to tint.
+       Decoration only — pointer-events:none, and it sits behind the label so
+       clicks and text always win.
+    */
+    var HOVER_SELECTORS = [
+        '.tab-btn',
+        '.dash-card',
+        '.mr-nav-item',
+        '.ph-shortcut',
+        '.ph-shortcut-pick',
+        '.ph-settings-tabs button',
+        '.sidebar-item',
+        '.nav-item',
+        '.chat-contact',
+        '.btn',
+        '.icon-btn',
+        '.modal-actions button',
+        '.quick-action',
+        '.stat-card',
+        '.ph-qmonth-head',
+        '.bg-option',
+        '.theme-option',
+        '.chat-bg-pick',
+        '.ph-transfer-field select'
+    ].join(',');
+
+    // Elements that clip their own children need overflow:hidden on the sheen.
+    var CLIP_SELECTORS = '.dash-card,.stat-card,.chat-contact,.ph-shortcut,.tab-btn';
+
+    function isTransparentish(el){
+        try {
+            var cs = getComputedStyle(el);
+            var img = cs.backgroundImage || 'none';
+            var bg = cs.backgroundColor || '';
+            var noImg = img === 'none' || img === '';
+            var clearBg = bg === 'transparent' || /rgba\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(bg);
+            return noImg && clearBg;
+        } catch(_){ return false; }
+    }
+
+    function tagHover(el){
+        if (!el || el.__phHover) return;
+        // Skip anything that is only a layout wrapper or already inside a
+        // tagged hover target, to avoid two sheens stacking up.
+        if (el.closest && el.closest('.ph-gradhover') && el.closest('.ph-gradhover') !== el) return;
+        el.__phHover = true;
+        el.classList.add('ph-gradhover');
+        if (el.matches && el.matches(CLIP_SELECTORS)) el.classList.add('ph-gradclip');
+        if (isTransparentish(el)) el.classList.add('ph-noimg');
+    }
+
+    function scanHover(root){
+        root = root || document;
+        var list;
+        try { list = root.querySelectorAll(HOVER_SELECTORS); } catch(_){ return; }
+        for (var i = 0; i < list.length; i++) tagHover(list[i]);
+    }
+
+    // Pointer tracking: one delegated listener for the whole document, so the
+    // number of hover targets does not matter.
+    var _rafPending = false, _lastEvt = null;
+    document.addEventListener('pointermove', function(ev){
+        _lastEvt = ev;
+        if (_rafPending) return;
+        _rafPending = true;
+        requestAnimationFrame(function(){
+            _rafPending = false;
+            var e = _lastEvt;
+            if (!e || !e.target || !e.target.closest) return;
+            var el = e.target.closest('.ph-gradhover');
+            if (!el) return;
+            var r = el.getBoundingClientRect();
+            if (!r.width || !r.height) return;
+            var x = ((e.clientX - r.left) / r.width) * 100;
+            var y = ((e.clientY - r.top) / r.height) * 100;
+            el.style.setProperty('--ph-mx', x.toFixed(1) + '%');
+            el.style.setProperty('--ph-my', y.toFixed(1) + '%');
+        });
+    }, { passive: true });
+
+    // Reset the highlight position when the pointer leaves, so the next hover
+    // does not start from a stale corner.
+    document.addEventListener('pointerleave', function(ev){
+        var el = ev.target;
+        if (el && el.classList && el.classList.contains('ph-gradhover')) {
+            el.style.removeProperty('--ph-mx');
+            el.style.removeProperty('--ph-my');
+        }
+    }, true);
+
+    // Tag existing nodes and anything the app renders later.
+    ready(function(){
+        scanHover();
+        try {
+            var mo = new MutationObserver(function(muts){
+                for (var i = 0; i < muts.length; i++) {
+                    var added = muts[i].addedNodes;
+                    for (var j = 0; j < added.length; j++) {
+                        var n = added[j];
+                        if (!n || n.nodeType !== 1) continue;
+                        if (n.matches) {
+                            try { if (n.matches(HOVER_SELECTORS)) tagHover(n); } catch(_){}
+                        }
+                        scanHover(n);
+                    }
+                }
+            });
+            mo.observe(document.body, { childList: true, subtree: true });
+        } catch(_){}
+        // Safety sweep for nodes injected in ways the observer misses.
+        setInterval(function(){ scanHover(); }, 2500);
+    });
+
+})();
+</script>
+
+
+
+
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
