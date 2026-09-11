@@ -3398,18 +3398,35 @@
                 return CryptoJS.SHA256(message).toString();
             }
 
+            var _ipPromise = null;
             async function fetchIP() {
-                try {
-                    var res = await fetch('https://api.ipify.org?format=json');
-                    var data = await res.json();
-                    if (data && data.ip) return data.ip;
-                } catch (_) {}
-                // Manual fallback
-                try {
-                    var manual = window.prompt('Could not auto-detect IP. Please enter your IP address (ask admin if unsure):', '');
-                    if (manual && manual.trim()) return manual.trim();
-                } catch (_) {}
-                return 'unknown';
+                // Speed fix: the lookup is memoized (the IP cannot change within
+                // one page session, so repeat logins never wait for the external
+                // call again) and capped at 2.5s, so a slow ipify response can
+                // never stall the login button.
+                if (_ipPromise) return _ipPromise;
+                _ipPromise = (async function() {
+                    try {
+                        var res = await Promise.race([
+                            fetch('https://api.ipify.org?format=json'),
+                            new Promise(function(_, reject) {
+                                setTimeout(function() { reject(new Error('ip-lookup-timeout')); }, 2500);
+                            })
+                        ]);
+                        var data = await res.json();
+                        if (data && data.ip) return data.ip;
+                    } catch (_) {}
+                    // Manual fallback
+                    try {
+                        var manual = window.prompt('Could not auto-detect IP. Please enter your IP address (ask admin if unsure):', '');
+                        if (manual && manual.trim()) return manual.trim();
+                    } catch (_) {}
+                    return 'unknown';
+                })();
+                var ip = await _ipPromise;
+                // Retry on the next login only if this attempt never got a real IP.
+                if (!ip || ip === 'unknown') _ipPromise = null;
+                return ip;
             }
 
             // ---- IP approval waiting screen ----
@@ -4091,9 +4108,11 @@
 
                 user.lastLogin = getNowISO();
                 user.ip = ip;
-                await persistUserRecord(username, user);
-
-                await logLoginEvent(username, ip, 'success', '');
+                // Speed fix: both writes are pure bookkeeping — the dashboard no
+                // longer waits on their network round-trips. (The lockout /
+                // failure paths above still persist synchronously.)
+                persistUserRecord(username, user).catch(function (_) {});
+                logLoginEvent(username, ip, 'success', '').catch(function (_) {});
                 return { ...user, username: username, ip: ip };
             }
 
@@ -11153,7 +11172,12 @@
                             try { localStorage.removeItem('ph_remember'); } catch (_) {}
                         }
                         saveSession(user);
-                        await afterLogin(user);
+                        // Speed fix: afterLogin reveals the dashboard synchronously
+                        // before its first await — don't hold the loading overlay
+                        // over it while the data loads in the background.
+                        afterLogin(user).catch(function (err) { console.warn('afterLogin:', err); });
+                        showLoading(false);
+                        return;
                     } else {
                         errorEl.textContent = 'Invalid username or password.';
                     }
@@ -17164,9 +17188,34 @@
                 }
                 if (typeof showQuoteHistory === 'function') {
                     var _mrPrevShowQuoteHistory = showQuoteHistory;
-                    showQuoteHistory = async function(){
-                        try { await loadQuotes(true); } catch (_) {}
-                        return _mrPrevShowQuoteHistory.apply(this, arguments);
+                    // Speed fix: this used to AWAIT a forced server fetch before
+                    // rendering, so Quote History hung on the network on every
+                    // click. The modal now opens instantly from the cached list;
+                    // the server copy loads silently in the background and the
+                    // table is redrawn only when the data actually changed and
+                    // the user is not mid-search / mid-selection.
+                    function _mrQuotesSig(){
+                        try {
+                            return ((window.STATE && window.STATE.quotes) || []).map(function(q){
+                                return (q.id || '') + ':' + (q.updatedAt || q.createdAt || '');
+                            }).join('|');
+                        } catch (_) { return ''; }
+                    }
+                    showQuoteHistory = function(){
+                        var sig = _mrQuotesSig();
+                        var result = _mrPrevShowQuoteHistory.apply(this, arguments);
+                        try {
+                            loadQuotes(true).then(function(){
+                                if (_mrQuotesSig() === sig) return;
+                                var tbl = document.getElementById('quoteTableBody');
+                                var search = document.getElementById('quoteSearchInput');
+                                var busy = (search && search.value) ||
+                                    document.querySelector('#quoteTableBody input[type="checkbox"]:checked');
+                                if (!tbl || busy) return;
+                                _mrPrevShowQuoteHistory();
+                            }).catch(function(){});
+                        } catch (_) {}
+                        return result;
                     };
                 }
             })();
@@ -30190,6 +30239,95 @@ body.theme-custom .ph-quote-white{
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"spa":2}' crossorigin="anonymous"></script>
+<script id="ph-chat-badge-sync">
+/* ================================================================
+   CHAT ICON — silent background unread sync (final layer, wins over
+   the older chat layers).
+   Several older layers poll chatMessages on their own 1-6s timers and
+   each writes ITS OWN unread number into the same badge — one counts
+   only today's messages, one includes missed calls, one ignores group
+   chats — so the badge value alternated and the chat icon looked like
+   it kept refreshing. This layer takes ownership of the badge:
+     - One canonical count: ALL unread messages addressed to me
+       (direct + my groups), no time window, no call logs.
+     - A MutationObserver rewrites any stray value BEFORE the browser
+       paints, so the icon never visibly flickers or blinks.
+     - A quiet 3s background pass recomputes the count and touches the
+       DOM only when the number really changed — the checking happens
+       in the background, never as a visible front-end refresh.
+     - 0 unread -> the badge is fully hidden; otherwise it shows only
+       the unread count.
+   The network fetches themselves keep running in the older layers
+   (realtime listener / pollers); this layer only reads their cache,
+   so it adds no extra server traffic.
+   ================================================================ */
+(function(){
+    'use strict';
+    if (window.__PH_CHAT_BADGE_SYNC) return;
+    window.__PH_CHAT_BADGE_SYNC = true;
+
+    function phMe(){
+        try { return (window.STATE && window.STATE.currentUser && window.STATE.currentUser.username) || ''; }
+        catch(_){ return ''; }
+    }
+    function phCachedMessages(){
+        try {
+            var c = window.STATE && window.STATE._cache && window.STATE._cache['chatMessages_ph_chat_messages'];
+            if (c && typeof c === 'object') return c;
+        } catch(_){}
+        try {
+            var raw = localStorage.getItem('ph_chat_messages');
+            if (raw) { var j = JSON.parse(raw); if (j && typeof j === 'object') return j; }
+        } catch(_){}
+        return {};
+    }
+    function phUnreadCount(){
+        var me = phMe();
+        if (!me) return 0;
+        var all = phCachedMessages();
+        var arr = Array.isArray(all) ? all : Object.keys(all).map(function(k){ return all[k]; });
+        var n = 0;
+        for (var i = 0; i < arr.length; i++) {
+            var m = arr[i];
+            if (!m || m.deleted || m.from === me) continue;
+            if (m.groupId) {
+                if ((m.members || []).indexOf(me) !== -1 && !(m.readBy && m.readBy[me])) n++;
+            } else if (m.to === me && !m.read) {
+                n++;
+            }
+        }
+        return n;
+    }
+    function phApply(){
+        var n = phUnreadCount();
+        ['chatNotifyBadge', 'chatCardNotifyBadge'].forEach(function(id){
+            var e = document.getElementById(id);
+            if (!e) return;
+            var d = n ? 'inline-flex' : 'none';
+            var t = String(n);
+            // Change-guarded: an idle portal performs zero DOM writes, so
+            // nothing repaints until the unread count genuinely changes.
+            if (e.style.display !== d) e.style.display = d;
+            if (e.textContent !== t) e.textContent = t;
+        });
+    }
+    function phWatch(){
+        ['chatNotifyBadge', 'chatCardNotifyBadge'].forEach(function(id){
+            var e = document.getElementById(id);
+            if (!e || e.__phBadgeSync) return;
+            e.__phBadgeSync = true;
+            new MutationObserver(phApply).observe(e, {
+                childList: true, characterData: true, subtree: true,
+                attributes: true, attributeFilter: ['style']
+            });
+        });
+        phApply();
+    }
+    setInterval(phApply, 3000);   // quiet background unread check
+    setInterval(phWatch, 1500);   // re-attach after login / chat UI rebuilds
+    phWatch();
+})();
+</script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"spa":2}' crossorigin="anonymous"></script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a39846b44ca3907d',t:'MTc4OTE0NjUyNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3987a4ba80e64cb',t:'MTc4OTE0ODYzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
