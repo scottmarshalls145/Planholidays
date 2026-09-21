@@ -7821,7 +7821,6 @@
                         showToast('Feature coming soon.', 'info');
                 }
             }
-            window.handleDashAction = handleDashAction;
 
             // --------------------------------------------------------------
             // 20. QUOTE HISTORY (with permission)
@@ -17268,7 +17267,6 @@
                         }
                         return _profilePrevHandleDashAction.apply(this, arguments);
                     };
-                    window.handleDashAction = handleDashAction;
                 }
 
                 if (typeof afterLogin === 'function') {
@@ -18122,8 +18120,7 @@
                         }
                         var online = _mrIsPresenceOnline(presence[user]);
                         dot.classList.toggle('offline', !online);
-                        var _t = online ? 'Online' : 'Offline';
-                        if (dot.title !== _t) dot.title = _t;
+                        dot.title = online ? 'Online' : 'Offline';
                     });
                 }
                 function _mrApplyNamesHiddenState(){
@@ -18866,7 +18863,6 @@
                             return prevHandle.apply(this, arguments);
                         };
                         handleDashAction.__screenViewPatched = true;
-                        window.handleDashAction = handleDashAction;
                     }
                     if (typeof showDashboard === 'function' && !showDashboard.__screenViewPatched) {
                         var prevShowDashboard = showDashboard;
@@ -18989,23 +18985,18 @@
                     var hidden=_privacyHidden();
                     shell.classList.toggle('mr-chat-names-hidden', hidden);
                     var btns=document.querySelectorAll('#mrSidebarHideNamesBtn,#mrToggleChatNamesBtn');
-                    var _btnHtml = hidden ? '<i class="fas fa-eye"></i> Show Names' : '<i class="fas fa-eye-slash"></i> Hide Names';
-                    Array.prototype.forEach.call(btns,function(btn){ if(btn && btn.innerHTML !== _btnHtml) btn.innerHTML = _btnHtml; });
+                    Array.prototype.forEach.call(btns,function(btn){ if(btn) btn.innerHTML = hidden ? '<i class="fas fa-eye"></i> Show Names' : '<i class="fas fa-eye-slash"></i> Hide Names'; });
                     Array.prototype.forEach.call(document.querySelectorAll('.chat-contact'), function(el){
                         var name=el.querySelector('.chat-contact-name'), sub=el.querySelector('.chat-contact-sub');
                         var key=String(el.dataset.key||'');
                         var label=key.indexOf('pair_')===0?'Mutual Chat':(key.indexOf('group_')===0?'Group':'Agent');
-                        /* Only write when the value actually differs: this runs on
-                           every refresh, and re-setting an identical attribute
-                           still costs a mutation record plus a style recalc. */
-                        var subLabel = key.indexOf('pair_')===0?'Agent-to-agent conversation':(key.indexOf('group_')===0?'Group conversation':'Status hidden');
-                        if(name && name.getAttribute('data-private-label')!==label) name.setAttribute('data-private-label', label);
-                        if(sub && sub.getAttribute('data-private-sub')!==subLabel) sub.setAttribute('data-private-sub', subLabel);
+                        if(name) name.setAttribute('data-private-label', label);
+                        if(sub) sub.setAttribute('data-private-sub', key.indexOf('pair_')===0?'Agent-to-agent conversation':(key.indexOf('group_')===0?'Group conversation':'Status hidden'));
                     });
                     Array.prototype.forEach.call(document.querySelectorAll('.mr-chat-online-item'), function(el){
                         var name=el.querySelector('.chat-contact-name'), sub=el.querySelector('.chat-contact-sub');
-                        if(name && name.getAttribute('data-private-label')!=='Online Agent') name.setAttribute('data-private-label','Online Agent');
-                        if(sub && sub.getAttribute('data-private-sub')!=='Status hidden') sub.setAttribute('data-private-sub','Status hidden');
+                        if(name) name.setAttribute('data-private-label','Online Agent');
+                        if(sub) sub.setAttribute('data-private-sub','Status hidden');
                     });
                 }
                 function _togglePrivacy(){ _setPrivacyHidden(!_privacyHidden()); _applyPrivacyLabels(); }
@@ -20812,7 +20803,6 @@
                         return prevHandle.apply(this, arguments);
                     };
                     handleDashAction.__mrBookingsPatched = true;
-                    window.handleDashAction = handleDashAction;
                 }
                 if (typeof renderUserManagement === 'function' && !renderUserManagement.__mrBookingsPatched) {
                     var prevUsers = renderUserManagement;
@@ -24381,6 +24371,7 @@ body.mr-new-theme.mr-light .mr-cal-day.today{color:#fff !important;}
 })();
 </script>
 <!-- ==== end PH-FIX v1 ==== -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <!-- ==== PH-FIX v2: minor targeted UI polish (agents online sticky+refresh, notifications trimmed, sidebar shortcuts, per-user theme persistence) ==== -->
 <style>
 /* Refresh button styling */
@@ -27178,6 +27169,10 @@ body.theme-custom .pdf-page tbody tr:nth-child(even){
     window.showHotelTransfers = showHotelTransfers;
 })();
 </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1}' crossorigin="anonymous"></script>
+
 <style id="ph-v5-css">
 /* ==================================================================
    PH-V5 — requested changes, styles only.
@@ -28748,32 +28743,14 @@ body.theme-custom .ph-quote-white{
         el.__phHover = true;
         el.classList.add('ph-gradhover');
         if (el.matches && el.matches(CLIP_SELECTORS)) el.classList.add('ph-gradclip');
-        // Reuse the measurement taken in scanHover's read pass when there is
-        // one, so a single element tagged on its own still works unchanged.
-        var _noimg = (el.__phNoimg !== undefined) ? el.__phNoimg : isTransparentish(el);
-        if (_noimg) el.classList.add('ph-noimg');
+        if (isTransparentish(el)) el.classList.add('ph-noimg');
     }
 
     function scanHover(root){
         root = root || document;
         var list;
         try { list = root.querySelectorAll(HOVER_SELECTORS); } catch(_){ return; }
-        var i, el;
-
-        /* Phase 1 - measure every candidate first.
-           getComputedStyle forces a style recalculation, and doing it inline
-           with the class writes below meant one full recalc per element. On a
-           long contact list that is what made the whole portal crawl. Reading
-           them all while the styles are still clean costs a single recalc. */
-        for (i = 0; i < list.length; i++){
-            el = list[i];
-            if (!el || el.__phHover) continue;
-            el.__phNoimg = isTransparentish(el);
-        }
-
-        /* Phase 2 - write, in the original order, so an element nested inside
-           a target tagged moments ago is still skipped exactly as before. */
-        for (i = 0; i < list.length; i++) tagHover(list[i]);
+        for (var i = 0; i < list.length; i++) tagHover(list[i]);
     }
 
     // Pointer tracking: one delegated listener for the whole document, so the
@@ -28812,39 +28789,18 @@ body.theme-custom .ph-quote-white{
     ready(function(){
         scanHover();
         try {
-            var _batch = 0;
             var mo = new MutationObserver(function(muts){
-                /* Collect every new candidate first.
-                   Tagging node by node meant a getComputedStyle read sat
-                   between two class writes, so every single node forced a
-                   full style recalculation. Rendering a long contact list
-                   therefore took many seconds. Gathering them all and then
-                   measuring once keeps it to a single recalculation. */
-                var pending = [];
-                _batch++;
-                function collect(n){
-                    if (!n || n.nodeType !== 1) return;
-                    if (n.__phHover || n.__phPendingBatch === _batch) return;
-                    n.__phPendingBatch = _batch;
-                    if (n.matches) { try { if (n.matches(HOVER_SELECTORS)) pending.push(n); } catch(_){} }
-                    try {
-                        var sub = n.querySelectorAll(HOVER_SELECTORS);
-                        for (var k = 0; k < sub.length; k++) {
-                            var c = sub[k];
-                            if (c.__phHover || c.__phPendingBatch === _batch) continue;
-                            c.__phPendingBatch = _batch;
-                            pending.push(c);
-                        }
-                    } catch(_){}
-                }
                 for (var i = 0; i < muts.length; i++) {
                     var added = muts[i].addedNodes;
-                    for (var j = 0; j < added.length; j++) collect(added[j]);
+                    for (var j = 0; j < added.length; j++) {
+                        var n = added[j];
+                        if (!n || n.nodeType !== 1) continue;
+                        if (n.matches) {
+                            try { if (n.matches(HOVER_SELECTORS)) tagHover(n); } catch(_){}
+                        }
+                        scanHover(n);
+                    }
                 }
-                if (!pending.length) return;
-                var a;
-                for (a = 0; a < pending.length; a++) pending[a].__phNoimg = isTransparentish(pending[a]);
-                for (a = 0; a < pending.length; a++) tagHover(pending[a]);
             });
             mo.observe(document.body, { childList: true, subtree: true });
         } catch(_){}
@@ -30666,6 +30622,9 @@ body.theme-custom .ph-quote-white{
     }, 900);
 })();
 </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"spa":2}' crossorigin="anonymous"></script>
 <script id="ph-chat-badge-sync">
 /* ================================================================
    CHAT ICON — silent background unread sync (final layer, wins over
@@ -30755,115 +30714,6 @@ body.theme-custom .ph-quote-white{
     phWatch();
 })();
 </script>
-<script>
-/* ==================================================================
-   CHAT — REPAINT GUARD
-   ------------------------------------------------------------------
-   A deliberately small, self-contained speed layer for the chat panel.
-   It never calls, replaces or disables any portal function, and it
-   patches nothing on a shared prototype, so the rest of the portal is
-   completely untouched.
-
-   It only sits on the innerHTML setter of the three chat containers
-   and drops two kinds of write:
-
-     1. The "everything" contact list while a filter tab (Online Agents
-        / Mutual Chats) is selected. The app renders the full list and
-        then the filtered list on the same pass; that first write is
-        exactly what made the panel flash back to showing everything.
-
-     2. Markup that is byte-identical to what is already on screen and
-        whose structure has not since been altered. Re-assigning it
-        costs a full re-parse and repaint and cannot change one pixel.
-
-   Everything else goes straight through, so new messages, unread
-   badges and presence still appear the moment they arrive.
-   ================================================================== */
-(function(){
-    var IDS = ['chatContactsList', 'chatMessagesContainer', 'mrChatOnlineList'];
-
-    var innerDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
-    if (!innerDesc || !innerDesc.set || !innerDesc.get) return;
-
-    var last     = {};   /* id -> last markup we actually painted      */
-    var lastKids = {};   /* id -> childElementCount right after paint   */
-
-    function currentMode(){
-        try {
-            var tabs = document.getElementById('mrAdminChatTabs');
-            if (!tabs) return 'all';
-            var act = tabs.querySelector('[data-mode].active');
-            if (!act) return 'all';
-            var m = act.getAttribute('data-mode') || 'all';
-            return (m === 'online' || m === 'mutual') ? m : 'all';
-        } catch (_) { return 'all'; }
-    }
-
-    function viewOf(html){
-        try {
-            var s = String(html || '');
-            if (s.indexOf('Mutual Chats Between Agents') !== -1) return 'mutual';
-            if (s.indexOf('Online Agents') !== -1) return 'online';
-            /* The filtered renderers emit this small placeholder when
-               nothing matches the filter. It is a genuine result, not
-               the everything-list, so it must never be dropped. */
-            if (s.indexOf('chat-contact-section') === -1) return 'empty';
-            return 'all';
-        } catch (_) { return 'all'; }
-    }
-
-    function install(id, el){
-        if (!el) return;
-        /* The portal ships an older patch that re-installs its own
-           innerHTML guard on the contact list on a timer and would
-           silently replace ours. Flag the element so it skips us. */
-        try { el.__phFreezeV2 = true; } catch (_) {}
-
-        var guard = function(html){
-            var next = (html === null || html === undefined) ? '' : String(html);
-
-            if (id === 'chatContactsList') {
-                var v = viewOf(next), m = currentMode();
-                /* never let the everything-list paint over a chosen filter */
-                if (m !== 'all' && v !== m && v !== 'empty') return;
-            }
-
-            /* identical markup, same structure -> the DOM would not change */
-            if (last[id] === next && el.childElementCount === lastKids[id]) return;
-
-            last[id]     = next;
-            lastKids[id] = el.childElementCount;
-            innerDesc.set.call(this, next);
-            lastKids[id] = el.childElementCount;   /* re-read after the paint */
-        };
-
-        Object.defineProperty(el, 'innerHTML', {
-            configurable: true,
-            get: function(){ return innerDesc.get.call(this); },
-            set: guard
-        });
-        el.__repaintGuard = guard;
-    }
-
-    function refresh(){
-        for (var i = 0; i < IDS.length; i++){
-            var el = document.getElementById(IDS[i]);
-            if (!el) continue;
-            if (el.__repaintGuard) {
-                var d = Object.getOwnPropertyDescriptor(el, 'innerHTML');
-                if (d && d.set === el.__repaintGuard) continue;   /* ours is in place */
-            }
-            install(IDS[i], el);
-        }
-    }
-
-    refresh();
-    /* cheap safety net: re-assert only if another patch swapped ours out */
-    setInterval(refresh, 2000);
-    document.addEventListener('DOMContentLoaded', refresh);
-    try { console.info('[repaint-guard] active'); } catch (_) {}
-})();
-</script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3e97697bb4e822f',t:'MTc4OTk5NzgzMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"spa":2}' crossorigin="anonymous"></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3987a4ba80e64cb',t:'MTc4OTE0ODYzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3c8286fb886ccfc',t:'MTc4OTY0ODYwMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
-
