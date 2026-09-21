@@ -3402,33 +3402,60 @@
 
             var _ipPromise = null;
             async function fetchIP() {
-                // Speed fix: the lookup is memoized (the IP cannot change within
-                // one page session, so repeat logins never wait for the external
-                // call again) and capped at 2.5s, so a slow ipify response can
-                // never stall the login button.
+                // Memoized: the IP cannot change during one page session, so
+                // repeat logins never wait on the network again.
+                //
+                // It now tries several public endpoints instead of one, and it
+                // NEVER calls window.prompt() any more. The prompt froze the
+                // whole page (a modal dialog blocks the main thread) and, once
+                // dismissed, stored the literal string 'unknown' against the
+                // account - which is what left agents stuck on "waiting for
+                // approval" while the admin had nothing sensible to approve.
+                // The admin can always add an IP by hand in User Management.
                 if (_ipPromise) return _ipPromise;
                 _ipPromise = (async function() {
-                    try {
-                        var res = await Promise.race([
-                            fetch('https://api.ipify.org?format=json'),
-                            new Promise(function(_, reject) {
-                                setTimeout(function() { reject(new Error('ip-lookup-timeout')); }, 2500);
-                            })
-                        ]);
-                        var data = await res.json();
-                        if (data && data.ip) return data.ip;
-                    } catch (_) {}
-                    // Manual fallback
-                    try {
-                        var manual = window.prompt('Could not auto-detect IP. Please enter your IP address (ask admin if unsure):', '');
-                        if (manual && manual.trim()) return manual.trim();
-                    } catch (_) {}
+                    var endpoints = [
+                        { url: 'https://api.ipify.org?format=json', json: true },
+                        { url: 'https://api64.ipify.org?format=json', json: true },
+                        { url: 'https://api.ipify.org?format=text', json: false },
+                        { url: 'https://api.myip.com', json: true }
+                    ];
+                    for (var i = 0; i < endpoints.length; i++) {
+                        var ep = endpoints[i];
+                        try {
+                            var res = await _fetchIpOnce(ep.url, 6000);
+                            if (!res || !res.ok) continue;
+                            if (ep.json) {
+                                var data = await res.json();
+                                if (data && data.ip && String(data.ip).trim()) return String(data.ip).trim();
+                            } else {
+                                var txt = ((await res.text()) || '').trim();
+                                if (/^[0-9a-fA-F:.]{4,45}$/.test(txt)) return txt;
+                            }
+                        } catch (_) {}
+                    }
                     return 'unknown';
                 })();
                 var ip = await _ipPromise;
                 // Retry on the next login only if this attempt never got a real IP.
                 if (!ip || ip === 'unknown') _ipPromise = null;
                 return ip;
+            }
+            // One IP lookup with a hard deadline. The request is aborted rather
+            // than left running, so a slow provider cannot keep the login waiting.
+            function _fetchIpOnce(url, ms) {
+                return new Promise(function(resolve, reject) {
+                    var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+                    var timer = setTimeout(function() {
+                        try { if (ctrl) ctrl.abort(); } catch (_) {}
+                        reject(new Error('ip-lookup-timeout'));
+                    }, ms);
+                    try {
+                        var opts = ctrl ? { signal: ctrl.signal } : undefined;
+                        fetch(url, opts).then(function(r) { clearTimeout(timer); resolve(r); },
+                                              function(e) { clearTimeout(timer); reject(e); });
+                    } catch (e) { clearTimeout(timer); reject(e); }
+                });
             }
 
             // ---- IP approval waiting screen ----
@@ -3705,7 +3732,12 @@
                 var cacheKey = path + '_' + (fallbackKey || '');
                 if (firebaseConnected && db) {
                     try {
-                        var snap = await db.ref(path).once('value');
+                        // Bounded: on a slow or stalled socket the SDK retries
+                        // with backoff instead of erroring, so an unguarded
+                        // once() can hang for ever and freeze whatever screen
+                        // called it. Give up and use the cached copy instead.
+                        var snap = await _awaitWithTimeout(db.ref(path).once('value'), 12000);
+                        if (!snap) throw new Error('read-timeout');
                         var val = snap.val();
                         if (val !== null && val !== undefined) {
                             if (fallbackKey) {
@@ -3734,7 +3766,11 @@
             async function writeData(path, data, fallbackKey) {
                 if (firebaseConnected && db) {
                     try {
-                        await db.ref(path).set(data);
+                        // Bounded for the same reason as the read above: a set()
+                        // that never settles would leave a save spinner (or a
+                        // login) hanging with no error and no way out.
+                        var wrote = await _awaitWithTimeout(db.ref(path).set(data), 12000);
+                        if (wrote === undefined) throw new Error('write-timeout');
                         if (fallbackKey) {
                             try { localStorage.setItem(fallbackKey, JSON.stringify(data)); } catch (_) {}
                         }
@@ -3760,7 +3796,10 @@
                 if (firebaseConnected && db) {
                     try {
                         var ref = db.ref(path).push();
-                        await ref.set(data);
+                        // Bounded: an unguarded set() here would stall anything
+                        // that logs (login history, activity log, chat sends).
+                        var pushed = await _awaitWithTimeout(ref.set(data), 12000);
+                        if (pushed === undefined) throw new Error('push-timeout');
                         var cacheKey = path + '_' + (fallbackKey || '');
                         // Update cache by reading the whole list if needed
                         return ref.key;
@@ -3894,6 +3933,31 @@
                 if (!users || typeof users !== 'object') return null;
                 if (users.username && !users.Plan) return null;
                 return users;
+            }
+
+            // Persist ONLY the IP-approval fields for one user.
+            // persistUserRecord() rewrites the ENTIRE users map, so if two agents
+            // hit "waiting for approval" at the same time the second write could
+            // resurrect a stale copy and silently drop the first agent's pending
+            // IP - the admin then sees nothing to approve. Writing just this
+            // user's child node is atomic and cannot clobber anybody else.
+            async function persistUserIpRequest(username, user, ip) {
+                var fields = {
+                    pendingIps: user.pendingIps || [],
+                    approvedIps: user.approvedIps || [],
+                    deniedIps: user.deniedIps || [],
+                    ip: ip || user.ip || '',
+                    lastIpRequest: user.lastIpRequest || getNowISO()
+                };
+                var merged = Object.assign({}, user, fields);
+                try { await writeData('users/' + username, merged, 'ph_user_' + username); } catch (_) {}
+                try {
+                    var all = (STATE._cache && STATE._cache['users_ph_users']) || {};
+                    if (!Object.keys(all).length) all = JSON.parse(localStorage.getItem('ph_users') || '{}') || {};
+                    all[username] = Object.assign({}, all[username] || {}, merged);
+                    STATE._cache['users_ph_users'] = all;
+                    localStorage.setItem('ph_users', JSON.stringify(all));
+                } catch (_) {}
             }
 
             // Persists one user WITHOUT clobbering the whole user map.
@@ -4107,7 +4171,10 @@
                         if (user.pendingIps.indexOf(ip) === -1) user.pendingIps.push(ip);
                         user.lastIpRequest = getNowISO();
                         user.ip = ip;
-                        await persistUserRecord(username, user);
+                        // Child-only write: never rewrites the whole users map,
+                        // so a concurrent request from another agent cannot
+                        // erase this pending IP.
+                        await persistUserIpRequest(username, user, ip);
                         await logLoginEvent(username, ip, 'pending', 'IP awaiting admin approval');
                         showToast('Waiting for admin to approve your IP address.', 'warning');
                         return { __pendingApproval: true, username: username, ip: ip };
@@ -4391,6 +4458,25 @@
                 } catch (_) {}
             }
 
+            // Resolve an awaited value, but never let a Firebase promise hang
+            // forever. When the database is unreachable (offline, file:// origin,
+            // rules, throttling) the SDK simply retries with backoff and the
+            // await never settles - which is why the history row actions used to
+            // look completely dead: no modal, no toast, no error.
+            function _awaitWithTimeout(promise, ms) {
+                return new Promise(function (resolve) {
+                    var settled = false;
+                    var timer = setTimeout(function () {
+                        if (!settled) { settled = true; resolve(undefined); }
+                    }, ms);
+                    Promise.resolve(promise).then(function (v) {
+                        if (!settled) { settled = true; clearTimeout(timer); resolve(v); }
+                    }, function () {
+                        if (!settled) { settled = true; clearTimeout(timer); resolve(undefined); }
+                    });
+                });
+            }
+
             // Fetch the COMPLETE quote (photos included) for one id.
             async function getFullQuote(id) {
                 try {
@@ -4399,8 +4485,8 @@
                 } catch (_) {}
                 if (firebaseConnected && db) {
                     try {
-                        var snap = await db.ref('quotes/' + id).once('value');
-                        var v = snap.val();
+                        var snap = await _awaitWithTimeout(db.ref('quotes/' + id).once('value'), 20000);
+                        var v = snap && typeof snap.val === 'function' ? snap.val() : null;
                         if (v) {
                             try {
                                 STATE._cache['quotes_ph_quotes_list'] = STATE._cache['quotes_ph_quotes_list'] || {};
@@ -4412,8 +4498,23 @@
                 }
                 try {
                     var all = JSON.parse(localStorage.getItem('ph_quotes_list') || '{}');
-                    return all[id] || null;
-                } catch (_) { return null; }
+                    if (all && all[id]) return all[id];
+                } catch (_) {}
+                // Last resort: the slim index. It carries no photos, but it still
+                // lets the quote open, be edited, duplicated or deleted. Returning
+                // null here is what made every row button appear broken.
+                try {
+                    var idx2 = (STATE._cache && STATE._cache['quotesIndex_ph_quotes_index']) || null;
+                    if (!idx2) idx2 = JSON.parse(localStorage.getItem('ph_quotes_index') || '{}');
+                    // _phPartial marks a summary-only record: it is safe to LOOK AT
+                    // but must never be saved back, or the hotel photos would be lost.
+                    if (idx2 && idx2[id]) return Object.assign({}, idx2[id], { _phPartial: true });
+                    if (Array.isArray(STATE.quotes)) {
+                        var sum = STATE.quotes.filter(function (q) { return q && String(q.id) === String(id); })[0];
+                        if (sum) return Object.assign({}, sum, { _phPartial: true });
+                    }
+                } catch (_) {}
+                return null;
             }
 
             async function loadQuotes(bypassCache) {
@@ -4436,11 +4537,13 @@
                 // Confirm it exists via the slim index - reading the full
                 // collection here would download hundreds of MB just to check
                 // one key.
-                var idx = await readData('quotesIndex', 'ph_quotes_index', true) || {};
+                var idx = await _awaitWithTimeout(readData('quotesIndex', 'ph_quotes_index', true), 15000) || {};
+                if (!Object.keys(idx).length) idx = (STATE._cache && STATE._cache['quotesIndex_ph_quotes_index']) || {};
+                if (!Object.keys(idx).length) { try { idx = JSON.parse(localStorage.getItem('ph_quotes_index') || '{}'); } catch (_) { idx = {}; } }
                 if (!idx[id]) { showToast('Quote not found.', 'error'); return false; }
                 // Remove ONLY this child in Firebase (non-destructive to siblings)
                 // then reconcile the local list.
-                await removeData('quotes/' + id, null);
+                await _awaitWithTimeout(removeData('quotes/' + id, null), 15000);
                 try {
                     var ls = JSON.parse(localStorage.getItem('ph_quotes_list') || '{}');
                     if (ls && ls[id]) { delete ls[id]; localStorage.setItem('ph_quotes_list', JSON.stringify(ls)); }
@@ -4455,12 +4558,14 @@
                 _forgetDraftIfDeleted(ids);
                 // Same as deleteQuote: check membership against the index so a
                 // bulk delete does not pull the whole (photo-laden) collection.
-                var idx = await readData('quotesIndex', 'ph_quotes_index', true) || {};
+                var idx = await _awaitWithTimeout(readData('quotesIndex', 'ph_quotes_index', true), 15000) || {};
+                if (!Object.keys(idx).length) idx = (STATE._cache && STATE._cache['quotesIndex_ph_quotes_index']) || {};
+                if (!Object.keys(idx).length) { try { idx = JSON.parse(localStorage.getItem('ph_quotes_index') || '{}'); } catch (_) { idx = {}; } }
                 var deleted = 0;
                 for (var i = 0; i < ids.length; i++) {
                     var id = ids[i];
                     if (idx[id]) {
-                        await removeData('quotes/' + id, null);
+                        await _awaitWithTimeout(removeData('quotes/' + id, null), 15000);
                         deleted++;
                     }
                 }
@@ -7822,6 +7927,26 @@
             }
 
             function initDashboard() {
+                // Delegate on the grid as well as binding each card. Several
+                // layers redraw the dashboard while the app is running, and any
+                // redraw destroys the per-card listeners, so a card can end up
+                // needing two or three clicks before it opens. Listening on the
+                // grid itself means a card works no matter how often the markup
+                // is rebuilt. The guard inside handleDashAction() stops the
+                // delegated and per-card listeners from both firing.
+                try {
+                    var grid = document.getElementById('dashGrid');
+                    if (grid && !grid.__phDashDelegated) {
+                        grid.__phDashDelegated = true;
+                        grid.addEventListener('click', function(e) {
+                            var card = e.target && e.target.closest ? e.target.closest('.dash-card') : null;
+                            if (!card) return;
+                            var action = card.dataset.action;
+                            if (!action) return;
+                            handleDashAction(action);
+                        });
+                    }
+                } catch (_) {}
                 document.querySelectorAll('.dash-card').forEach(function(card) {
                     card.addEventListener('click', function() {
                         var action = this.dataset.action;
@@ -7830,7 +7955,16 @@
                 });
             }
 
+            // One physical click can now be seen by both the per-card listener
+            // and the grid delegate, so ignore a repeat of the same action
+            // within a short window.
+            var _hdaGuard = { a: null, t: 0 };
             function handleDashAction(action) {
+                try {
+                    var _t = Date.now();
+                    if (_hdaGuard.a === action && (_t - _hdaGuard.t) < 400) return;
+                    _hdaGuard = { a: action, t: _t };
+                } catch (_) {}
                 switch (action) {
                     case 'newQuote':
                         if (!hasPermission('canCreateQuotes') && !isAdmin()) {
@@ -9047,8 +9181,13 @@
             }
 
             async function loadQuoteForEdit(id) {
+                showToast('Opening quote…', 'info');
                 var q = await getFullQuote(id);
                 if (!q) { showToast('Quote not found.', 'error'); return; }
+                if (q._phPartial) {
+                    showToast('Could not download this quote from the database, so editing is blocked to avoid saving over the hotel photos. Check your connection and try again.', 'error');
+                    return;
+                }
                 STATE.currentQuote = { ...q };
                 STATE.editingQuoteId = id;
                 STATE.isNewQuote = false;
@@ -9062,11 +9201,15 @@
             }
 
             async function loadQuoteForView(id) {
+                // Show something immediately: fetching a quote with photos can
+                // take a while, and a dead-looking button is worse than a spinner.
+                showModal('<h3>Quote</h3><p class="text-muted">Loading quote…</p><div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>');
                 var q = await getFullQuote(id);
-                if (!q) { showToast('Quote not found.', 'error'); return; }
+                if (!q) { showToast('Quote not found.', 'error'); closeModal(); return; }
                 var html = buildQuotePDFHTML(q, STATE.branding || {}, STATE.quoteConditions || '');
                 showModal(
-                    '<h3>Quote #' + q.quoteNumber +
+                    (q._phPartial ? '<p class="text-muted text-sm" style="margin:0 0 8px;">Showing stored details only — the full quote (with photos) could not be downloaded. Check your connection to view it completely.</p>' : '') +
+                    '<h3>Quote #' + (q.quoteNumber || q.quoteNum || '') +
                     // class="pdf-safe" — this is the SAME markup that becomes the PDF,
                     // so on screen it inherited the custom-theme's white body text and
                     // the labels vanished against the white paper. The .pdf-safe rules
@@ -9092,8 +9235,13 @@
             }
 
             async function duplicateQuote(id) {
+                showToast('Duplicating quote…', 'info');
                 var q = await getFullQuote(id);
                 if (!q) { showToast('Quote not found.', 'error'); return; }
+                if (q._phPartial) {
+                    showToast('Could not download this quote from the database, so it cannot be duplicated. Check your connection and try again.', 'error');
+                    return;
+                }
                 var copy = { ...q, id: null, quoteNumber: generateQuoteNumber(), status: 'draft' };
                 delete copy.id;
                 STATE.currentQuote = copy;
@@ -30996,6 +31144,6 @@ body.theme-custom .ph-quote-white{
     try { console.info('[repaint-guard] active'); } catch (_) {}
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3eaeba81fbf38c4',t:'MTc5MDAxMzExMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
 
