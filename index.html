@@ -10705,7 +10705,6 @@
                     checkInDate: '',
                     checkOutDate: '',
                     passengerCount: '',
-                    mealPlan: '',
                     terms: '',
                     status: 'Saved',
                     createdAt: getNowISO(),
@@ -10732,7 +10731,6 @@
                     checkInDate: document.getElementById('hvCheckInDate').value || '',
                     checkOutDate: document.getElementById('hvCheckOutDate').value || '',
                     passengerCount: (document.getElementById('hvPassengerCount').value || '').trim(),
-                    mealPlan: (document.getElementById('hvMealPlan') ? document.getElementById('hvMealPlan').value : '').trim(),
                     terms: document.getElementById('hvTerms').value || '',
                     status: document.getElementById('hvStatus').value || 'Saved',
                     createdAt: existing.createdAt || now,
@@ -10793,7 +10791,6 @@
                         '<div class="form-group"><label>Hotel Name <span class="required">*</span></label><input type="text" id="hvHotelName" value="' + escapeHTML(v.hotelName) + '" /></div>' +
                         '<div class="form-group" style="grid-column:1/-1;"><label>Hotel Complete Address</label><textarea id="hvHotelAddress" rows="3" placeholder="Full hotel address, city, postcode, country" style="min-height:90px;resize:vertical;">' + escapeHTML(v.hotelAddress || '') + '</textarea></div>' +
                         '<div class="form-group"><label>Room Type</label><input type="text" id="hvRoomType" value="' + escapeHTML(v.roomType) + '" /></div>' +
-                        '<div class="form-group"><label>Meal Plan</label><input type="text" id="hvMealPlan" value="' + escapeHTML(v.mealPlan || '') + '" placeholder="e.g. Room Only, Bed & Breakfast, Half Board, All Inclusive" /></div>' +
                         '<div class="form-group"><label>Hotel Confirmation Number</label><input type="text" id="hvConfirmationNumber" value="' + escapeHTML(v.hotelConfirmationNumber) + '" /></div>' +
                         '<div class="form-group"><label>Check-in Date</label><input type="date" id="hvCheckInDate" value="' + escapeHTML(v.checkInDate) + '" /></div>' +
                         '<div class="form-group"><label>Check-out Date</label><input type="date" id="hvCheckOutDate" value="' + escapeHTML(v.checkOutDate) + '" /></div>' +
@@ -10851,78 +10848,22 @@
                 })();
             }
 
-            /* The voucher layout. The company logo (whatever is saved in Brand
-               Settings) sits above the title; every heading that appears in the
-               voucher tab prints the value typed into its box straight after the
-               colon — no placeholder rules anywhere. */
             function hotelVoucherPreviewHTML(v) {
                 var brand = STATE.branding || {};
-                var logo = brand.logo || (document.getElementById('appLogo') && document.getElementById('appLogo').src) || '';
-                var NAVY = '#152d53', INK = '#16213a', MUTED = '#6b7280', LINE = '#d7dee9';
-                var company = escapeHTML(brand.companyName || 'Plan Holidays');
-
-                function dash(x) {
-                    return escapeHTML((x === undefined || x === null || String(x).trim() === '') ? '\u2014' : x);
-                }
-                function bar(title) {
-                    return '<div style="background:' + NAVY + ';color:#fff;font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;text-align:center;padding:9px 12px;border-radius:4px;margin:22px 0 14px;">' + escapeHTML(title) + '</div>';
-                }
-                // Value printed on the same line as its heading.
-                function inline(pairs) {
-                    return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 26px;margin-bottom:13px;">' +
-                        pairs.map(function (p) {
-                            return '<div style="display:flex;gap:7px;align-items:baseline;flex-wrap:wrap;">' +
-                                '<span style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:' + MUTED + ';white-space:nowrap;">' + escapeHTML(p[0]) + '</span>' +
-                                '<span style="font-size:13.5px;font-weight:700;color:' + INK + ';word-break:break-word;">' + dash(p[1]) + '</span>' +
-                                '</div>';
-                        }).join('') + '</div>';
-                }
-                // Value printed on the line underneath its heading.
-                function stacked(pairs) {
-                    return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 26px;margin-bottom:14px;">' +
-                        pairs.map(function (p) {
-                            return '<div>' +
-                                '<div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:' + MUTED + ';">' + escapeHTML(p[0]) + '</div>' +
-                                '<div style="margin-top:3px;font-size:13.5px;font-weight:700;color:' + INK + ';word-break:break-word;">' + dash(p[1]) + '</div>' +
-                                '</div>';
-                        }).join('') + '</div>';
-                }
-                function stayItem(icon, label, value) {
-                    return '<div style="text-align:center;">' +
-                        '<div style="color:' + NAVY + ';font-size:19px;line-height:1;margin-bottom:7px;"><i class="fas ' + icon + '"></i></div>' +
-                        '<div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:' + MUTED + ';">' + escapeHTML(label) + '</div>' +
-                        '<div style="margin-top:4px;font-size:13.5px;font-weight:700;color:' + INK + ';word-break:break-word;">' + dash(value) + '</div>' +
-                        '</div>';
-                }
-                var agent = v.createdByName || v.createdBy || '';
-                var terms = (v.terms && String(v.terms).trim()) ? v.terms : '\u2014';
-                var contactBits = [brand.address, brand.telephone, brand.email, brand.website].filter(Boolean).join('   |   ');
-
-                return '<div style="background:#fff;color:' + INK + ';font-family:Segoe UI,Helvetica,Arial,sans-serif;padding:26px 30px 18px;border:1px solid ' + LINE + ';border-radius:8px;">' +
-                    (logo
-                        ? '<div style="text-align:center;margin-bottom:14px;"><img src="' + escapeHTML(logo) + '" alt="' + company + '" style="max-width:260px;max-height:110px;object-fit:contain;" /></div>'
-                        : '<div style="text-align:center;font-size:22px;font-weight:800;color:' + NAVY + ';letter-spacing:.06em;margin-bottom:14px;">' + company + '</div>') +
-                    '<div style="text-align:center;font-size:clamp(19px,3.4vw,30px);font-weight:800;letter-spacing:.09em;color:' + NAVY + ';margin:0 0 4px;line-height:1.15;">HOTEL CONFIRMATION VOUCHER</div>' +
-                    bar('Booking Summary') +
-                    inline([['Voucher Number:', v.voucherNumber], ['Customer Name:', v.customerName]]) +
-                    inline([['Invoice Number:', v.invoiceNumber], ['Email Address:', v.customerEmail]]) +
-                    inline([['Issue Date:', formatDateDisplay(v.createdAt || getToday())], ['Contact Number:', v.customerPhone]]) +
-                    inline([['Status:', v.status || 'Saved'], ['Agent:', agent]]) +
-                    bar('Accommodation Details') +
-                    stacked([['Hotel Name:', v.hotelName], ['Room Type:', v.roomType]]) +
-                    stacked([['Complete Address:', v.hotelAddress], ['Confirmation Number:', v.hotelConfirmationNumber]]) +
-                    bar('Stay Information') +
-                    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:6px;">' +
-                        stayItem('fa-calendar-days', 'Check-in Date:', formatDateDisplay(v.checkInDate)) +
-                        stayItem('fa-calendar-days', 'Check-out Date:', formatDateDisplay(v.checkOutDate)) +
-                        stayItem('fa-users', 'Guests:', v.passengerCount) +
-                        stayItem('fa-utensils', 'Meal Plan:', v.mealPlan) +
-                    '</div>' +
-                    '<div style="text-align:center;font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:' + NAVY + ';margin:26px 0 8px;">Booking Terms &amp; Conditions</div>' +
-                    '<div style="font-size:12px;line-height:1.75;color:#26303f;white-space:pre-wrap;word-break:break-word;">' + escapeHTML(terms) + '</div>' +
-                    '<div style="margin-top:22px;padding-top:12px;border-top:1px solid ' + LINE + ';text-align:center;font-size:10.5px;color:' + MUTED + ';line-height:1.6;">' +
-                        (contactBits ? escapeHTML(contactBits) + '<br/>' : '') +
-                        'Thank you for choosing ' + company + '. This voucher is computer generated and does not require a signature.' +
+                var logo = brand.logo || document.getElementById('appLogo').src || '';
+                function row(label, value) { return '<div class="voucher-preview-row"><div class="voucher-preview-label">' + label + '</div><div class="voucher-preview-value">' + escapeHTML(value || '—') + '</div></div>'; }
+                return '<div class="voucher-preview-card">' +
+                    '<div class="voucher-preview-head"><img class="voucher-preview-logo" src="' + escapeHTML(logo) + '" alt="Company Logo" />' +
+                    '<div><h3 style="margin:0;color:#172033;">' + escapeHTML(brand.companyName || 'Plan Holidays') + '</h3>' +
+                    '<div style="color:#61576a;font-size:.88rem;line-height:1.55;">' + escapeHTML(brand.address || 'London, UK') + '<br>' + escapeHTML(brand.telephone || '') + ' · ' + escapeHTML(brand.email || '') + (brand.website ? '<br>' + escapeHTML(brand.website) : '') + '</div></div>' +
+                    '<div class="voucher-preview-title">HOTEL VOUCHER</div></div>' +
+                    '<div class="voucher-preview-body">' +
+                    '<div class="voucher-preview-grid">' +
+                    '<div class="voucher-preview-section"><h4>Voucher Details</h4>' + row('Voucher Number', v.voucherNumber) + row('Invoice Number', v.invoiceNumber) + row('Issue Date', formatDateDisplay(v.createdAt || getToday())) + row('Status', v.status || 'Saved') + '</div>' +
+                    '<div class="voucher-preview-section"><h4>Customer Details</h4>' + row('Customer Name', v.customerName) + row('Email Address', v.customerEmail) + row('Contact Number', v.customerPhone) + '</div>' +
+                    '<div class="voucher-preview-section" style="grid-column:1/-1;"><h4>Hotel Details</h4>' + row('Hotel Name', v.hotelName) + row('Hotel Complete Address', v.hotelAddress) + row('Room Type', v.roomType) + row('Hotel Confirmation No.', v.hotelConfirmationNumber) + row('Check-in Date', formatDateDisplay(v.checkInDate)) + row('Check-out Date', formatDateDisplay(v.checkOutDate)) + row('Number of Passengers', v.passengerCount) + '</div>' +
+                    '</div><div class="voucher-preview-section voucher-terms-section"><h4>Terms & Conditions</h4><div class="voucher-preview-terms">' + escapeHTML(v.terms || '—') + '</div></div>' +
+                    '<div style="margin-top:16px;color:#61576a;font-size:.86rem;text-align:center;">Thank you for choosing ' + escapeHTML(brand.companyName || 'Plan Holidays') + '. This voucher is computer generated and does not require a signature.</div>' +
                     '</div></div>';
             }
 
@@ -11090,62 +11031,6 @@
                 return 'JPEG';
             }
 
-            /* Small line icons for the Stay Information row. They are drawn on a
-               canvas and handed to jsPDF as PNGs, which keeps them crisp and
-               avoids depending on any external asset. Purely decorative — if a
-               browser refuses the canvas the voucher is laid out without them. */
-            function hotelVoucherIconPng(kind, rgb) {
-                var S = 128, pad = 14;
-                try {
-                    var cv = document.createElement('canvas');
-                    cv.width = S; cv.height = S;
-                    var g = cv.getContext('2d');
-                    if (!g) return '';
-                    var col = 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
-                    g.strokeStyle = col; g.fillStyle = col;
-                    g.lineWidth = 7; g.lineCap = 'round'; g.lineJoin = 'round';
-                    var a = pad, b = S - pad, w = b - a, h = b - a;
-                    if (kind === 'calendar') {
-                        g.beginPath();
-                        if (g.roundRect) g.roundRect(a, a + 20, w, h - 20, 14); else g.rect(a, a + 20, w, h - 20);
-                        g.stroke();
-                        g.beginPath(); g.moveTo(a + 24, a + 4); g.lineTo(a + 24, a + 30); g.stroke();
-                        g.beginPath(); g.moveTo(b - 24, a + 4); g.lineTo(b - 24, a + 30); g.stroke();
-                        g.beginPath(); g.moveTo(a + 3, a + 46); g.lineTo(b - 3, a + 46); g.stroke();
-                        for (var r = 0; r < 2; r++) {
-                            for (var c = 0; c < 3; c++) {
-                                g.beginPath();
-                                g.arc(a + 24 + c * ((w - 48) / 2), a + 64 + r * 20, 5, 0, Math.PI * 2);
-                                g.fill();
-                            }
-                        }
-                    } else if (kind === 'users') {
-                        g.beginPath(); g.arc(a + 28, a + 30, 14, 0, Math.PI * 2); g.stroke();
-                        g.beginPath(); g.moveTo(a + 4, b); g.quadraticCurveTo(a + 28, a + 54, a + 52, b); g.stroke();
-                        g.beginPath(); g.arc(a + 60, a + 24, 18, 0, Math.PI * 2); g.stroke();
-                        g.beginPath(); g.moveTo(a + 28, b); g.quadraticCurveTo(a + 64, a + 48, b - 6, b); g.stroke();
-                    } else if (kind === 'utensils') {
-                        g.beginPath();
-                        g.moveTo(a + 12, a + 2); g.lineTo(a + 12, a + 40);
-                        g.moveTo(a + 30, a + 2); g.lineTo(a + 30, a + 40);
-                        g.moveTo(a + 48, a + 2); g.lineTo(a + 48, a + 40);
-                        g.stroke();
-                        g.beginPath();
-                        if (g.roundRect) g.roundRect(a + 4, a + 38, 52, 14, 7); else g.rect(a + 4, a + 38, 52, 14);
-                        g.stroke();
-                        g.beginPath(); g.moveTo(a + 30, a + 52); g.lineTo(a + 30, b); g.stroke();
-                        g.beginPath();
-                        g.moveTo(b - 14, a + 2);
-                        g.quadraticCurveTo(b - 42, a + 26, b - 14, a + 58);
-                        g.stroke();
-                        g.beginPath(); g.moveTo(b - 14, a + 56); g.lineTo(b - 14, b); g.stroke();
-                    } else {
-                        return '';
-                    }
-                    return cv.toDataURL('image/png');
-                } catch (_) { return ''; }
-            }
-
             async function downloadHotelVoucherPDF(v) {
                 if (!canDownloadHotelVoucher(v)) { showToast('You do not have permission to download this voucher.', 'error'); return; }
                 // PDF engine is fetched on first use (see phLoadPdfLibs).
@@ -11162,204 +11047,89 @@
                 if (!jsPDFCtor) {
                     var el = document.createElement('div');
                     el.innerHTML = hotelVoucherPreviewHTML(v);
-                    await html2pdf().set({ margin: [10, 10, 14, 10], filename: 'Hotel_Voucher_' + (v.voucherNumber || 'voucher') + '.pdf', html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['css', 'legacy'] } }).from(el).save();
+                    await html2pdf().set({ margin: [10, 10, 14, 10], filename: 'Hotel_Voucher_' + (v.voucherNumber || 'voucher') + '.pdf', html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['css', 'legacy'], avoid: ['.voucher-preview-row'] } }).from(el).save();
                     return;
                 }
                 var pdf = new jsPDFCtor({ unit: 'pt', format: 'a4', orientation: 'portrait' });
                 var pageW = pdf.internal.pageSize.getWidth();
                 var pageH = pdf.internal.pageSize.getHeight();
-                var margin = 40;
-                var contentW = pageW - margin * 2;
-                var bottom = pageH - 84;          // keep clear of the footer rule
-                var NAVY = [21, 45, 83];          // section bars + title
-                var INK = [22, 33, 58];           // the values themselves
-                var LABEL = [107, 114, 128];      // the small headings
-                var RULE = [215, 222, 233];       // hairlines
-                var y = 0;
-
-                // jsPDF centres text using the width measured *before* letter
-                // spacing is added, so anything drawn with charSpace lands half
-                // the total spacing to the right. This nudges it back so the
-                // title, the section bars and the terms heading sit dead centre.
-                function centred(text, cy, size, weight, colour, cs) {
-                    cs = cs || 0;
-                    var str = String(text);
-                    pdf.setFont('helvetica', weight); pdf.setFontSize(size); pdf.setTextColor.apply(pdf, colour);
-                    pdf.text(str, pageW / 2 - (str.length * cs) / 2, cy, { align: 'center', charSpace: cs });
-                }
-
-                /* ---- masthead: the brand logo, larger, above the title ----
-                   Repeated at the top of every page so a multi-page voucher
-                   still reads as one document. */
-                function drawMasthead() {
-                    var yy = 42;
+                var margin = 44, bottom = pageH - 116, y = 146;
+                var gold = [42, 123, 196], gold2 = [10, 63, 119], dark = [18, 39, 68], muted = [82, 103, 132], light = [255, 255, 255], border = [181, 211, 238];
+                function header() {
+                    pdf.setFillColor(255, 255, 255); pdf.rect(0, 0, pageW, pageH, 'F');
+                    pdf.setDrawColor.apply(pdf, border); pdf.setLineWidth(1.1); pdf.roundedRect(28, 24, pageW - 56, pageH - 58, 12, 12, 'S');
+                    pdf.setFillColor.apply(pdf, light); pdf.roundedRect(margin, 28, pageW - margin * 2, 92, 14, 14, 'F');
+                    pdf.setDrawColor.apply(pdf, gold); pdf.setLineWidth(1.4); pdf.roundedRect(margin, 28, pageW - margin * 2, 92, 14, 14, 'S');
                     var logo = brand.logo || (document.getElementById('appLogo') && document.getElementById('appLogo').src) || '';
-                    var placed = false;
-                    // Only PNG / JPEG survive jsPDF — anything else falls back
-                    // to the company name set in large type.
-                    if (logo && /^data:image\/(png|jpe?g)/i.test(logo)) {
-                        try {
-                            var props = pdf.getImageProperties(logo);
-                            var scale = Math.min(240 / props.width, 92 / props.height);
-                            var w = props.width * scale, h = props.height * scale;
-                            pdf.addImage(logo, getHotelVoucherImageType(logo), (pageW - w) / 2, yy, w, h);
-                            yy += h + 14;
-                            placed = true;
-                        } catch (_) { placed = false; }
-                    }
-                    if (!placed) {
-                        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(18); pdf.setTextColor.apply(pdf, NAVY);
-                        pdf.text(safePdfText(brand.companyName || 'Plan Holidays'), pageW / 2, yy + 18, { align: 'center' });
-                        yy += 32;
-                    }
-                    centred('HOTEL CONFIRMATION VOUCHER', yy + 20, 24, 'bold', NAVY, 0.7);
-                    return yy + 44;
+                    try { if (logo && /^data:image\/(png|jpeg|jpg|webp)/i.test(logo)) pdf.addImage(logo, getHotelVoucherImageType(logo), margin + 20, 36, 124, 76); else throw new Error('fallback'); }
+                    catch (_) { pdf.setFillColor.apply(pdf, gold); pdf.roundedRect(margin + 20, 38, 116, 70, 10, 10, 'F'); pdf.setTextColor(255,255,255); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(30); pdf.text('PH', margin + 61, 82); }
+                    pdf.setTextColor.apply(pdf, gold2); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(25); pdf.text('HOTEL VOUCHER', pageW - margin - 18, 62, { align: 'right' });
+                    var headerInvoice = safePdfText(v.invoiceNumber || v.voucherNumber);
+                    pdf.setFillColor(255,255,255); pdf.setDrawColor.apply(pdf, gold); pdf.roundedRect(pageW - margin - 184, 82, 166, 24, 12, 12, 'FD');
+                    pdf.setTextColor.apply(pdf, gold2); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9.5); pdf.text(headerInvoice, pageW - margin - 101, 98, { align: 'center' });
                 }
-
-                function drawFooter() {
-                    pdf.setDrawColor.apply(pdf, RULE); pdf.setLineWidth(0.9);
-                    pdf.line(margin, pageH - 62, pageW - margin, pageH - 62);
-                    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7.8); pdf.setTextColor.apply(pdf, LABEL);
-                    var bits = [brand.address, brand.telephone, brand.email, brand.website].filter(Boolean);
-                    if (bits.length) {
-                        pdf.text(pdf.splitTextToSize(bits.join('   |   '), contentW), pageW / 2, pageH - 48, { align: 'center' });
-                    }
-                    pdf.text('Thank you for choosing ' + (brand.companyName || 'Plan Holidays') + '. This voucher is computer generated and does not require a signature.', pageW / 2, pageH - 36, { align: 'center' });
+                function footer() {
+                    pdf.setDrawColor.apply(pdf, border); pdf.line(margin, pageH - 90, pageW - margin, pageH - 90);
+                    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor.apply(pdf, muted);
+                    var support = 'Support: ' + (brand.email || 'info@planholidays.co.uk') + (brand.telephone ? ' | ' + brand.telephone : '');
+                    pdf.text(support, margin, pageH - 70);
+                    pdf.text(pdf.splitTextToSize('Thank you for choosing ' + (brand.companyName || 'Plan Holidays') + '. This voucher is computer generated and does not require a signature.', pageW - margin * 2 - 120), margin, pageH - 56);
                 }
-
-                // Set while the terms are being written so a page break in the
-                // middle of them is retitled rather than left dangling.
-                var inTerms = false;
+                var hotelVoucherTermsMode = false;
                 function newPage() {
-                    drawFooter();
+                    footer();
                     pdf.addPage();
-                    var ny = drawMasthead();
-                    if (inTerms) {
-                        centred('BOOKING TERMS & CONDITIONS (CONTINUED)', ny + 2, 11, 'bold', NAVY, 1);
-                        return ny + 20;
+                    header();
+                    if (hotelVoucherTermsMode) {
+                        var start = addHotelVoucherSectionTitle(pdf, 'Terms & Conditions (continued)', margin, 146, pageW - margin * 2, { gold: gold, dark: dark, border: border });
+                        pdf.setDrawColor.apply(pdf, border);
+                        pdf.roundedRect(margin, start - 8, pageW - margin * 2, Math.max(34, bottom - start + 12), 10, 10, 'S');
+                        return start + 10;
                     }
-                    return ny;
+                    return 146;
                 }
                 function ensure(h) { if (y + h > bottom) y = newPage(); }
-
-                // A full-width navy bar holding the section name.
-                function sectionBar(title) {
-                    ensure(58);
-                    pdf.setFillColor.apply(pdf, NAVY);
-                    pdf.rect(margin, y, contentW, 26, 'F');
-                    centred(String(title).toUpperCase(), y + 17.5, 11, 'bold', [255, 255, 255], 1.2);
-                    y += 26 + 18;
+                function sectionTitle(title) { ensure(40); y = addHotelVoucherSectionTitle(pdf, title, margin, y, pageW - margin * 2, { gold: gold, dark: dark, border: border }); }
+                function field(label, value, x, width) {
+                    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor.apply(pdf, muted); pdf.text(label, x, y);
+                    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10); pdf.setTextColor.apply(pdf, dark);
+                    var lines = pdf.splitTextToSize(String(value || '—'), width);
+                    pdf.text(lines, x, y + 13);
+                    return Math.max(30, 13 + (lines.length * 12));
                 }
-
-                // Two columns. The value is printed straight after its heading,
-                // in the place the old template left an empty rule.
-                function inlineRow(pairs) {
-                    ensure(46);
-                    var gap = 26;
-                    var colW = (contentW - gap) / 2;
-                    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.6);
-                    var labelW = 0;
-                    pairs.forEach(function (p) {
-                        labelW = Math.max(labelW, pdf.getTextWidth(String(p[0]).toUpperCase()));
-                    });
-                    labelW += 9;
-                    var valW = Math.max(44, colW - labelW - 4);
-                    var rowH = 0;
-                    pairs.forEach(function (p, i) {
-                        var x = margin + (i ? (colW + gap) : 0);
-                        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.6); pdf.setTextColor.apply(pdf, LABEL);
-                        pdf.text(String(p[0]).toUpperCase(), x, y + 9);
-                        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9.4); pdf.setTextColor.apply(pdf, INK);
-                        var lines = pdf.splitTextToSize(safePdfText(p[1]), valW);
-                        if (lines.length > 2) lines = lines.slice(0, 2);
-                        pdf.text(lines, x + labelW, y + 9);
-                        rowH = Math.max(rowH, 13 + lines.length * 10.4);
-                    });
-                    y += Math.max(21, rowH) + 12;
+                function twoCol(a, b) {
+                    ensure(68); var w = (pageW - margin * 2 - 18) / 2; var h = 56;
+                    drawHotelVoucherBox(pdf, margin, y, w, h, a[0], a[1], { gold: gold, dark: dark, border: border, fill: [247, 251, 255] });
+                    drawHotelVoucherBox(pdf, margin + w + 18, y, w, h, b[0], b[1], { gold: gold, dark: dark, border: border, fill: [247, 251, 255] });
+                    y += h + 12;
                 }
-
-                // Two columns, value on the line beneath its heading — used for
-                // the longer fields such as the hotel address.
-                function stackedRow(pairs, maxLines) {
-                    ensure(64);
-                    var gap = 26;
-                    var colW = (contentW - gap) / 2;
-                    var cap = maxLines || 3;
-                    var rowH = 0;
-                    pairs.forEach(function (p, i) {
-                        var x = margin + (i ? (colW + gap) : 0);
-                        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.6); pdf.setTextColor.apply(pdf, LABEL);
-                        pdf.text(String(p[0]).toUpperCase(), x, y + 9);
-                        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9.6); pdf.setTextColor.apply(pdf, INK);
-                        var lines = pdf.splitTextToSize(safePdfText(p[1]), colW - 4);
-                        if (lines.length > cap) lines = lines.slice(0, cap);
-                        pdf.text(lines, x, y + 23);
-                        rowH = Math.max(rowH, 23 + lines.length * 11.4);
-                    });
-                    y += Math.max(37, rowH) + 14;
-                }
-
-                // Four equal columns, each with an icon, a heading and a value.
-                function stayRow(items) {
-                    ensure(96);
-                    var colW = contentW / 4;
-                    var rowH = 0;
-                    items.forEach(function (it, i) {
-                        var cx = margin + colW * i + colW / 2;
-                        var icon = hotelVoucherIconPng(it[2], NAVY);
-                        if (icon) {
-                            try { pdf.addImage(icon, 'PNG', cx - 11, y, 22, 22); }
-                            catch (_) { /* decorative only — carry on without it */ }
-                        }
-                        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.4); pdf.setTextColor.apply(pdf, LABEL);
-                        pdf.text(String(it[0]).toUpperCase(), cx, y + 36, { align: 'center' });
-                        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9.6); pdf.setTextColor.apply(pdf, INK);
-                        var lines = pdf.splitTextToSize(safePdfText(it[1]), colW - 10);
-                        if (lines.length > 2) lines = lines.slice(0, 2);
-                        pdf.text(lines, cx, y + 50, { align: 'center' });
-                        rowH = Math.max(rowH, 50 + lines.length * 11.4);
-                    });
-                    y += Math.max(63, rowH) + 10;
-                }
-
-                y = drawMasthead();
-
-                sectionBar('Booking Summary');
-                inlineRow([['Voucher Number:', v.voucherNumber], ['Customer Name:', v.customerName]]);
-                inlineRow([['Invoice Number:', v.invoiceNumber], ['Email Address:', v.customerEmail]]);
-                inlineRow([['Issue Date:', formatDateDisplay(v.createdAt || getToday())], ['Contact Number:', v.customerPhone]]);
-                inlineRow([['Status:', v.status || 'Saved'], ['Agent:', v.createdByName || v.createdBy || '']]);
-
-                sectionBar('Accommodation Details');
-                stackedRow([['Hotel Name:', v.hotelName], ['Room Type:', v.roomType]]);
-                stackedRow([['Complete Address:', v.hotelAddress], ['Confirmation Number:', v.hotelConfirmationNumber]], 4);
-
-                sectionBar('Stay Information');
-                stayRow([
-                    ['Check-in Date:', formatDateDisplay(v.checkInDate), 'calendar'],
-                    ['Check-out Date:', formatDateDisplay(v.checkOutDate), 'calendar'],
-                    ['Guests:', v.passengerCount, 'users'],
-                    ['Meal Plan:', v.mealPlan, 'utensils']
-                ]);
-
-                // Terms come straight from the Terms & Conditions box in the
-                // voucher tab and flow onto further pages when they overflow.
-                ensure(48);
-                centred('BOOKING TERMS & CONDITIONS', y + 10, 11, 'bold', NAVY, 1);
-                y += 26;
-                pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9.2); pdf.setTextColor(38, 48, 63);
-                inTerms = true;
-                y = addHotelVoucherPdfText(pdf, (v.terms && String(v.terms).trim()) ? v.terms : '\u2014', margin, y + 6, {
-                    maxWidth: contentW, lineHeight: 13.2, bottom: bottom, newPage: newPage
-                });
-                inTerms = false;
-
-                drawFooter();
+                header();
+                sectionTitle('Voucher Details');
+                twoCol(['Voucher Number', v.voucherNumber], ['Invoice Number', v.invoiceNumber]);
+                twoCol(['Issue Date', formatDateDisplay(v.createdAt || getToday())], ['Status', v.status || 'Saved']);
+                sectionTitle('Customer Details');
+                twoCol(['Customer Name', v.customerName], ['Email Address', v.customerEmail]);
+                twoCol(['Contact Number', v.customerPhone], ['Agent', v.createdByName || v.createdBy || '']);
+                sectionTitle('Hotel Details');
+                var hotelFull = safePdfText(v.hotelName) + (v.hotelAddress ? '\n' + v.hotelAddress : '');
+                ensure(82);
+                var hotelBoxH = drawHotelVoucherFullBox(pdf, margin, y, pageW - margin * 2, 'Hotel Name & Complete Address', hotelFull, { gold: gold, dark: dark, border: border, fill: [247, 251, 255] });
+                y += hotelBoxH + 12;
+                twoCol(['Room Type', v.roomType], ['Hotel Confirmation Number', v.hotelConfirmationNumber]);
+                twoCol(['Check-in Date', formatDateDisplay(v.checkInDate)], ['Check-out Date', formatDateDisplay(v.checkOutDate)]);
+                twoCol(['Number of Passengers', v.passengerCount], ['Voucher Status', v.status || 'Saved']);
+                sectionTitle('Terms & Conditions');
+                pdf.setDrawColor.apply(pdf, border); pdf.setFillColor(247, 251, 255);
+                pdf.roundedRect(margin, y - 8, pageW - margin * 2, Math.max(34, bottom - y + 12), 10, 10, 'S');
+                pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9.4); pdf.setTextColor(25, 45, 70);
+                hotelVoucherTermsMode = true;
+                y = addHotelVoucherPdfText(pdf, v.terms || '—', margin + 14, y + 10, { maxWidth: pageW - margin * 2 - 28, lineHeight: 13.4, bottom: bottom, newPage: newPage });
+                hotelVoucherTermsMode = false;
+                footer();
                 var total = pdf.internal.getNumberOfPages();
                 for (var i = 1; i <= total; i++) {
-                    pdf.setPage(i);
-                    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7.6); pdf.setTextColor.apply(pdf, LABEL);
-                    pdf.text('Page ' + i + ' of ' + total, pageW - margin, pageH - 22, { align: 'right' });
+                    pdf.setPage(i); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor.apply(pdf, muted);
+                    pdf.text('Page ' + i + ' of ' + total, pageW - margin, pageH - 56, { align: 'right' });
                 }
                 pdf.save('Hotel_Voucher_' + (v.voucherNumber || 'voucher') + '.pdf');
             }
@@ -28846,19 +28616,6 @@ body.theme-custom .ph-quote-white{
 .ph-pr-month:hover{background:linear-gradient(135deg,rgba(184,134,11,.24),rgba(184,134,11,.10));}
 .ph-pr-month-name{font-weight:800;font-size:1rem;}
 .ph-pr-month-sub{font-size:.78rem;opacity:.75;}
-/* Month tile wrapper — hosts the small delete button in the top-right corner. */
-.ph-pr-month-wrap{position:relative;display:block;}
-.ph-pr-month-wrap .ph-pr-month{width:100%;padding-right:36px;}
-.ph-pr-month-del{
-    position:absolute;top:6px;right:6px;width:26px;height:26px;padding:0;
-    display:flex;align-items:center;justify-content:center;
-    border:0;border-radius:50%;background:rgba(220,38,38,.92);color:#fff;
-    font-size:.7rem;line-height:1;cursor:pointer;opacity:0;
-    transition:opacity .15s ease;box-shadow:0 3px 8px rgba(0,0,0,.18);
-}
-.ph-pr-month-wrap:hover .ph-pr-month-del,.ph-pr-month-del:focus{opacity:1;}
-/* Currency symbol shown in front of an expense amount. */
-.exp-cursym{margin-right:3px;font-weight:700;opacity:.8;}
 
 /* Tables */
 .ph-pr-table{width:100%;border-collapse:collapse;margin:10px 0;}
@@ -29137,36 +28894,6 @@ body.theme-custom .ph-quote-white{
         }
         return out;
     }
-    // Months the admin has deleted. Remembered so a deleted month stays off the
-    // list instead of reappearing through the rolling 15-month window. Adding
-    // the month again clears the entry.
-    function getDeletedMonths(){
-        try {
-            var arr = JSON.parse(localStorage.getItem('ph_payroll_deleted_months') || '[]');
-            return Array.isArray(arr) ? arr : [];
-        } catch(_){ return []; }
-    }
-    function setDeletedMonths(arr){
-        try { localStorage.setItem('ph_payroll_deleted_months', JSON.stringify(arr)); } catch(_){}
-    }
-    // <option> lists for the "Add month" picker. Month and year are picked
-    // separately so the year is always explicit rather than buried in a
-    // browser-drawn month widget.
-    function monthOptionsHtml(selected){
-        var sel = parseInt(selected, 10);
-        return MONTH_NAMES.map(function(m, i){
-            return '<option value="' + (i + 1) + '"' + ((i + 1) === sel ? ' selected' : '') + '>' + esc(m) + '</option>';
-        }).join('');
-    }
-    function yearOptionsHtml(selected){
-        var thisY = new Date().getFullYear();
-        var sel = parseInt(selected, 10) || thisY;
-        var out = [];
-        for (var y = thisY + 5; y >= thisY - 10; y--) {
-            out.push('<option value="' + y + '"' + (y === sel ? ' selected' : '') + '>' + y + '</option>');
-        }
-        return out.join('');
-    }
 
     // Users who can receive a salary. Elevated roles are included because a
     // branch admin is still an employee who gets paid.
@@ -29290,10 +29017,6 @@ body.theme-custom .ph-quote-white{
             }
         } catch(_){}
         months.sort().reverse();
-        // A month the admin deleted stays hidden, even though the rolling
-        // window above would otherwise offer it again.
-        var gone = getDeletedMonths();
-        if (gone.length) months = months.filter(function(m){ return gone.indexOf(m) === -1; });
 
         var mine = me().username;
         var seeAll = canSeeAll();
@@ -29355,15 +29078,9 @@ body.theme-custom .ph-quote-white{
                              var own = slips[slipKey(mine, mk)];
                              sub = (own && !own.deleted) ? money(slipFigures(own, null).net) + ' net' : 'Not issued';
                          }
-                         // The tile plus its delete button live in a wrapper so
-                         // the trash button can sit in the corner of the tile.
-                         return '<div class="ph-pr-month-wrap">' +
-                                '<button type="button" class="ph-pr-month ph-gradhover" data-prmonth="' + esc(mk) + '">' +
+                         return '<button type="button" class="ph-pr-month ph-gradhover" data-prmonth="' + esc(mk) + '">' +
                                 '<span class="ph-pr-month-name">' + esc(monthLabelShort(mk)) + '</span>' +
-                                '<span class="ph-pr-month-sub">' + esc(sub) + '</span></button>' +
-                                (seeAll ? '<button type="button" class="ph-pr-month-del" data-prdelmonth="' + esc(mk) + '" ' +
-                                    'title="Delete ' + esc(monthLabel(mk)) + '"><i class="fas fa-trash"></i></button>' : '') +
-                                '</div>';
+                                '<span class="ph-pr-month-sub">' + esc(sub) + '</span></button>';
                      }).join('') + '</div>' +
                    '</div></div>';
         }
@@ -29375,13 +29092,8 @@ body.theme-custom .ph-quote-white{
         var adder = seeAll ?
             '<div class="ph-pr-bar ph-pr-addbar">' +
                 '<label class="text-sm" style="display:flex;align-items:center;gap:6px;font-weight:600;">Add month' +
-                    '<select id="prSalNewMonth" ' +
-                    'style="padding:7px 9px;border-radius:8px;border:1px solid rgba(0,0,0,.15);font-family:inherit;">' +
-                        monthOptionsHtml(new Date().getMonth() + 1) + '</select>' +
-                    '<select id="prSalNewYear" ' +
-                    'style="padding:7px 9px;border-radius:8px;border:1px solid rgba(0,0,0,.15);font-family:inherit;">' +
-                        yearOptionsHtml(new Date().getFullYear()) + '</select>' +
-                '</label>' +
+                    '<input type="month" id="prSalNewMonth" value="' + esc(todayKey) + '" ' +
+                    'style="padding:7px 9px;border-radius:8px;border:1px solid rgba(0,0,0,.15);font-family:inherit;" /></label>' +
                 '<button type="button" class="btn btn-primary ph-gradhover" id="prSalAddMonth"><i class="fas fa-plus"></i> Open / Add Month</button>' +
             '</div>' : '';
 
@@ -29418,69 +29130,23 @@ body.theme-custom .ph-quote-white{
             });
         });
 
-        // Delete one month — the trash button in the corner of a month tile.
-        host.querySelectorAll('[data-prdelmonth]').forEach(function(b){
-            b.addEventListener('click', function(ev){
-                ev.stopPropagation();
-                deleteSalaryMonth(b.getAttribute('data-prdelmonth'), host);
-            });
-        });
-
         // Admin "Add Month" — remembers the picked month so it appears on
         // the year list even before any slips are saved for it.
         var addBtn = document.getElementById('prSalAddMonth');
         if (addBtn) addBtn.addEventListener('click', function(){
-            // Month and year come from two separate dropdowns now.
-            var mSel = document.getElementById('prSalNewMonth');
-            var ySel = document.getElementById('prSalNewYear');
-            var mm = mSel ? String(mSel.value || '') : '';
-            var yy = ySel ? String(ySel.value || '') : '';
-            var v = (yy && mm) ? (yy + '-' + String(mm).padStart(2, '0')) : '';
-            if (!v || !/^\d{4}-\d{2}$/.test(v)) return toast('Choose a valid month and year first.', 'error');
+            var picker = document.getElementById('prSalNewMonth');
+            var v = picker ? String(picker.value || '').slice(0, 7) : '';
+            if (!v || !/^\d{4}-\d{2}$/.test(v)) return toast('Choose a valid month first.', 'error');
             try {
                 var arr = JSON.parse(localStorage.getItem('ph_payroll_extra_months') || '[]');
                 if (!Array.isArray(arr)) arr = [];
                 if (arr.indexOf(v) === -1) { arr.push(v); localStorage.setItem('ph_payroll_extra_months', JSON.stringify(arr)); }
-                // Re-adding a month that was deleted brings it back.
-                var gone = getDeletedMonths().filter(function(m){ return m !== v; });
-                setDeletedMonths(gone);
                 // Make sure the year that will host the new month is expanded.
                 openState[monthYear(v)] = true;
                 localStorage.setItem('ph_payroll_year_open', JSON.stringify(openState));
             } catch(_){}
             openSalaryMonth(v);
         });
-    }
-
-    /* Deleting a month
-       Removes every salary slip saved against that 'YYYY-MM' key, then drops
-       the month from the "extra months" list so it disappears from the year
-       accordion as well. Guarded by a confirm because it cannot be undone. */
-    async function deleteSalaryMonth(mk, host){
-        if (!canSalaries()) return toast('You do not have permission to delete salary months.', 'error');
-        if (!mk || !/^\d{4}-\d{2}$/.test(String(mk))) return;
-        if (!window.confirm('Delete ' + monthLabel(mk) + ' and every salary slip saved in it?\n\nThis cannot be undone.')) return;
-        var slips = await readColl('salaries');
-        var removed = 0;
-        Object.keys(slips).forEach(function(k){
-            if (String(k).split('__')[1] === mk) { delete slips[k]; removed++; }
-        });
-        await writeColl('salaries', slips);
-        // Forget the month if it was only pinned here by "Add month", and keep
-        // it out of the list until it is deliberately added again.
-        try {
-            var arr = JSON.parse(localStorage.getItem('ph_payroll_extra_months') || '[]');
-            if (Array.isArray(arr)) {
-                arr = arr.filter(function(m){ return m !== mk; });
-                localStorage.setItem('ph_payroll_extra_months', JSON.stringify(arr));
-            }
-        } catch(_){}
-        var gone = getDeletedMonths();
-        if (gone.indexOf(mk) === -1) { gone.push(mk); setDeletedMonths(gone); }
-        toast(removed
-                ? removed + ' salary slip' + (removed === 1 ? '' : 's') + ' deleted for ' + monthLabel(mk) + '.'
-                : monthLabel(mk) + ' removed.', 'success');
-        renderSalaries(host || document.getElementById('phPrSalaries'));
     }
 
     // Admin view of one month: an editable row per agent.
@@ -29798,23 +29464,14 @@ body.theme-custom .ph-quote-white{
         var users = seeAll ? payrollUsers() : [me().username].filter(Boolean);
 
         var grand = { taken: 0, repaid: 0, left: 0 };
-        // Every loan row on screen, so the combined figures can be shown in the
-        // currency the entries were actually recorded in.
-        var allRows = [];
         var rows = users.map(function(u){
-            var uRows = loanRowsFor(loans, u);
-            allRows = allRows.concat(uRows);
-            var t = loanTotals(uRows);
-            // One agent on one currency shows that currency; mixed entries fall
-            // back to the branding currency for the combined figure.
-            var curLabel = uRows.length ? (singleCur(uRows) || 'Mixed') : defaultCur();
+            var t = loanTotals(loanRowsFor(loans, u));
             grand.taken += t.taken; grand.repaid += t.repaid; grand.left += t.left;
             return '<tr data-prloan="' + esc(u) + '">' +
                 '<td>' + esc(dispName(u)) + '<div class="text-muted text-xs">@' + esc(u) + '</div></td>' +
-                '<td class="ph-pr-num ph-pr-debit">' + esc(statsMoney(t.taken, uRows)) + '</td>' +
-                '<td class="ph-pr-num ph-pr-credit">' + esc(statsMoney(t.repaid, uRows)) + '</td>' +
-                '<td class="ph-pr-num"><strong>' + esc(statsMoney(t.left, uRows)) + '</strong></td>' +
-                '<td><span class="ph-pr-pill">' + esc(curLabel) + '</span></td>' +
+                '<td class="ph-pr-num ph-pr-debit">' + esc(money(t.taken)) + '</td>' +
+                '<td class="ph-pr-num ph-pr-credit">' + esc(money(t.repaid)) + '</td>' +
+                '<td class="ph-pr-num"><strong>' + esc(money(t.left)) + '</strong></td>' +
                 '<td><button type="button" class="btn btn-sm btn-primary pr-open">' +
                     (canLoans() ? 'Manage' : 'View') + '</button></td>' +
             '</tr>';
@@ -29822,9 +29479,9 @@ body.theme-custom .ph-quote-white{
 
         host.innerHTML =
             '<div class="ph-pr-summary">' +
-                stat('Total Loan Given', statsMoney(grand.taken, allRows), 'warn') +
-                stat('Total Repaid', statsMoney(grand.repaid, allRows), 'good') +
-                stat('Loan Outstanding', statsMoney(grand.left, allRows), '') +
+                stat('Total Loan Given', money(grand.taken), 'warn') +
+                stat('Total Repaid', money(grand.repaid), 'good') +
+                stat('Loan Outstanding', money(grand.left), '') +
             '</div>' +
             '<p class="ph-pr-hint">' +
                 (canLoans()
@@ -29834,7 +29491,7 @@ body.theme-custom .ph-quote-white{
             (users.length ?
             '<table class="ph-pr-table"><thead><tr><th>Agent</th>' +
                 '<th class="ph-pr-num">Total Loan Taken</th><th class="ph-pr-num">Repaid</th>' +
-                '<th class="ph-pr-num">Loan Left</th><th>Currency</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
+                '<th class="ph-pr-num">Loan Left</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
             : '<div class="ph-pr-empty">No agents on record yet.</div>');
 
         host.querySelectorAll('tr[data-prloan]').forEach(function(tr){
@@ -29844,12 +29501,10 @@ body.theme-custom .ph-quote-white{
         });
     }
 
-    // `id` is optional — it lets a caller address the value afterwards so a
-    // figure can be refreshed live (the expense month total, for instance).
-    function stat(label, value, kind, id){
+    function stat(label, value, kind){
         return '<div class="ph-pr-stat ' + (kind || '') + '">' +
                '<div class="ph-pr-stat-label">' + esc(label) + '</div>' +
-               '<div class="ph-pr-stat-value"' + (id ? ' id="' + esc(id) + '"' : '') + '>' + esc(value) + '</div></div>';
+               '<div class="ph-pr-stat-value">' + esc(value) + '</div></div>';
     }
 
     // One agent's loan portal: running debit/credit ledger, newest last so the
@@ -29989,23 +29644,19 @@ body.theme-custom .ph-quote-white{
     async function renderExpenses(host){
         var all = await readColl('expenses');
         var months = {};
-        var everyRow = [];
         Object.keys(all).forEach(function(k){
             var r = all[k];
             if (r && !r.deleted && r.month) {
                 months[r.month] = (months[r.month] || 0) + num(r.amount);
-                everyRow.push(r);
             }
         });
         var keys = Object.keys(months).sort().reverse();
         var manage = canExpenses();
 
-        // Each month tile is quoted in the currency its entries were recorded
-        // in, so a PKR month reads "Rs 12,500.00 total" rather than "£12,500".
         var cards = keys.map(function(mk){
             return '<button type="button" class="ph-pr-month ph-gradhover" data-prexp="' + esc(mk) + '">' +
                    '<span class="ph-pr-month-name">' + esc(monthLabel(mk)) + '</span>' +
-                   '<span class="ph-pr-month-sub">' + esc(statsMoney(months[mk], expenseRows(all, mk))) + ' total</span></button>';
+                   '<span class="ph-pr-month-sub">' + esc(money(months[mk])) + ' total</span></button>';
         }).join('');
 
         var total = keys.reduce(function(s, k){ return s + months[k]; }, 0);
@@ -30017,7 +29668,7 @@ body.theme-custom .ph-quote-white{
                     'style="padding:7px 9px;border-radius:8px;border:1px solid rgba(0,0,0,.15);font-family:inherit;" /></label>' +
                     '<button type="button" class="btn btn-primary ph-gradhover" id="prExpAddMonth"><i class="fas fa-plus"></i> Open / Add Month</button>' : '') +
             '</div>' +
-            (keys.length ? '<div class="ph-pr-summary">' + stat('All Recorded Expenses', statsMoney(total, everyRow), 'warn') +
+            (keys.length ? '<div class="ph-pr-summary">' + stat('All Recorded Expenses', money(total), 'warn') +
                 stat('Months on Record', String(keys.length), '') + '</div>' : '') +
             '<p class="ph-pr-hint">' +
                 (manage ? 'Pick a month to record expenses. Each row saves automatically as you type, and there is a Save button too.'
@@ -30057,10 +29708,7 @@ body.theme-custom .ph-quote-white{
                 '<td><input type="date" class="exp-date" value="' + esc(r.date || '') + '"' + ro + ' /></td>' +
                 '<td><input type="text" class="exp-desc" value="' + esc(r.description || '') + '" placeholder="What was it for?"' + ro + ' /></td>' +
                 '<td><select class="exp-cur"' + ro + '>' + curOptionsHtml(r.currency || defaultCur()) + '</select></td>' +
-                // The chosen currency's symbol sits in front of the amount so
-                // the figure reads in the currency it was recorded in.
-                '<td class="ph-pr-num"><span class="exp-cursym">' + esc(curSymFor(r.currency || defaultCur())) + '</span>' +
-                    '<input type="number" step="0.01" class="exp-amt" value="' + esc(r.amount === '' || r.amount == null ? '' : r.amount) + '" placeholder="0.00"' + ro + ' /></td>' +
+                '<td class="ph-pr-num"><input type="number" step="0.01" class="exp-amt" value="' + esc(r.amount === '' || r.amount == null ? '' : r.amount) + '" placeholder="0.00"' + ro + ' /></td>' +
                 (manage ? '<td>' + (r._key ? '<button type="button" class="btn btn-sm btn-danger exp-del"><i class="fas fa-trash"></i></button>' : '<span class="text-muted text-xs">new</span>') + '</td>' : '') +
             '</tr>';
         }).join('');
@@ -30076,8 +29724,8 @@ body.theme-custom .ph-quote-white{
                 '<button type="button" class="btn ph-gradhover" id="prExpExport"><i class="fas fa-file-excel"></i> Export This Month</button>' +
                 '<span class="text-muted text-sm" id="prExpStatus"></span>' +
             '</div>' +
-            '<div class="ph-pr-summary">' + stat(monthLabel(mk) + ' Total', statsMoney(total, rows), 'warn', 'prExpTotal') +
-                stat('Entries', String(rows.length), '', 'prExpEntries') + '</div>' +
+            '<div class="ph-pr-summary">' + stat(monthLabel(mk) + ' Total', statsMoney(total, rows), 'warn') +
+                stat('Entries', String(rows.length), '') + '</div>' +
             '<table class="ph-pr-table"><thead><tr>' +
                 '<th style="width:150px;">Date</th><th>Description</th><th style="width:120px;">Currency</th><th class="ph-pr-num" style="width:130px;">Amount</th>' +
                 (manage ? '<th style="width:60px;"></th>' : '') +
@@ -30097,8 +29745,7 @@ body.theme-custom .ph-quote-white{
             tr.innerHTML = '<td><input type="date" class="exp-date" /></td>' +
                 '<td><input type="text" class="exp-desc" placeholder="What was it for?" /></td>' +
                 '<td><select class="exp-cur">' + curOptionsHtml(defaultCur()) + '</select></td>' +
-                '<td class="ph-pr-num"><span class="exp-cursym">' + esc(curSymFor(defaultCur())) + '</span>' +
-                    '<input type="number" step="0.01" class="exp-amt" placeholder="0.00" /></td>' +
+                '<td class="ph-pr-num"><input type="number" step="0.01" class="exp-amt" placeholder="0.00" /></td>' +
                 '<td><span class="text-muted text-xs">new</span></td>';
             tb.appendChild(tr);
             wireExpenseRow(tr, mk);
@@ -30111,50 +29758,17 @@ body.theme-custom .ph-quote-white{
         }
     }
 
-    // Recomputes the month total straight from the table. When every row shares
-    // one currency the total is shown in it (PKR rows total in Rs, and so on).
-    function updateExpenseTotals(){
-        var tb = document.getElementById('prExpBody');
-        var el = document.getElementById('prExpTotal');
-        if (!tb || !el) return;
-        var total = 0, seen = {}, entries = 0;
-        Array.prototype.slice.call(tb.querySelectorAll('tr[data-prexprow]')).forEach(function(tr){
-            var amt = num((tr.querySelector('.exp-amt') || {}).value);
-            if (!amt) return;
-            total += amt;
-            entries++;
-            seen[String((tr.querySelector('.exp-cur') || {}).value || defaultCur()).toUpperCase()] = 1;
-        });
-        var ks = Object.keys(seen);
-        var c = (ks.length === 1) ? ks[0] : '';
-        el.textContent = (c ? curSymFor(c) : curSym()) + total.toFixed(2);
-        var ent = document.getElementById('prExpEntries');
-        if (ent) ent.textContent = String(entries);
-    }
-
     // Autosave: debounced so typing a description doesn't hammer the database.
     var _expTimer = null;
     function wireExpenseRow(tr, mk){
         tr.querySelectorAll('input, select').forEach(function(i){
             i.addEventListener('input', function(){
-                // Switching the currency re-labels the symbol, and any amount
-                // change re-adds the total — both without a redraw.
-                if (i.classList && i.classList.contains('exp-cur')) {
-                    var sym = tr.querySelector('.exp-cursym');
-                    if (sym) sym.textContent = curSymFor(i.value || defaultCur());
-                }
-                updateExpenseTotals();
                 var st = document.getElementById('prExpStatus');
                 if (st) st.textContent = 'Saving\u2026';
                 clearTimeout(_expTimer);
                 _expTimer = setTimeout(function(){ saveExpenseMonth(mk, false); }, 900);
             });
             i.addEventListener('change', function(){
-                if (i.classList && i.classList.contains('exp-cur')) {
-                    var sym2 = tr.querySelector('.exp-cursym');
-                    if (sym2) sym2.textContent = curSymFor(i.value || defaultCur());
-                }
-                updateExpenseTotals();
                 clearTimeout(_expTimer);
                 _expTimer = setTimeout(function(){ saveExpenseMonth(mk, false); }, 400);
             });
@@ -30715,5 +30329,5 @@ body.theme-custom .ph-quote-white{
 })();
 </script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"spa":2}' crossorigin="anonymous"></script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3987a4ba80e64cb',t:'MTc4OTE0ODYzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3c8286fb886ccfc',t:'MTc4OTY0ODYwMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3987a4ba80e64cb',t:'MTc4OTE0ODYzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
