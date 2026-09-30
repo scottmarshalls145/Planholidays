@@ -2613,6 +2613,65 @@
             color:var(--mr-text) !important;
             min-height:100vh;
         }
+        /* Portal-wide font color settling as per theme */
+        body.mr-new-theme:not(.mr-light) {
+            --text: #f2ecff !important;
+            --text2: #c9b8e8 !important;
+            --text-muted: #c9b8e8 !important;
+            --bg2: #1e1237 !important;
+            --card-bg: rgba(30,18,55,.72) !important;
+            --border: rgba(255,255,255,.14) !important;
+        }
+        body.mr-new-theme:not(.mr-light) .modal-box {
+            background: #1a0f2b !important;
+            color: #f2ecff !important;
+            border: 1px solid rgba(255,255,255,.16) !important;
+            box-shadow: 0 25px 65px rgba(0,0,0,.65) !important;
+        }
+        body.mr-new-theme:not(.mr-light) .modal-box h1,
+        body.mr-new-theme:not(.mr-light) .modal-box h2,
+        body.mr-new-theme:not(.mr-light) .modal-box h3,
+        body.mr-new-theme:not(.mr-light) .modal-box h4 {
+            color: #ffffff !important;
+        }
+        body.mr-new-theme:not(.mr-light) .modal-box p,
+        body.mr-new-theme:not(.mr-light) .modal-box label,
+        body.mr-new-theme:not(.mr-light) .modal-box span {
+            color: inherit;
+        }
+        body.mr-new-theme:not(.mr-light) .text-muted,
+        body.dark .text-muted {
+            color: #c9b8e8 !important;
+        }
+        body.mr-new-theme:not(.mr-light) .modal-box p.text-muted,
+        body.dark .modal-box p.text-muted {
+            color: #c9b8e8 !important;
+        }
+        body.mr-new-theme:not(.mr-light) .modal-box .table th,
+        body.dark .modal-box .table th {
+            background: rgba(255,255,255,.08) !important;
+            color: #ffffff !important;
+            border-bottom: 1px solid rgba(255,255,255,.15) !important;
+        }
+        body.mr-new-theme:not(.mr-light) .modal-box .table td,
+        body.dark .modal-box .table td {
+            color: #e6edf3 !important;
+            border-bottom: 1px solid rgba(255,255,255,.08) !important;
+        }
+        body.mr-new-theme:not(.mr-light) .modal-box input:not([type="checkbox"]):not([type="radio"]),
+        body.mr-new-theme:not(.mr-light) .modal-box select,
+        body.mr-new-theme:not(.mr-light) .modal-box textarea,
+        body.dark .modal-box input:not([type="checkbox"]):not([type="radio"]),
+        body.dark .modal-box select,
+        body.dark .modal-box textarea {
+            background: rgba(255,255,255,.08) !important;
+            color: #ffffff !important;
+            border: 1px solid rgba(255,255,255,.2) !important;
+        }
+        body.mr-new-theme:not(.mr-light) .modal-box input::placeholder,
+        body.mr-new-theme:not(.mr-light) .modal-box textarea::placeholder {
+            color: rgba(255,255,255,.5) !important;
+        }
         body.mr-new-theme.dark{background:radial-gradient(circle at 15% 20%,#4a1550 0%,transparent 45%),radial-gradient(circle at 85% 80%,#0f2560 0%,transparent 50%),linear-gradient(135deg,#0d0619 0%,#050310 100%) !important;}
         body.mr-new-theme.mr-light{background:linear-gradient(135deg,#f6f4ff 0%,#eef1fb 100%) !important;color:#1e1e2a !important;--mr-panel:rgba(255,255,255,.86);--mr-panel-2:rgba(255,255,255,.65);--mr-border:rgba(20,20,40,.09);--mr-text:#1e1e2a;--mr-text-2:#5b5b76;--mr-shadow:0 18px 45px rgba(30,20,60,.10);}
         body.mr-new-theme #appShell{padding-left:250px;transition:padding-left .28s ease;}
@@ -2797,6 +2856,184 @@
         .mr-menu-toggle{display:none;width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.08);border:1px solid var(--mr-border);color:var(--mr-text);align-items:center;justify-content:center;cursor:pointer;}
         @media(max-width:900px){body.mr-new-theme .mr-menu-toggle{display:inline-flex;}}
 
+
+        /* ============================================================== */
+        /* CUSTOMER DATA MODULE STYLES                                    */
+        /* ============================================================== */
+        .ph-cd-modal-wide {
+            max-width: min(1380px, 98vw) !important;
+            width: 98vw !important;
+        }
+        .cd-header-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .cd-header-wrap h3 {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.35rem;
+        }
+        .cd-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 14px 0 16px;
+            background: rgba(255, 255, 255, .03);
+            border: 1px solid var(--card-border);
+            padding: 12px 14px;
+            border-radius: var(--radius);
+        }
+        .cd-search-wrap {
+            flex: 1;
+            min-width: 240px;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .cd-search-wrap i {
+            position: absolute;
+            left: 12px;
+            color: var(--text2);
+            pointer-events: none;
+            font-size: 0.9rem;
+        }
+        .cd-search-wrap input {
+            width: 100%;
+            padding-left: 36px;
+            margin: 0;
+        }
+        .cd-btn-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .cd-table-wrap {
+            max-height: 60vh;
+            overflow: auto;
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            background: var(--bg);
+        }
+        .cd-table-wrap table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .86rem;
+            text-align: left;
+        }
+        .cd-table-wrap thead th {
+            position: sticky;
+            top: 0;
+            background: var(--bg2);
+            color: var(--text);
+            font-weight: 700;
+            padding: 12px 14px;
+            border-bottom: 2px solid var(--card-border);
+            z-index: 2;
+            white-space: nowrap;
+        }
+        .cd-table-wrap tbody td {
+            padding: 11px 14px;
+            border-bottom: 1px solid var(--card-border);
+            vertical-align: middle;
+            color: var(--text);
+        }
+        .cd-table-wrap tbody tr:hover {
+            background: rgba(255, 255, 255, .03);
+        }
+        .cd-table-wrap tbody tr.selected {
+            background: rgba(184, 134, 11, .11);
+        }
+        .cd-dest-pill {
+            display: inline-block;
+            padding: 3px 9px;
+            border-radius: 6px;
+            background: rgba(184, 134, 11, .14);
+            color: var(--primary);
+            font-weight: 600;
+            font-size: .78rem;
+            max-width: 240px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .cd-agent-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, .07);
+            border: 1px solid var(--card-border);
+            font-size: .78rem;
+            font-weight: 500;
+            color: var(--text);
+        }
+        .cd-quote-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-family: monospace;
+            font-size: .8rem;
+            padding: 2px 7px;
+            border-radius: 4px;
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            color: var(--text2);
+            white-space: nowrap;
+        }
+        .cd-link {
+            color: var(--primary);
+            text-decoration: none;
+            transition: color .2s;
+        }
+        .cd-link:hover {
+            text-decoration: underline;
+        }
+        .cd-checkbox {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--primary);
+            vertical-align: middle;
+        }
+        .cd-actions-cell {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            white-space: nowrap;
+        }
+        .cd-empty-box {
+            text-align: center;
+            padding: 48px 20px;
+            color: var(--text2);
+        }
+        .cd-empty-box i {
+            font-size: 2.8rem;
+            margin-bottom: 12px;
+            opacity: .4;
+            color: var(--primary);
+        }
+        .cd-stats-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            background: rgba(184, 134, 11, .15);
+            color: var(--primary);
+            font-size: .8rem;
+            font-weight: 600;
+        }
+
     </style>
 </head>
 <body>
@@ -2918,6 +3155,12 @@
                     <p>Passenger inquiries &amp; leads</p>
                     <span class="badge-count" id="inquiryCountBadge">0</span>
                 </div>
+                <div class="dash-card" data-action="customerData" id="dashCustomerData" data-perm="canViewCustomerData">
+                    <i class="fas fa-address-book"></i>
+                    <h4>Customer Data</h4>
+                    <p>Passenger records &amp; quote directory</p>
+                    <span class="badge-count" id="customerDataCountBadge">0</span>
+                </div>
                 <div class="dash-card" data-action="users" id="dashUsers" data-perm="canManageUsers">
                     <i class="fas fa-users-gear"></i>
                     <h4>User Management</h4>
@@ -3022,6 +3265,7 @@
                 <button class="tab-btn" data-tab="tabOthers"><i class="fas fa-person-hiking"></i> Others</button>
                 <button class="tab-btn" data-tab="tabPayment"><i class="fas fa-credit-card"></i> Payment</button>
                 <button class="tab-btn" data-tab="tabConditions"><i class="fas fa-file-lines"></i> Conditions</button>
+                <button class="tab-btn" data-tab="tabCustomerData" id="quoteTabCustomerData" data-perm="canViewCustomerData"><i class="fas fa-address-book"></i> Customer Data</button>
             </div>
 
             <!-- ===== TAB: CUSTOMER ===== -->
@@ -3171,6 +3415,13 @@
                     <button class="btn btn-primary mt-16" id="btnSaveConditions"><i class="fas fa-save"></i> Save Quote Conditions</button>
                 </div>
             </div>
+
+            <!-- ===== TAB: CUSTOMER DATA ===== -->
+            <div class="tab-panel" id="tabCustomerData">
+                <div class="form-card" style="padding: 24px;">
+                    <div id="tabCustomerDataInline"></div>
+                </div>
+            </div>
         </section>
     </div>
 
@@ -3220,6 +3471,7 @@
                 quoteConditions: null,
                 invoiceConditions: null,
                 agentTimes: [],
+                customerData: [],
                 currentQuote: {
                     id: null,
                     quoteNumber: '',
@@ -3940,7 +4192,11 @@
                     canManageHotelTransfers: true,
                     canExportHotelTransfers: true,
                     canViewAccountDetails: true,
-                    canEditAccountDetails: true
+                    canEditAccountDetails: true,
+                    canViewCustomerData: true,
+                    canEditCustomerData: true,
+                    canDeleteCustomerData: true,
+                    canExportCustomerData: true
                 }
             };
 
@@ -4413,6 +4669,7 @@
                     // vanishing quotes and the admin history missing agents' work),
                     // and a single quote save no longer re-uploads the entire DB.
                     await _upsertQuoteChild(data);
+                    try { await syncSingleQuoteToCustomerData(data); } catch (_) {}
                     showToast('Quote saved successfully.', 'success');
                     return data;
                 } catch (e) {
@@ -4688,12 +4945,14 @@
                 if (Object.keys(idx).length) {
                     STATE.quotes = Object.values(idx);
                     updateQuoteCount();
+                    try { syncAllCustomerDataFromQuotes(); } catch (_) {}
                     return STATE.quotes;
                 }
                 // Reached only on a brand-new database with no index yet.
                 var allQuotes = await readData('quotes', 'ph_quotes_list', bypassCache !== false) || {};
                 STATE.quotes = Object.values(allQuotes);
                 updateQuoteCount();
+                try { syncAllCustomerDataFromQuotes(); } catch (_) {}
                 return STATE.quotes;
             }
 
@@ -8059,12 +8318,14 @@
                     loadInvoices();
                     loadAgentTimes();
                     loadInquiries();
+                    loadCustomerData();
                     loadHotelVouchers();
                     loadProBackground();
                 }
                 updateQuoteCount();
                 updateInvoiceCount();
                 updateInquiryCount();
+                updateCustomerDataCount();
                 updateAgentTimeBadge();
 
                 // Apply permission-based visibility
@@ -8093,6 +8354,12 @@
                 var builder = document.getElementById('quoteBuilder');
                 builder.style.display = 'block';
                 requestAnimationFrame(function() { builder.classList.add('visible'); });
+                try {
+                    var tabBtn = document.getElementById('quoteTabCustomerData');
+                    if (tabBtn) {
+                        tabBtn.style.display = (isAdmin() || hasPermission('canViewCustomerData')) ? 'inline-flex' : 'none';
+                    }
+                } catch (_) {}
             }
 
             function switchTab(tabId) {
@@ -8102,6 +8369,9 @@
                 if (panel) panel.classList.add('active');
                 var btn = document.querySelector('.tab-btn[data-tab="' + tabId + '"]');
                 if (btn) btn.classList.add('active');
+                if (tabId === 'tabCustomerData') {
+                    try { renderCustomerData('tabCustomerDataInline', false); } catch (_) {}
+                }
             }
 
             function initQuoteTabs() {
@@ -8174,6 +8444,13 @@
                         }
                         showInvoiceHistory();
                         break;
+                    case 'bookings':
+                        if (typeof showBookings === 'function') {
+                            showBookings();
+                        } else if (typeof window._mrShowBookings === 'function') {
+                            window._mrShowBookings();
+                        }
+                        break;
                     case 'accountsMain':
                         if (!isAdmin() && !hasPermission('canManageAccounts')) {
                             showToast('Permission denied.', 'error');
@@ -8187,6 +8464,13 @@
                             return;
                         }
                         showInquiries();
+                        break;
+                    case 'customerData':
+                        if (!isAdmin() && !hasPermission('canViewCustomerData')) {
+                            showToast('You do not have permission to view Customer Data.', 'error');
+                            return;
+                        }
+                        showCustomerData();
                         break;
                     case 'users':
                         // Follows canManageUsers too, so the main admin can hand
@@ -8270,14 +8554,17 @@
             // --------------------------------------------------------------
             // 20. QUOTE HISTORY (with permission)
             // --------------------------------------------------------------
-            function showQuoteHistory() {
+            async function showQuoteHistory() {
                 var user = STATE.currentUser;
-                var quotes = STATE.quotes;
                 if (!isAdmin() && !hasPermission('canViewQuoteHistory')) {
                     showToast('You do not have permission to view quote history.', 'error');
                     return;
                 }
-                if (!isAdmin()) {
+                if (!STATE.quotes || !STATE.quotes.length) {
+                    try { await loadQuotes(); } catch(_) {}
+                }
+                var quotes = STATE.quotes || [];
+                if (!isAdmin() && !hasPermission('canViewAllQuotes')) {
                     quotes = quotes.filter(function(q) { return _quoteOwnedByUser(q, user); });
                 }
                 if (!quotes.length) {
@@ -8361,8 +8648,6 @@
                 // re-runs itself whenever a row reappears, so an extra row here
                 // would make it wipe the grouped view it had just built.
                 function _qhPaint(list) {
-                    // A fresh paint cancels any fill still in progress, so a
-                    // search or a sort never fights the loader.
                     clearTimeout(_qhFillTimer);
                     _qhList = list || [];
                     var tbody = document.getElementById('quoteTableBody');
@@ -8373,29 +8658,11 @@
                         if (bar) bar.innerHTML = '<div class="text-muted text-sm">No matching quotes.</div>';
                         return;
                     }
-                    if (_qhShown > _qhList.length) _qhShown = _qhList.length;
+                    _qhShown = _qhList.length;
                     var html = '';
                     for (var i = 0; i < _qhShown; i++) html += _qhRow(_qhList[i]);
                     tbody.innerHTML = html;
-                    if (!bar) return;
-                    var left = _qhList.length - _qhShown;
-                    if (left > 0) {
-                        // Keep painting the rest by itself, in growing blocks,
-                        // until every quote is on screen. It used to stop at the
-                        // first 100 and wait for a button right at the bottom of
-                        // a very long modal, so most of the history was never
-                        // seen - by admins or by agents. The button stays as a
-                        // manual override.
-                        bar.innerHTML =
-                            '<span class="text-muted text-sm">Loading all ' + _qhList.length +
-                            ' quotes… showing ' + _qhShown + '</span> ' +
-                            '<button class="btn btn-sm btn-outline" onclick="window._qhShowMore(true)"><i class="fas fa-angles-down"></i> Show all ' +
-                            _qhList.length + '</button>';
-                        _qhFillTimer = setTimeout(function () {
-                            _qhShown = Math.min(_qhList.length, Math.max(_qhShown + _qhChunk, _qhShown * 2));
-                            _qhPaint(_qhList);
-                        }, 24);
-                    } else {
+                    if (bar) {
                         bar.innerHTML = '<div class="text-muted text-sm">Showing all ' + _qhList.length +
                             ' quote' + (_qhList.length === 1 ? '' : 's') + '.</div>';
                     }
@@ -10518,7 +10785,750 @@
                 })();
             }
 
+
             // --------------------------------------------------------------
+            // 29c. CUSTOMER DATA MODULE
+            // Directory of passenger names, emails, contact numbers, destinations,
+            // and agent names fetched from all quotes, with edit, single delete,
+            // multi-select delete, and export to Excel.
+            // --------------------------------------------------------------
+
+            function _getDeletedCustomerList() {
+                try {
+                    var str = localStorage.getItem('ph_customer_data_deleted');
+                    if (str) return JSON.parse(str);
+                } catch (_) {}
+                return [];
+            }
+
+            function _saveDeletedCustomerList(list) {
+                try {
+                    var uniq = Array.from(new Set(list || []));
+                    localStorage.setItem('ph_customer_data_deleted', JSON.stringify(uniq));
+                } catch (_) {}
+            }
+
+            function _isCustomerDeleted(key) {
+                if (!key) return false;
+                var list = _getDeletedCustomerList();
+                return list.indexOf(String(key)) !== -1;
+            }
+
+            function getQuoteDestination(q) {
+                if (!q) return '';
+                if (q.destination && String(q.destination).trim()) return String(q.destination).trim();
+                if (q.packageDestination && String(q.packageDestination).trim()) return String(q.packageDestination).trim();
+                
+                // Flights
+                if (Array.isArray(q.flights) && q.flights.length) {
+                    var fDests = [];
+                    q.flights.forEach(function(f) {
+                        var city = f.destinationCity || f.arrivalCity || f.destination || f.destinationAirportName || '';
+                        var country = f.destinationCountry || f.arrivalCountry || '';
+                        var combined = [city, country].filter(Boolean).join(', ').trim();
+                        if (combined && fDests.indexOf(combined) === -1) fDests.push(combined);
+                    });
+                    if (fDests.length) return fDests.join(' / ');
+                }
+
+                // Hotels
+                if (Array.isArray(q.hotels) && q.hotels.length) {
+                    var hDests = [];
+                    q.hotels.forEach(function(h) {
+                        var city = h.destination || h.city || '';
+                        var country = h.country || '';
+                        var combined = [city, country].filter(Boolean).join(', ').trim();
+                        if (combined && hDests.indexOf(combined) === -1) hDests.push(combined);
+                    });
+                    if (hDests.length) return hDests.join(' / ');
+                }
+
+                // Route details
+                if (q.route && String(q.route).trim()) {
+                    var r = String(q.route).trim();
+                    var parts = r.split(/\s*[-→–>]+\s*/);
+                    if (parts.length > 1) {
+                        return parts.slice(1).join(', ');
+                    }
+                    return r;
+                }
+                return '';
+            }
+
+            async function syncSingleQuoteToCustomerData(q) {
+                if (!q) return null;
+                var qId = q.id || '';
+                var key = 'quote_' + (qId || genId());
+
+                // If user is actively saving/creating a quote, un-delete it if it was previously deleted
+                if (_isCustomerDeleted(key) || (qId && _isCustomerDeleted(qId)) || (qId && _isCustomerDeleted('quote_' + qId))) {
+                    var filtered = _getDeletedCustomerList().filter(function(d) {
+                        return d !== key && d !== qId && d !== ('quote_' + qId);
+                    });
+                    _saveDeletedCustomerList(filtered);
+                }
+
+                var pName = (q.passengerNames && q.passengerNames.trim()) || (q.customerName && q.customerName.trim()) || '';
+                var cName = (q.customerName && q.customerName.trim()) || '';
+                var email = (q.customerEmail || q.email || '').trim();
+                var phone = (q.customerPhone || q.phone || q.contactNumber || q.customerContact || '').trim();
+                var dest = getQuoteDestination(q);
+                var agent = (q.agentName || q.agent || q.createdBy || (STATE.currentUser && (STATE.currentUser.name || STATE.currentUser.username)) || '').trim();
+                var quoteNo = (q.quoteNumber || '').trim();
+
+                if (!pName && !email && !phone && !dest) return null;
+
+                var all = await readData('customerData', 'ph_customer_data', true) || {};
+                var existing = all[key] || {};
+
+                all[key] = {
+                    id: key,
+                    quoteId: qId,
+                    quoteNumber: quoteNo,
+                    passengerName: existing.editedManually ? (existing.passengerName || pName) : pName,
+                    customerName: existing.editedManually ? (existing.customerName || cName) : cName,
+                    email: existing.editedManually ? (existing.email || email) : email,
+                    contactNumber: existing.editedManually ? (existing.contactNumber || phone) : phone,
+                    destination: existing.editedManually ? (existing.destination || dest) : dest,
+                    agentName: existing.editedManually ? (existing.agentName || agent) : agent,
+                    date: q.quoteDate || q.createdAt || getToday(),
+                    createdAt: existing.createdAt || q.createdAt || getNowISO(),
+                    updatedAt: getNowISO(),
+                    source: 'quote'
+                };
+
+                await writeData('customerData', all, 'ph_customer_data');
+                STATE.customerData = Object.values(all);
+                updateCustomerDataCount();
+                return all[key];
+            }
+
+            async function syncAllCustomerDataFromQuotes() {
+                var quotes = STATE.quotes || [];
+                if (!quotes.length) {
+                    try {
+                        var idx = await readData('quotesIndex', 'ph_quotes_index', false) || {};
+                        quotes = Object.values(idx);
+                    } catch (_) {}
+                }
+                if (!quotes.length) return;
+
+                var all = await readData('customerData', 'ph_customer_data', true) || {};
+                var deletedList = _getDeletedCustomerList();
+                var changed = false;
+
+                for (var i = 0; i < quotes.length; i++) {
+                    var q = quotes[i];
+                    if (!q) continue;
+                    var qId = q.id || '';
+                    var key = 'quote_' + (qId || q.quoteNumber || i);
+                    if (deletedList.indexOf(key) !== -1 || (qId && deletedList.indexOf(qId) !== -1) || (qId && deletedList.indexOf('quote_' + qId) !== -1)) {
+                        continue;
+                    }
+
+                    if (all[key]) {
+                        if (!all[key].destination && getQuoteDestination(q)) {
+                            all[key].destination = getQuoteDestination(q);
+                            changed = true;
+                        }
+                        if (!all[key].contactNumber && (q.customerPhone || q.phone)) {
+                            all[key].contactNumber = (q.customerPhone || q.phone || '').trim();
+                            changed = true;
+                        }
+                        if (!all[key].email && (q.customerEmail || q.email)) {
+                            all[key].email = (q.customerEmail || q.email || '').trim();
+                            changed = true;
+                        }
+                        continue;
+                    }
+
+                    var pName = (q.passengerNames && q.passengerNames.trim()) || (q.customerName && q.customerName.trim()) || '';
+                    var email = (q.customerEmail || q.email || '').trim();
+                    var phone = (q.customerPhone || q.phone || q.contactNumber || q.customerContact || '').trim();
+                    var dest = getQuoteDestination(q);
+                    var agent = (q.agentName || q.agent || q.createdBy || '').trim();
+
+                    if (!pName && !email && !phone && !dest) continue;
+
+                    all[key] = {
+                        id: key,
+                        quoteId: qId,
+                        quoteNumber: (q.quoteNumber || '').trim(),
+                        passengerName: pName,
+                        customerName: (q.customerName || '').trim(),
+                        email: email,
+                        contactNumber: phone,
+                        destination: dest,
+                        agentName: agent,
+                        date: q.quoteDate || q.createdAt || getToday(),
+                        createdAt: q.createdAt || getNowISO(),
+                        updatedAt: getNowISO(),
+                        source: 'quote'
+                    };
+                    changed = true;
+                }
+
+                if (changed) {
+                    await writeData('customerData', all, 'ph_customer_data');
+                    STATE.customerData = Object.values(all);
+                    updateCustomerDataCount();
+                }
+            }
+
+            async function loadCustomerData(bypassCache) {
+                var all = await readData('customerData', 'ph_customer_data', bypassCache !== false) || {};
+                STATE.customerData = Object.values(all);
+                try { await syncAllCustomerDataFromQuotes(); } catch (_) {}
+                updateCustomerDataCount();
+                return STATE.customerData;
+            }
+
+            function updateCustomerDataCount() {
+                var badge = document.getElementById('customerDataCountBadge');
+                var count = STATE.customerData ? STATE.customerData.length : 0;
+                if (badge) badge.textContent = count;
+                var pill = document.getElementById('cdTotalCountPill');
+                if (pill) pill.textContent = count + ' passenger' + (count === 1 ? '' : 's');
+            }
+
+            window._cdSelectedIds = new Set();
+            window._cdSearchQuery = '';
+
+            function _updateCdSelectionUI() {
+                var count = window._cdSelectedIds ? window._cdSelectedIds.size : 0;
+                var btn = document.getElementById('btnDeleteSelectedCustomers');
+                var countSpan = document.getElementById('cdSelectedCount');
+                if (btn) {
+                    btn.style.display = count > 0 ? 'inline-flex' : 'none';
+                }
+                if (countSpan) {
+                    countSpan.textContent = count;
+                }
+                var selectAll = document.getElementById('cdSelectAll');
+                var checkboxes = document.querySelectorAll('.cd-row-cb');
+                if (selectAll && checkboxes.length) {
+                    selectAll.checked = count > 0 && count === checkboxes.length;
+                    selectAll.indeterminate = count > 0 && count < checkboxes.length;
+                }
+            }
+
+            window._onCustomerRowSelect = function(cb) {
+                if (!window._cdSelectedIds) window._cdSelectedIds = new Set();
+                var id = cb.getAttribute('data-id');
+                var tr = cb.closest('tr');
+                if (cb.checked) {
+                    window._cdSelectedIds.add(id);
+                    if (tr) tr.classList.add('selected');
+                } else {
+                    window._cdSelectedIds.delete(id);
+                    if (tr) tr.classList.remove('selected');
+                }
+                _updateCdSelectionUI();
+            };
+
+            window._toggleSelectAllCustomers = function(checked) {
+                if (!window._cdSelectedIds) window._cdSelectedIds = new Set();
+                var checkboxes = document.querySelectorAll('.cd-row-cb');
+                checkboxes.forEach(function(cb) {
+                    var id = cb.getAttribute('data-id');
+                    cb.checked = checked;
+                    var tr = cb.closest('tr');
+                    if (checked) {
+                        window._cdSelectedIds.add(id);
+                        if (tr) tr.classList.add('selected');
+                    } else {
+                        window._cdSelectedIds.delete(id);
+                        if (tr) tr.classList.remove('selected');
+                    }
+                });
+                _updateCdSelectionUI();
+            };
+
+            window._filterCustomerData = function(val) {
+                window._cdSearchQuery = (val !== undefined ? val : (document.getElementById('cdSearchInput') ? document.getElementById('cdSearchInput').value : '')).trim();
+                _reRenderCustomerDataTable();
+            };
+
+            function _reRenderCustomerDataTable() {
+                var tbody = document.getElementById('cdTableBody');
+                if (!tbody) {
+                    var panel = document.getElementById('tabCustomerDataInline');
+                    if (panel && panel.closest('.tab-panel.active')) {
+                        renderCustomerData('tabCustomerDataInline', false);
+                    }
+                    return;
+                }
+                var list = (STATE.customerData || []).slice();
+                if (window._cdSearchQuery) {
+                    var q = window._cdSearchQuery.toLowerCase();
+                    list = list.filter(function(r) {
+                        return (r.passengerName && r.passengerName.toLowerCase().indexOf(q) !== -1) ||
+                            (r.customerName && r.customerName.toLowerCase().indexOf(q) !== -1) ||
+                            (r.email && r.email.toLowerCase().indexOf(q) !== -1) ||
+                            (r.contactNumber && r.contactNumber.toLowerCase().indexOf(q) !== -1) ||
+                            (r.destination && r.destination.toLowerCase().indexOf(q) !== -1) ||
+                            (r.agentName && r.agentName.toLowerCase().indexOf(q) !== -1) ||
+                            (r.quoteNumber && r.quoteNumber.toLowerCase().indexOf(q) !== -1);
+                    });
+                }
+                list.sort(function(a, b) {
+                    var da = a.date || a.createdAt || '';
+                    var db = b.date || b.createdAt || '';
+                    return db.localeCompare(da);
+                });
+
+                var canEdit = isAdmin() || hasPermission('canEditCustomerData');
+                var canDelete = isAdmin() || hasPermission('canDeleteCustomerData');
+
+                if (!list.length) {
+                    tbody.innerHTML = '<tr><td colspan="9"><div class="cd-empty-box"><i class="fas fa-address-book"></i><h4 style="margin:4px 0 6px;">No Customer Records Found</h4><p style="margin:0;font-size:0.85rem;">When quotes are created or saved by agents, passenger and customer details are automatically captured here.</p></div></td></tr>';
+                } else {
+                    tbody.innerHTML = list.map(function(item) {
+                        var isChecked = window._cdSelectedIds && window._cdSelectedIds.has(item.id);
+                        var trClass = isChecked ? 'class="selected"' : '';
+                        return '<tr ' + trClass + ' data-cd-id="' + escapeHTML(item.id) + '">' +
+                            '<td style="text-align:center;width:36px;"><input type="checkbox" class="cd-checkbox cd-row-cb" data-id="' + escapeHTML(item.id) + '" ' + (isChecked ? 'checked' : '') + ' onchange="window._onCustomerRowSelect(this)" /></td>' +
+                            '<td><strong>' + escapeHTML(item.passengerName || item.customerName || '—') + '</strong>' +
+                                (item.customerName && item.passengerName && item.customerName !== item.passengerName ? '<br><small class="text-muted" style="font-size:0.75rem;">Lead: ' + escapeHTML(item.customerName) + '</small>' : '') + '</td>' +
+                            '<td>' + (item.email ? '<a class="cd-link" href="mailto:' + escapeHTML(item.email) + '"><i class="fas fa-envelope" style="font-size:0.75rem;margin-right:4px;"></i>' + escapeHTML(item.email) + '</a>' : '<span class="text-muted">—</span>') + '</td>' +
+                            '<td>' + (item.contactNumber ? '<a class="cd-link" href="tel:' + escapeHTML(item.contactNumber) + '" style="color:inherit;"><i class="fas fa-phone" style="font-size:0.75rem;margin-right:4px;"></i>' + escapeHTML(item.contactNumber) + '</a>' : '<span class="text-muted">—</span>') + '</td>' +
+                            '<td>' + (item.destination ? '<span class="cd-dest-pill" title="' + escapeHTML(item.destination) + '"><i class="fas fa-location-dot" style="font-size:0.7rem;margin-right:4px;"></i>' + escapeHTML(item.destination) + '</span>' : '<span class="text-muted">—</span>') + '</td>' +
+                            '<td>' + (item.agentName ? '<span class="cd-agent-pill"><i class="fas fa-user-tie" style="font-size:0.72rem;color:var(--primary);"></i>' + escapeHTML(item.agentName) + '</span>' : '<span class="text-muted">—</span>') + '</td>' +
+                            '<td>' + (item.quoteNumber ? '<span class="cd-quote-pill">' + escapeHTML(item.quoteNumber) + '</span>' : '<span class="text-muted">—</span>') + '</td>' +
+                            '<td style="white-space:nowrap;font-size:0.82rem;">' + (item.date ? formatDateDisplay(item.date) : (item.createdAt ? formatDateDisplay(item.createdAt) : '—')) + '</td>' +
+                            '<td><div class="cd-actions-cell">' +
+                                (canEdit ? '<button class="btn btn-sm btn-outline" onclick="window._editCustomerRecord(\'' + escapeHTML(item.id) + '\')" title="Edit Customer Record"><i class="fas fa-pen"></i></button>' : '') +
+                                (canDelete ? '<button class="btn btn-sm btn-danger" onclick="window._deleteCustomerRecord(\'' + escapeHTML(item.id) + '\')" title="Remove Record"><i class="fas fa-trash"></i></button>' : '') +
+                            '</div></td>' +
+                        '</tr>';
+                    }).join('');
+                }
+                _updateCdSelectionUI();
+                var pill = document.getElementById('cdTotalCountPill');
+                if (pill) pill.textContent = list.length + ' passenger' + (list.length === 1 ? '' : 's');
+            }
+
+            function renderCustomerData(targetContainerId, isModal) {
+                var container = document.getElementById(targetContainerId);
+                if (!container) return;
+                (async function() {
+                    await loadCustomerData();
+                    var list = STATE.customerData || [];
+                    var canEdit = isAdmin() || hasPermission('canEditCustomerData');
+                    var canDelete = isAdmin() || hasPermission('canDeleteCustomerData');
+                    var canExport = isAdmin() || hasPermission('canExportCustomerData');
+                    var selectedCount = (window._cdSelectedIds ? window._cdSelectedIds.size : 0);
+
+                    var html = '<div class="cd-header-wrap">' +
+                        '<h3><i class="fas fa-address-book" style="color:var(--primary);"></i> Customer Data <span class="cd-stats-pill" id="cdTotalCountPill">' + list.length + ' passenger' + (list.length === 1 ? '' : 's') + '</span></h3>' +
+                        (isModal ? '' : '<p class="text-muted text-sm" style="margin:4px 0 0;">Directory of passenger names, contact numbers, email addresses, destinations, and agents from all holiday quotes sent.</p>') +
+                    '</div>' +
+                    '<div class="cd-toolbar">' +
+                        '<div class="cd-search-wrap">' +
+                            '<i class="fas fa-search"></i>' +
+                            '<input type="text" id="cdSearchInput" placeholder="Search passenger name, email, phone, destination, agent, quote #..." value="' + escapeHTML(window._cdSearchQuery || '') + '" oninput="window._filterCustomerData(this.value)" />' +
+                        '</div>' +
+                        '<div class="cd-btn-group">' +
+                            (canExport ? '<button class="btn btn-success" id="btnExportCustomerData" onclick="window._exportCustomerDataToExcel()"><i class="fas fa-file-excel"></i> Export to Excel</button>' : '') +
+                            (canDelete ? '<button class="btn btn-danger" id="btnDeleteSelectedCustomers" style="display:' + (selectedCount > 0 ? 'inline-flex' : 'none') + ';" onclick="window._deleteSelectedCustomers()"><i class="fas fa-trash-can"></i> Delete Selected (<span id="cdSelectedCount">' + selectedCount + '</span>)</button>' : '') +
+                            (canEdit ? '<button class="btn btn-primary" onclick="window._showAddCustomerModal()"><i class="fas fa-plus"></i> Add Record</button>' : '') +
+                            '<button class="btn btn-outline" onclick="window._refreshCustomerData()" title="Sync quotes and refresh data"><i class="fas fa-rotate"></i> Refresh</button>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="history-table-wrap cd-table-wrap">' +
+                        '<table>' +
+                            '<thead>' +
+                                '<tr>' +
+                                    '<th style="width:36px;text-align:center;"><input type="checkbox" id="cdSelectAll" class="cd-checkbox" onchange="window._toggleSelectAllCustomers(this.checked)" title="Select all" /></th>' +
+                                    '<th>Passenger Name</th>' +
+                                    '<th>Email Address</th>' +
+                                    '<th>Contact Number</th>' +
+                                    '<th>Destination</th>' +
+                                    '<th>Agent Name</th>' +
+                                    '<th>Quote #</th>' +
+                                    '<th>Date</th>' +
+                                    '<th style="text-align:right;">Actions</th>' +
+                                '</tr>' +
+                            '</thead>' +
+                            '<tbody id="cdTableBody"></tbody>' +
+                        '</table>' +
+                    '</div>' +
+                    (isModal ? '<div class="modal-actions" style="margin-top:18px;"><button class="btn btn-close-modal" data-close-modal>Close</button></div>' : '');
+
+                    container.innerHTML = html;
+                    if (isModal) {
+                        container.querySelectorAll('[data-close-modal]').forEach(function(el) {
+                            el.addEventListener('click', window.closeModal);
+                        });
+                    }
+                    _reRenderCustomerDataTable();
+                })();
+            }
+
+            function showCustomerData() {
+                if (!isAdmin() && !hasPermission('canViewCustomerData')) {
+                    showToast('You do not have permission to view Customer Data.', 'error');
+                    return;
+                }
+                window._cdSelectedIds = new Set();
+                window._cdSearchQuery = '';
+                showModal('<div id="cdModalContainer"></div>');
+                var box = document.getElementById('modalBox');
+                if (box) box.classList.add('ph-cd-modal-wide');
+                renderCustomerData('cdModalContainer', true);
+            }
+
+            window._deleteSelectedCustomers = async function() {
+                if (!isAdmin() && !hasPermission('canDeleteCustomerData')) {
+                    showToast('You do not have permission to delete customer records.', 'error');
+                    return;
+                }
+                var ids = Array.from(window._cdSelectedIds || []);
+                if (!ids.length) {
+                    showToast('No customer records selected.', 'warning');
+                    return;
+                }
+                if (!confirm('Are you sure you want to delete ' + ids.length + ' selected passenger record(s)?')) {
+                    return;
+                }
+                showLoading(true);
+                try {
+                    var all = await readData('customerData', 'ph_customer_data', true) || {};
+                    var deletedList = _getDeletedCustomerList();
+                    for (var i = 0; i < ids.length; i++) {
+                        var id = ids[i];
+                        var rec = all[id];
+                        delete all[id];
+                        deletedList.push(id);
+                        if (rec && rec.quoteId) {
+                            deletedList.push('quote_' + rec.quoteId);
+                            deletedList.push(rec.quoteId);
+                        }
+                        if (firebaseConnected && db) {
+                            try { await db.ref('customerData/' + id).remove(); } catch (_) {}
+                        }
+                    }
+                    _saveDeletedCustomerList(deletedList);
+                    await writeData('customerData', all, 'ph_customer_data');
+                    STATE.customerData = Object.values(all);
+                    window._cdSelectedIds.clear();
+                    updateCustomerDataCount();
+                    _reRenderCustomerDataTable();
+                    showToast('Deleted ' + ids.length + ' customer record(s).', 'success');
+                } catch (e) {
+                    showToast('Failed to delete records: ' + e.message, 'error');
+                } finally {
+                    showLoading(false);
+                }
+            };
+
+            window._deleteCustomerRecord = async function(id) {
+                if (!isAdmin() && !hasPermission('canDeleteCustomerData')) {
+                    showToast('You do not have permission to delete customer records.', 'error');
+                    return;
+                }
+                var all = await readData('customerData', 'ph_customer_data', true) || {};
+                var item = all[id];
+                var name = (item && (item.passengerName || item.customerName)) || 'this record';
+                if (!confirm('Are you sure you want to delete the record for "' + name + '"?')) return;
+                showLoading(true);
+                try {
+                    delete all[id];
+                    var deletedList = _getDeletedCustomerList();
+                    deletedList.push(id);
+                    if (item && item.quoteId) {
+                        deletedList.push('quote_' + item.quoteId);
+                        deletedList.push(item.quoteId);
+                    }
+                    _saveDeletedCustomerList(deletedList);
+                    if (firebaseConnected && db) {
+                        try { await db.ref('customerData/' + id).remove(); } catch (_) {}
+                    }
+                    await writeData('customerData', all, 'ph_customer_data');
+                    STATE.customerData = Object.values(all);
+                    if (window._cdSelectedIds) window._cdSelectedIds.delete(id);
+                    updateCustomerDataCount();
+                    _reRenderCustomerDataTable();
+                    showToast('Customer record deleted.', 'success');
+                } catch (e) {
+                    showToast('Failed to delete: ' + e.message, 'error');
+                } finally {
+                    showLoading(false);
+                }
+            };
+
+            window._editCustomerRecord = async function(id) {
+                if (!isAdmin() && !hasPermission('canEditCustomerData')) {
+                    showToast('You do not have permission to edit customer records.', 'error');
+                    return;
+                }
+                var all = await readData('customerData', 'ph_customer_data', true) || {};
+                var item = all[id];
+                if (!item) {
+                    showToast('Record not found.', 'error');
+                    return;
+                }
+                var html = '<h3><i class="fas fa-pen-to-square"></i> Edit Customer Record</h3>' +
+                    '<div class="form-row">' +
+                        '<div class="form-group full">' +
+                            '<label>Passenger Name(s) <span class="required">*</span></label>' +
+                            '<input type="text" id="cdEditPassengerName" value="' + escapeHTML(item.passengerName || '') + '" placeholder="e.g. John Smith, Jane Smith" />' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="form-row">' +
+                        '<div class="form-group">' +
+                            '<label>Email Address</label>' +
+                            '<input type="email" id="cdEditEmail" value="' + escapeHTML(item.email || '') + '" placeholder="john@example.com" />' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label>Contact Number</label>' +
+                            '<input type="text" id="cdEditPhone" value="' + escapeHTML(item.contactNumber || '') + '" placeholder="+44 1234 567890" />' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="form-row">' +
+                        '<div class="form-group">' +
+                            '<label>Destination</label>' +
+                            '<input type="text" id="cdEditDestination" value="' + escapeHTML(item.destination || '') + '" placeholder="e.g. Dubai, UAE" />' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label>Agent Name (who sent the quote)</label>' +
+                            '<input type="text" id="cdEditAgentName" value="' + escapeHTML(item.agentName || '') + '" placeholder="Agent name" />' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="form-row">' +
+                        '<div class="form-group">' +
+                            '<label>Quote Number / Reference</label>' +
+                            '<input type="text" id="cdEditQuoteNumber" value="' + escapeHTML(item.quoteNumber || '') + '" placeholder="e.g. PH-260930-01" />' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label>Date</label>' +
+                            '<div class="date-input-wrap"><i class="fas fa-calendar-alt date-icon"></i><input type="text" class="smart-date smart-date-standalone" id="cdEditDate" value="' + escapeHTML(item.date || '') + '" placeholder="DD-MM-YYYY" /></div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="modal-actions">' +
+                        '<button class="btn btn-primary" id="btnSaveCustomerEdit" onclick="window._saveCustomerRecord(\'' + escapeHTML(id) + '\')"><i class="fas fa-save"></i> Save Changes</button>' +
+                        '<button class="btn btn-close-modal" data-close-modal>Cancel</button>' +
+                    '</div>';
+
+                showModal(html);
+            };
+
+            window._saveCustomerRecord = async function(id) {
+                var pName = (document.getElementById('cdEditPassengerName').value || '').trim();
+                if (!pName) {
+                    showToast('Passenger Name is required.', 'error');
+                    return;
+                }
+                var email = (document.getElementById('cdEditEmail').value || '').trim();
+                var phone = (document.getElementById('cdEditPhone').value || '').trim();
+                var dest = (document.getElementById('cdEditDestination').value || '').trim();
+                var agent = (document.getElementById('cdEditAgentName').value || '').trim();
+                var quoteNo = (document.getElementById('cdEditQuoteNumber').value || '').trim();
+                var dateVal = (document.getElementById('cdEditDate').value || '').trim();
+
+                showLoading(true);
+                try {
+                    var all = await readData('customerData', 'ph_customer_data', true) || {};
+                    var existing = all[id] || {};
+                    all[id] = {
+                        ...existing,
+                        id: id,
+                        passengerName: pName,
+                        customerName: existing.customerName || pName,
+                        email: email,
+                        contactNumber: phone,
+                        destination: dest,
+                        agentName: agent,
+                        quoteNumber: quoteNo,
+                        date: dateVal || existing.date || getToday(),
+                        updatedAt: getNowISO(),
+                        editedManually: true
+                    };
+                    await writeData('customerData', all, 'ph_customer_data');
+                    STATE.customerData = Object.values(all);
+                    updateCustomerDataCount();
+                    window.closeModal();
+                    showToast('Customer record updated successfully.', 'success');
+                    showCustomerData();
+                } catch (e) {
+                    showToast('Failed to save customer record: ' + e.message, 'error');
+                } finally {
+                    showLoading(false);
+                }
+            };
+
+            window._showAddCustomerModal = function() {
+                if (!isAdmin() && !hasPermission('canEditCustomerData')) {
+                    showToast('Permission denied.', 'error');
+                    return;
+                }
+                var currentAgent = STATE.currentUser ? (STATE.currentUser.name || STATE.currentUser.username) : '';
+                var html = '<h3><i class="fas fa-user-plus"></i> Add Customer Record</h3>' +
+                    '<div class="form-row">' +
+                        '<div class="form-group full">' +
+                            '<label>Passenger Name(s) <span class="required">*</span></label>' +
+                            '<input type="text" id="cdNewPassengerName" placeholder="e.g. John Smith, Jane Smith" />' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="form-row">' +
+                        '<div class="form-group">' +
+                            '<label>Email Address</label>' +
+                            '<input type="email" id="cdNewEmail" placeholder="john@example.com" />' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label>Contact Number</label>' +
+                            '<input type="text" id="cdNewPhone" placeholder="+44 1234 567890" />' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="form-row">' +
+                        '<div class="form-group">' +
+                            '<label>Destination</label>' +
+                            '<input type="text" id="cdNewDestination" placeholder="e.g. Dubai, UAE" />' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label>Agent Name</label>' +
+                            '<input type="text" id="cdNewAgentName" value="' + escapeHTML(currentAgent) + '" placeholder="Agent name" />' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="form-row">' +
+                        '<div class="form-group">' +
+                            '<label>Quote Number / Reference</label>' +
+                            '<input type="text" id="cdNewQuoteNumber" placeholder="Optional quote #" />' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label>Date</label>' +
+                            '<div class="date-input-wrap"><i class="fas fa-calendar-alt date-icon"></i><input type="text" class="smart-date smart-date-standalone" id="cdNewDate" value="' + formatDateDisplay(getToday()) + '" placeholder="DD-MM-YYYY" /></div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="modal-actions">' +
+                        '<button class="btn btn-primary" onclick="window._saveNewCustomerRecord()"><i class="fas fa-plus"></i> Add Record</button>' +
+                        '<button class="btn btn-close-modal" data-close-modal>Cancel</button>' +
+                    '</div>';
+
+                showModal(html);
+            };
+
+            window._saveNewCustomerRecord = async function() {
+                var pName = (document.getElementById('cdNewPassengerName').value || '').trim();
+                if (!pName) {
+                    showToast('Passenger Name is required.', 'error');
+                    return;
+                }
+                var email = (document.getElementById('cdNewEmail').value || '').trim();
+                var phone = (document.getElementById('cdNewPhone').value || '').trim();
+                var dest = (document.getElementById('cdNewDestination').value || '').trim();
+                var agent = (document.getElementById('cdNewAgentName').value || '').trim();
+                var quoteNo = (document.getElementById('cdNewQuoteNumber').value || '').trim();
+                var dateVal = (document.getElementById('cdNewDate').value || '').trim();
+
+                var id = 'cd_' + genId();
+                showLoading(true);
+                try {
+                    var all = await readData('customerData', 'ph_customer_data', true) || {};
+                    all[id] = {
+                        id: id,
+                        passengerName: pName,
+                        customerName: pName,
+                        email: email,
+                        contactNumber: phone,
+                        destination: dest,
+                        agentName: agent,
+                        quoteNumber: quoteNo,
+                        date: dateVal || getToday(),
+                        createdAt: getNowISO(),
+                        updatedAt: getNowISO(),
+                        source: 'manual'
+                    };
+                    await writeData('customerData', all, 'ph_customer_data');
+                    STATE.customerData = Object.values(all);
+                    updateCustomerDataCount();
+                    window.closeModal();
+                    showToast('Customer record added successfully.', 'success');
+                    showCustomerData();
+                } catch (e) {
+                    showToast('Failed to add record: ' + e.message, 'error');
+                } finally {
+                    showLoading(false);
+                }
+            };
+
+            window._exportCustomerDataToExcel = function() {
+                if (!isAdmin() && !hasPermission('canExportCustomerData')) {
+                    showToast('You do not have permission to export customer data.', 'error');
+                    return;
+                }
+                var list = (STATE.customerData || []).slice();
+                if (window._cdSelectedIds && window._cdSelectedIds.size > 0) {
+                    list = list.filter(function(r) { return window._cdSelectedIds.has(r.id); });
+                } else if (window._cdSearchQuery) {
+                    var q = window._cdSearchQuery.toLowerCase();
+                    list = list.filter(function(r) {
+                        return (r.passengerName && r.passengerName.toLowerCase().indexOf(q) !== -1) ||
+                            (r.customerName && r.customerName.toLowerCase().indexOf(q) !== -1) ||
+                            (r.email && r.email.toLowerCase().indexOf(q) !== -1) ||
+                            (r.contactNumber && r.contactNumber.toLowerCase().indexOf(q) !== -1) ||
+                            (r.destination && r.destination.toLowerCase().indexOf(q) !== -1) ||
+                            (r.agentName && r.agentName.toLowerCase().indexOf(q) !== -1) ||
+                            (r.quoteNumber && r.quoteNumber.toLowerCase().indexOf(q) !== -1);
+                    });
+                }
+
+                if (!list.length) {
+                    showToast('No customer records to export.', 'warning');
+                    return;
+                }
+
+                var headers = ['Passenger Name', 'Email Address', 'Contact Number', 'Destination', 'Agent Name', 'Quote Number', 'Date'];
+                var rows = list.map(function(item) {
+                    return [
+                        item.passengerName || item.customerName || '',
+                        item.email || '',
+                        item.contactNumber || '',
+                        item.destination || '',
+                        item.agentName || '',
+                        item.quoteNumber || '',
+                        formatDateDisplay(item.date || item.createdAt || '')
+                    ];
+                });
+
+                var csv = '\ufeff' + headers.join(',') + '\n' + rows.map(function(r) {
+                    return r.map(function(field) {
+                        var val = (field === null || field === undefined) ? '' : String(field);
+                        return '"' + val.replace(/"/g, '""').replace(/\r?\n/g, ' ') + '"';
+                    }).join(',');
+                }).join('\n');
+
+                var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'Customer_Data_' + (new Date().toISOString().slice(0, 10)) + '.csv';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(function() {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 1000);
+
+                showToast('Exported ' + list.length + ' customer record(s) to Excel.', 'success');
+            };
+
+            window._refreshCustomerData = async function() {
+                showLoading(true);
+                try {
+                    await syncAllCustomerDataFromQuotes();
+                    await loadCustomerData(true);
+                    _reRenderCustomerDataTable();
+                    showToast('Customer data refreshed & quotes synced.', 'info');
+                } catch (e) {
+                    showToast('Refresh failed: ' + e.message, 'error');
+                } finally {
+                    showLoading(false);
+                }
+            };
+
+
+// --------------------------------------------------------------
             // 30. USER MANAGEMENT (with Manager role)
             // --------------------------------------------------------------
             function showUserManagement() {
@@ -10828,6 +11838,12 @@
                     { key: 'canViewHotelVoucher', label: 'View Hotel Voucher' },
                     { key: 'canViewVoucherHistory', label: 'View Voucher History' }
                 ] },
+                { group: 'Customer Data', items: [
+                    { key: 'canViewCustomerData', label: 'View Customer Data' },
+                    { key: 'canEditCustomerData', label: 'Edit Customer Data' },
+                    { key: 'canDeleteCustomerData', label: 'Delete Customer Data' },
+                    { key: 'canExportCustomerData', label: 'Export Customer Data' }
+                ] },
                 { group: 'Inquiries', items: [
                     { key: 'canCreateInquiries', label: 'Create Inquiries' },
                     { key: 'canDeleteInquiries', label: 'Delete Inquiries' },
@@ -10845,7 +11861,8 @@
                     { key: 'canCreateQuotes', label: 'Create Quotes' },
                     { key: 'canDeleteQuotes', label: 'Delete Quotes' },
                     { key: 'canEditQuotes', label: 'Edit Quotes' },
-                    { key: 'canViewQuoteHistory', label: 'Quote History (Own Quotes)' }
+                    { key: 'canViewQuoteHistory', label: 'Quote History (Own Quotes)' },
+                    { key: 'canViewAllQuotes', label: 'View All Quotes (All Agents)' }
                 ] },
                 { group: 'Quote Appearance', items: [
                     { key: 'canManageProBackground', label: 'Professional Background (Quote PDF)' }
@@ -10865,6 +11882,11 @@
 
             var DEFAULT_NEW_USER_PERMISSIONS = {
                 canAddCalendarTasks: true,
+                canViewAllQuotes: true,
+                canViewCustomerData: true,
+                canEditCustomerData: true,
+                canDeleteCustomerData: true,
+                canExportCustomerData: true,
                 canCreateInquiries: true,
                 canCreateQuotes: true,
                 canCreateTasks: true,
@@ -16054,34 +17076,44 @@
                 var st = document.createElement('style');
                 st.id = 'calls-center-styles';
                 st.textContent =
-                    '.cc-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}'+
-                    '.cc-tabs button{padding:8px 14px;border-radius:10px;border:1px solid rgba(0,0,0,.1);background:transparent;cursor:pointer;font-weight:600;}'+
-                    '.cc-tabs button.active{background:var(--primary);color:#fff;border-color:var(--primary);}'+
+                    '.cc-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}'+
+                    '.cc-tabs button{padding:8px 16px;border-radius:10px;border:1px solid var(--border, rgba(0,0,0,.15));background:rgba(0,0,0,.04);color:var(--text,#1e1e2a);cursor:pointer;font-weight:600;font-size:.88rem;display:inline-flex;align-items:center;gap:7px;transition:all .15s ease;}'+
+                    '.cc-tabs button:hover{background:rgba(0,0,0,.08);color:var(--text,#1e1e2a);}'+
+                    '.cc-tabs button.active{background:var(--primary) !important;color:#ffffff !important;border-color:var(--primary) !important;box-shadow:0 4px 12px rgba(184,134,11,.25);}'+
+                    'body.dark .cc-tabs button,body.mr-new-theme:not(.mr-light) .cc-tabs button,.dark .cc-tabs button{border-color:rgba(255,255,255,.18) !important;background:rgba(255,255,255,.08) !important;color:#f2ecff !important;}'+
+                    'body.dark .cc-tabs button:hover,body.mr-new-theme:not(.mr-light) .cc-tabs button:hover,.dark .cc-tabs button:hover{background:rgba(255,255,255,.15) !important;color:#ffffff !important;}'+
+                    'body.dark .cc-tabs button.active,body.mr-new-theme:not(.mr-light) .cc-tabs button.active,.dark .cc-tabs button.active{background:var(--primary) !important;color:#ffffff !important;border-color:var(--primary) !important;}'+
                     '.cc-agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}'+
-                    '.cc-agent-card{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid rgba(0,0,0,.1);border-radius:12px;background:rgba(0,0,0,.02);cursor:pointer;transition:.15s;}'+
-                    '.cc-agent-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.08);border-color:var(--primary);}'+
+                    '.cc-agent-card{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border, rgba(0,0,0,.1));border-radius:12px;background:var(--card-bg, rgba(0,0,0,.02));color:var(--text,#1e1e2a);cursor:pointer;transition:.15s;}'+
+                    '.cc-agent-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.15);border-color:var(--primary);}'+
+                    'body.dark .cc-agent-card,body.mr-new-theme:not(.mr-light) .cc-agent-card,.dark .cc-agent-card{border-color:rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#f2ecff;}'+
                     '.cc-agent-card.offline{opacity:.55;cursor:not-allowed;}'+
                     '.cc-avatar{width:42px;height:42px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;position:relative;flex-shrink:0;}'+
-                    '.cc-avatar .cc-dot{position:absolute;bottom:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:#bbb;border:2px solid #fff;}'+
+                    '.cc-avatar .cc-dot{position:absolute;bottom:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:#bbb;border:2px solid var(--bg2, #fff);}'+
                     '.cc-avatar .cc-dot.online{background:#27ae60;}'+
                     '.cc-agent-main{flex:1;min-width:0;}'+
-                    '.cc-agent-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'+
-                    '.cc-agent-sub{font-size:.78rem;color:var(--text-muted,#888);}'+
+                    '.cc-agent-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text,inherit);}'+
+                    'body.dark .cc-agent-name,body.mr-new-theme:not(.mr-light) .cc-agent-name,.dark .cc-agent-name{color:#ffffff !important;}'+
+                    '.cc-agent-sub{font-size:.78rem;color:var(--text2,var(--text-muted,#888));}'+
+                    'body.dark .cc-agent-sub,body.mr-new-theme:not(.mr-light) .cc-agent-sub,.dark .cc-agent-sub{color:#c9b8e8 !important;}'+
                     '.cc-call-btn{background:#27ae60;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-weight:600;cursor:pointer;}'+
                     '.cc-call-btn:disabled{background:#bbb;cursor:not-allowed;}'+
                     '.cc-table{width:100%;border-collapse:collapse;font-size:.9rem;}'+
-                    '.cc-table th,.cc-table td{padding:8px 10px;border-bottom:1px solid rgba(0,0,0,.08);text-align:left;}'+
-                    '.cc-table th{background:rgba(0,0,0,.04);font-weight:700;}'+
-                    '.dark .cc-table th{background:rgba(255,255,255,.05);}'+
-                    '.dark .cc-table th,.dark .cc-table td{border-bottom-color:rgba(255,255,255,.08);}'+
+                    '.cc-table th,.cc-table td{padding:10px 12px;border-bottom:1px solid var(--border, rgba(0,0,0,.08));text-align:left;color:var(--text,inherit);}'+
+                    '.cc-table th{background:var(--bg2, rgba(0,0,0,.04));font-weight:700;color:var(--text,inherit);}'+
+                    'body.dark .cc-table th,body.mr-new-theme:not(.mr-light) .cc-table th,.dark .cc-table th{background:rgba(255,255,255,.08) !important;color:#ffffff !important;border-bottom-color:rgba(255,255,255,.15) !important;}'+
+                    'body.dark .cc-table td,body.mr-new-theme:not(.mr-light) .cc-table td,.dark .cc-table td{color:#e6edf3 !important;border-bottom-color:rgba(255,255,255,.08) !important;}'+
                     '.cc-pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.75rem;font-weight:600;}'+
-                    '.cc-pill.completed{background:rgba(39,174,96,.18);color:#1f7a43;}'+
-                    '.cc-pill.missed{background:rgba(192,57,43,.18);color:#8a2b21;}'+
-                    '.cc-pill.ringing{background:rgba(243,156,18,.18);color:#a76a04;}'+
-                    '.cc-pill.ended{background:rgba(0,0,0,.1);color:#555;}'+
-                    '.cc-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;}'+
-                    '.cc-filters input,.cc-filters select{padding:6px 10px;border:1px solid rgba(0,0,0,.15);border-radius:8px;}'+
-                    '.cc-empty{text-align:center;padding:30px;color:var(--text-muted,#888);}'+
+                    '.cc-pill.completed{background:rgba(39,174,96,.22);color:#2ecc71;}'+
+                    '.cc-pill.missed{background:rgba(231,76,60,.22);color:#e74c3c;}'+
+                    '.cc-pill.ringing{background:rgba(241,196,15,.22);color:#f1c40f;}'+
+                    '.cc-pill.ended{background:rgba(255,255,255,.14);color:var(--text2,#c9b8e8);}'+
+                    '.cc-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}'+
+                    '.cc-filters input,.cc-filters select{padding:7px 12px;border:1px solid var(--border, rgba(0,0,0,.15));border-radius:8px;background:var(--bg,#fff);color:var(--text,#1e1e2a);font-size:.85rem;}'+
+                    'body.dark .cc-filters input,body.dark .cc-filters select,body.mr-new-theme:not(.mr-light) .cc-filters input,body.mr-new-theme:not(.mr-light) .cc-filters select,.dark .cc-filters input,.dark .cc-filters select{background:rgba(255,255,255,.08) !important;color:#ffffff !important;border-color:rgba(255,255,255,.18) !important;}'+
+                    '.cc-filters input::placeholder{color:var(--text2,rgba(255,255,255,.5));}'+
+                    '.cc-empty{text-align:center;padding:30px;color:var(--text2,var(--text-muted,#888));}'+
+                    'body.dark .cc-empty,body.mr-new-theme:not(.mr-light) .cc-empty,.dark .cc-empty{color:#c9b8e8 !important;}'+
                     '';
                 document.head.appendChild(st);
 
@@ -16286,7 +17318,7 @@
                     var headerTitle = _ccTab === 'logs' ? 'Call Logs' : 'Agents Online';
                     var headerIcon = _ccTab === 'logs' ? 'fa-clock-rotate-left' : 'fa-users';
                     var html = '<h3><i class="fas '+headerIcon+'"></i> '+headerTitle+'</h3>'+
-                        '<p class="text-muted text-sm">See which agents are online and click to start a voice call. Admin can review all call logs.</p>'+
+                        '<p class="text-muted text-sm" style="color:var(--text2, var(--mr-text-2, #c9b8e8)) !important;margin-bottom:14px;line-height:1.5;">See which agents are online and click to start a voice call. Admin can review all call logs.</p>'+
                         '<div class="cc-tabs">'+
                             '<button data-cc-tab="online"'+onlineActive+'><i class="fas fa-users"></i> Online Agents</button>'+
                             '<button data-cc-tab="logs"'+logsActive+'><i class="fas fa-clock-rotate-left"></i> Call Logs</button>'+
@@ -20883,6 +21915,7 @@
                         if (!all[id]) changed = true;
                         all[id] = next;
                     });
+                    try { STATE.bookings = _values(all); } catch (_) {}
                     if (changed) await _writeBookings(all);
                     return all;
                 }
@@ -21032,8 +22065,11 @@
                 }
                 function _updateBookingCount(){
                     var badge = document.getElementById('bookingCountBadge');
-                    if (!badge) return;
-                    _readBookings().then(function(all){ badge.textContent = _visibleBookings(_values(all)).length; }).catch(function(){});
+                    _readBookings().then(function(all){
+                        var list = _visibleBookings(_values(all));
+                        try { STATE.bookings = _values(all); } catch (_) {}
+                        if (badge) badge.textContent = list.length;
+                    }).catch(function(){});
                 }
                 function _ensureDashboardCard(){
                     var grid = document.querySelector('.dashboard-grid');
@@ -21409,12 +22445,19 @@
                         _ensureDashboardCard();
                         try { await _syncAllBookedInquiries(); } catch (_) {}
                         _updateBookingCount();
+                        try { if (typeof window.refreshAll === 'function') window.refreshAll(); } catch (_) {}
                         return r;
                     };
                     afterLogin.__mrBookingsPatched = true;
                 }
                 _injectPermissionStyles();
-                document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ _ensureDashboardCard(); _updateBookingCount(); }, 1400); });
+                document.addEventListener('DOMContentLoaded', function(){
+                    setTimeout(function(){
+                        _ensureDashboardCard();
+                        _updateBookingCount();
+                        try { if (typeof window.refreshAll === 'function') window.refreshAll(); } catch (_) {}
+                    }, 1400);
+                });
             })();
             document.addEventListener('DOMContentLoaded', init);
         })();
@@ -21433,7 +22476,29 @@
         function $(sel,root){return (root||document).querySelector(sel);}
         function $$(sel,root){return Array.prototype.slice.call((root||document).querySelectorAll(sel));}
         function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-        function parseDate(v){if(!v)return null;var d=new Date(v);return isNaN(d.getTime())?null:d;}
+        function parseDate(v){
+            if(!v) return null;
+            if(v instanceof Date) return isNaN(v.getTime()) ? null : v;
+            var s = String(v).trim();
+            if(!s) return null;
+            // Match DD-MM-YYYY or DD/MM/YYYY first (standard format in app)
+            var m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+            if(m){
+                var day = parseInt(m[1], 10), mon = parseInt(m[2], 10) - 1, yr = parseInt(m[3], 10);
+                var dt = new Date(yr, mon, day);
+                if(!isNaN(dt.getTime())) return dt;
+            }
+            // Match YYYY-MM-DD (ISO date format)
+            var m2 = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+            if(m2){
+                var yr2 = parseInt(m2[1], 10), mon2 = parseInt(m2[2], 10) - 1, day2 = parseInt(m2[3], 10);
+                var dt2 = new Date(yr2, mon2, day2);
+                if(!isNaN(dt2.getTime())) return dt2;
+            }
+            var d = new Date(s);
+            if(!isNaN(d.getTime())) return d;
+            return null;
+        }
         function fmtDate(d){if(!d)return '';try{return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}catch(e){return d.toISOString().slice(0,10);}}
         function fmtShort(d){if(!d)return '';try{return d.toLocaleDateString(undefined,{month:'short',day:'numeric'});}catch(e){return '';}}
         function daysBetween(a,b){return Math.round((a-b)/86400000);}
@@ -21862,9 +22927,9 @@
                 '<div class="mr-col">'+
                     '<div class="mr-cards" id="mrCards"></div>'+
                     '<div class="mr-panel" id="mrChartPanel">'+
-                        '<div class="mr-panel-head"><div><div class="mr-panel-title" id="mrChartTitle">Bookings vs Inquiries</div><div class="mr-panel-sub" id="mrChartSub">Last 6 months</div></div><div class="mr-panel-actions" id="mrChartActions"></div></div>'+
+                        '<div class="mr-panel-head"><div><div class="mr-panel-title" id="mrChartTitle">Quotes, Bookings & Inquiries</div><div class="mr-panel-sub" id="mrChartSub">Last 6 months</div></div><div class="mr-panel-actions" id="mrChartActions"></div></div>'+
                         '<div class="mr-chart-wrap" id="mrChartWrap"><div class="mr-chart-tip" id="mrChartTip"></div></div>'+
-                        '<div class="mr-chart-legend"><span><span class="dot" style="background:#ff5cad;"></span>Inquiries</span><span><span class="dot" style="background:#8b5cf6;"></span>Bookings</span></div>'+
+                        '<div class="mr-chart-legend"><span><span class="dot" style="background:#ff5cad;"></span>Inquiries</span><span><span class="dot" style="background:#f59e0b;"></span>Quotes</span><span><span class="dot" style="background:#8b5cf6;"></span>Bookings</span></div>'+
                     '</div>'+
                     '<div class="mr-panel" id="mrListPanel">'+
                         '<div class="mr-panel-head"><div class="mr-panel-title" id="mrListTitle">Latest Quotes</div><a class="mr-panel-sub" style="cursor:pointer;" id="mrListMore">View all</a></div>'+
@@ -21905,19 +22970,78 @@
             list=Array.isArray(list)?list:[];
             var user=(window.STATE&&window.STATE.currentUser)||{};
             if(seesEverything()) return list.slice();
-            return list.filter(function(x){ return x && (x.createdBy===user.username || x.assignedTo===user.username); });
+            var u=String(user.username||'').toLowerCase();
+            var uname=String(user.name||'').toLowerCase();
+            return list.filter(function(x){
+                if(!x) return false;
+                var cb=String(x.createdBy||'').toLowerCase();
+                var asg=String(x.assignedTo||'').toLowerCase();
+                var au=String(x.agentUsername||'').toLowerCase();
+                var an=String(x.agentName||x.agent||'').toLowerCase();
+                return cb===u || asg===u || au===u || (uname && (an===uname || cb===uname));
+            });
         }
-        function isBookedInquiry(iq){ return iq && (iq.status==='Booked' || iq.status==='Already Booked'); }
-        function invoicesToBookings(list){ return list; } // treat invoices as bookings
-
-        // Local calendar-day key, so "today" follows the user's own clock
-        // rather than UTC (a UTC cutoff mis-counted evening entries).
+        function isBookedInquiry(iq){
+            if(!iq) return false;
+            var s=String(iq.status||'').trim().toLowerCase();
+            var d=String(iq.deal||'').trim().toLowerCase();
+            var st=String(iq.stage||'').trim().toLowerCase();
+            return s==='booked' || s==='already booked' || s.indexOf('book')!==-1 || d==='booked' || st==='booked';
+        }
+        function recordDate(x){
+            if(!x) return null;
+            return parseDate(x.bookingAt || x.bookingDate || x.bookedAt || x.createdAt || x.quoteDate || x.invoiceDate || x.date || x.updatedAt);
+        }
         function dayKey(d){
             if(!d) return '';
             return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
         }
-        function recordDate(x){
-            return parseDate(x && (x.createdAt||x.quoteDate||x.invoiceDate||x.date));
+        function getBookingsList(agentFilterFn){
+            var list=[];
+            var seen={};
+            function add(b, type){
+                if(!b) return;
+                var id=String(b.id || b.bookingRef || b.invoiceNumber || b.inquiryId || '').trim();
+                var d=recordDate(b);
+                var key=id || (String(b.customerName || b.passengerName || '') + '_' + (d ? d.getTime() : ''));
+                if(key && seen[key]) return;
+                if(key) seen[key]=true;
+                var item=Object.assign({}, b, {
+                    _type: type,
+                    bookingDate: b.bookingDate || b.date || b.invoiceDate || b.quoteDate,
+                    bookingAt: b.bookingAt || b.bookedAt || b.createdAt || b.invoiceDate,
+                    customerName: b.customerName || b.passengerName || b.clientName || '',
+                    agentName: b.agentName || b.createdByName || b.createdBy || b.agentUsername || ''
+                });
+                list.push(item);
+            }
+            // 1. Confirmed bookings from STATE.bookings (or localStorage fallback if not yet in memory)
+            var sBookings=inScope((window.STATE && window.STATE.bookings) || []);
+            if(!sBookings.length && typeof localStorage !== 'undefined'){
+                try {
+                    var raw = localStorage.getItem('ph_bookings');
+                    if(raw){
+                        var parsed = JSON.parse(raw);
+                        var localList = Array.isArray(parsed) ? parsed : Object.keys(parsed).map(function(k){ var v=parsed[k]||{}; if(!v.id) v.id=k; return v; });
+                        if(localList && localList.length){
+                            if(window.STATE && (!window.STATE.bookings || !window.STATE.bookings.length)) window.STATE.bookings = localList;
+                            sBookings = inScope(localList);
+                        }
+                    }
+                } catch(_){}
+            }
+            sBookings.forEach(function(b){ add(b, 'booking'); });
+            // 2. Booked inquiries from STATE.inquiries
+            var sInquiries=inScope((window.STATE && window.STATE.inquiries) || []);
+            sInquiries.forEach(function(iq){ if(isBookedInquiry(iq)) add(iq, 'inquiry_booked'); });
+            // 3. Invoices from STATE.invoices
+            var sInvoices=inScope((window.STATE && window.STATE.invoices) || []);
+            sInvoices.forEach(function(inv){ add(inv, 'invoice'); });
+
+            if(typeof agentFilterFn==='function'){
+                return list.filter(agentFilterFn);
+            }
+            return list;
         }
         function countOnDay(list,when){
             var key=dayKey(when||new Date());
@@ -21932,7 +23056,7 @@
             var quotes=inScope((window.STATE&&window.STATE.quotes)||[]);
             var invoices=inScope((window.STATE&&window.STATE.invoices)||[]);
             var inquiries=inScope((window.STATE&&window.STATE.inquiries)||[]);
-            var bookings=invoicesToBookings(invoices);
+            var bookings=getBookingsList();
 
             // Inquiry status chips
             var statusCounts={};
@@ -21952,7 +23076,7 @@
 
             host.innerHTML=''+
                 '<div class="mr-stat" data-mract="inquiries"><div class="mr-stat-ico ico-1"><i class="fas fa-headset"></i></div><div><div class="mr-stat-val">'+inquiries.length+'</div><div class="mr-stat-lbl">Total Inquiries</div><div class="mr-stat-sub"><span class="mr-chip">Today: '+inquiriesToday+'</span>'+(statusChips||'')+'</div><div class="mr-stat-sub" style="margin-top:4px;color:var(--mr-text-2);">'+esc(scopeLbl)+'</div></div></div>'+
-                '<div class="mr-stat" data-mract="invoices"><div class="mr-stat-ico ico-2"><i class="fas fa-plane-departure"></i></div><div><div class="mr-stat-val">'+bookings.length+'</div><div class="mr-stat-lbl">Total Bookings</div><div class="mr-stat-sub"><span class="mr-chip">Today: '+bookingsToday+'</span><span class="mr-chip">Last 30d: '+countRecent(bookings,30)+'</span></div><div class="mr-stat-sub" style="margin-top:4px;color:var(--mr-text-2);">'+esc(scopeLbl)+'</div></div></div>'+
+                '<div class="mr-stat" data-mract="bookings"><div class="mr-stat-ico ico-2"><i class="fas fa-plane-departure"></i></div><div><div class="mr-stat-val">'+bookings.length+'</div><div class="mr-stat-lbl">Total Bookings</div><div class="mr-stat-sub"><span class="mr-chip">Today: '+bookingsToday+'</span><span class="mr-chip">Last 30d: '+countRecent(bookings,30)+'</span></div><div class="mr-stat-sub" style="margin-top:4px;color:var(--mr-text-2);">'+esc(scopeLbl)+'</div></div></div>'+
                 '<div class="mr-stat" data-mract="history"><div class="mr-stat-ico ico-3"><i class="fas fa-file-pen"></i></div><div><div class="mr-stat-val">'+quotesToday+'</div><div class="mr-stat-lbl">Quotes Today</div><div class="mr-stat-sub"><span class="mr-chip">Total: '+quotes.length+'</span><span class="mr-chip">Last 30d: '+countRecent(quotes,30)+'</span></div><div class="mr-stat-sub" style="margin-top:4px;color:var(--mr-text-2);">'+(latest?'Latest: '+esc(latestTitle)+' · '+esc(latestSub):'No quotes yet')+'</div></div></div>';
             $$('.mr-stat',host).forEach(function(el){ el.addEventListener('click',function(){ try{window.handleDashAction(el.dataset.mract);}catch(e){} }); });
         }
@@ -21965,6 +23089,7 @@
         var CHART_STATE={monthsBack:6,byAgent:null};
         function renderChart(){
             var wrap=$('#mrChartWrap'); if(!wrap) return;
+            var titleEl=$('#mrChartTitle'); if(titleEl) titleEl.textContent='Quotes, Bookings & Inquiries';
             var actions=$('#mrChartActions'); if(actions){
                 var agentOpts='';
                 if(isAdmin() && window.STATE&&window.STATE.users){
@@ -21976,44 +23101,84 @@
                 var sel=$('#mrChartAgent'); if(sel){ sel.value=CHART_STATE.byAgent||''; sel.addEventListener('change',function(){ CHART_STATE.byAgent=sel.value||null; renderChart(); }); }
             }
             var months=lastNMonths(CHART_STATE.monthsBack);
-            // Scope first (agents only ever see their own rows), then optionally
-            // narrow to one agent when an admin picks from the dropdown.
+
+            // Fetch and scope all three data sets: Inquiries, Quotes, Bookings
             var inquiries=inScope((window.STATE&&window.STATE.inquiries)||[]);
-            var invoices=inScope((window.STATE&&window.STATE.invoices)||[]);
+            var quotes=inScope((window.STATE&&window.STATE.quotes)||[]);
+
             function agentFilter(x){
-                if(!seesEverything()) return true;      // already scoped by inScope()
+                if(!seesEverything()) return true;
                 if(!CHART_STATE.byAgent) return true;
-                return x.createdBy===CHART_STATE.byAgent || x.assignedTo===CHART_STATE.byAgent;
+                var target=String(CHART_STATE.byAgent).toLowerCase();
+                var userObj=(window.STATE&&window.STATE.users&&window.STATE.users[CHART_STATE.byAgent])||{};
+                var targetName=String(userObj.name||'').toLowerCase();
+                var creator=String(x.createdBy||x.agentUsername||'').toLowerCase();
+                var assigned=String(x.assignedTo||'').toLowerCase();
+                var agent=String(x.agentName||x.agent||'').toLowerCase();
+                return creator===target || assigned===target || agent===target || (targetName && (agent===targetName || creator===targetName));
             }
+
             inquiries=inquiries.filter(agentFilter);
-            invoices=invoices.filter(agentFilter);
-            // "Bookings vs Inquiries" must compare exactly those two series.
-            // Quotes were previously added into the inquiry bar, which inflated it.
+            quotes=quotes.filter(agentFilter);
+            var bookings=getBookingsList(agentFilter);
+
             var byMonth=months.map(function(m){
                 function inMonth(x){ var d=recordDate(x); return d && d.getFullYear()===m.y && d.getMonth()===m.m; }
-                return {m:m, i:inquiries.filter(inMonth).length, b:invoices.filter(inMonth).length};
+                return {
+                    m: m,
+                    i: inquiries.filter(inMonth).length,
+                    q: quotes.filter(inMonth).length,
+                    b: bookings.filter(inMonth).length
+                };
             });
+
             var sub=$('#mrChartSub');
             if(sub) sub.textContent='Last '+CHART_STATE.monthsBack+' months · '+(seesEverything()?(CHART_STATE.byAgent||'All agents'):'My records');
-            var maxV=Math.max(1,byMonth.reduce(function(a,r){return Math.max(a,r.i,r.b);},1));
+
+            // Sync the legend to ensure all 3 items appear
+            var legendEl=wrap.parentNode ? wrap.parentNode.querySelector('.mr-chart-legend') : null;
+            if(legendEl){
+                legendEl.innerHTML='<span><span class="dot" style="background:#ff5cad;"></span>Inquiries</span>'+
+                    '<span><span class="dot" style="background:#f59e0b;"></span>Quotes</span>'+
+                    '<span><span class="dot" style="background:#8b5cf6;"></span>Bookings</span>';
+            }
+
+            var maxV=Math.max(1, byMonth.reduce(function(a,r){ return Math.max(a, r.i, r.q, r.b); }, 1));
             var W=wrap.clientWidth||600, H=260, pad=32;
             var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">';
-            // grid
-            for(var g=0;g<=4;g++){ var y=pad+(H-pad*2)*g/4; svg+='<line x1="'+pad+'" y1="'+y+'" x2="'+(W-pad)+'" y2="'+y+'" stroke="rgba(255,255,255,.06)" />'; }
+            // grid lines
+            for(var g=0;g<=4;g++){
+                var y=pad+(H-pad*2)*g/4;
+                svg+='<line x1="'+pad+'" y1="'+y+'" x2="'+(W-pad)+'" y2="'+y+'" stroke="rgba(255,255,255,.06)" />';
+            }
             var groupW=(W-pad*2)/byMonth.length;
-            var barW=Math.max(6,groupW*0.28);
+            var barW=Math.max(5, Math.min(22, (groupW-14)/3));
+            var groupBarsW=barW*3+4;
+
             byMonth.forEach(function(r,ix){
                 var cx=pad+groupW*ix+groupW/2;
+                var startX=cx-groupBarsW/2;
+                var x1=startX;
+                var x2=startX+barW+2;
+                var x3=startX+(barW+2)*2;
                 var hi=(r.i/maxV)*(H-pad*2);
+                var hq=(r.q/maxV)*(H-pad*2);
                 var hb=(r.b/maxV)*(H-pad*2);
-                var x1=cx-barW-2, x2=cx+2;
-                svg+='<rect class="mr-bar" data-idx="'+ix+'" data-kind="i" x="'+x1+'" y="'+(H-pad-hi)+'" width="'+barW+'" height="'+hi+'" rx="6" fill="url(#gradI)"/>';
-                svg+='<rect class="mr-bar" data-idx="'+ix+'" data-kind="b" x="'+x2+'" y="'+(H-pad-hb)+'" width="'+barW+'" height="'+hb+'" rx="6" fill="url(#gradB)"/>';
+
+                // Render Inquiries (pink), Quotes (amber/gold), Bookings (purple)
+                svg+='<rect class="mr-bar" data-idx="'+ix+'" data-kind="i" x="'+x1+'" y="'+(H-pad-Math.max(hi, (r.i>0?3:0)))+'" width="'+barW+'" height="'+Math.max(hi, (r.i>0?3:0))+'" rx="4" fill="'+(r.i>0?'url(#gradI)':'rgba(255,92,173,.15)')+'"/>';
+                svg+='<rect class="mr-bar" data-idx="'+ix+'" data-kind="q" x="'+x2+'" y="'+(H-pad-Math.max(hq, (r.q>0?3:0)))+'" width="'+barW+'" height="'+Math.max(hq, (r.q>0?3:0))+'" rx="4" fill="'+(r.q>0?'url(#gradQ)':'rgba(245,158,11,.15)')+'"/>';
+                svg+='<rect class="mr-bar" data-idx="'+ix+'" data-kind="b" x="'+x3+'" y="'+(H-pad-Math.max(hb, (r.b>0?3:0)))+'" width="'+barW+'" height="'+Math.max(hb, (r.b>0?3:0))+'" rx="4" fill="'+(r.b>0?'url(#gradB)':'rgba(139,92,246,.15)')+'"/>';
                 svg+='<text x="'+cx+'" y="'+(H-8)+'" fill="rgba(255,255,255,.6)" font-size="11" text-anchor="middle">'+esc(r.m.label)+'</text>';
             });
-            svg+='<defs><linearGradient id="gradI" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ff8ac6"/><stop offset="100%" stop-color="#ff5cad"/></linearGradient>'+
-                 '<linearGradient id="gradB" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient></defs>';
+
+            svg+='<defs>'+
+                 '<linearGradient id="gradI" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ff8ac6"/><stop offset="100%" stop-color="#ff5cad"/></linearGradient>'+
+                 '<linearGradient id="gradQ" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fbbf24"/><stop offset="100%" stop-color="#f59e0b"/></linearGradient>'+
+                 '<linearGradient id="gradB" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient>'+
+                 '</defs>';
             svg+='</svg>';
+
             wrap.innerHTML=svg+'<div class="mr-chart-tip" id="mrChartTip"></div>';
             var tip=$('#mrChartTip');
             $$('.mr-bar',wrap).forEach(function(b){
@@ -22021,11 +23186,14 @@
                     var r=byMonth[+b.dataset.idx]; if(!r) return;
                     var wrapRect=wrap.getBoundingClientRect();
                     tip.style.left=(e.clientX-wrapRect.left)+'px';
-                    tip.style.top=(e.clientY-wrapRect.top-8)+'px';
-                    tip.textContent=r.m.label+' — '+(b.dataset.kind==='i'?'Inquiries: '+r.i:'Bookings: '+r.b);
+                    tip.style.top=(e.clientY-wrapRect.top-14)+'px';
+                    tip.innerHTML='<strong>'+esc(r.m.label)+' '+r.m.y+'</strong><br>'+
+                        '<span style="color:#ff5cad;">● Inquiries:</span> '+r.i+'<br>'+
+                        '<span style="color:#f59e0b;">● Quotes:</span> '+r.q+'<br>'+
+                        '<span style="color:#a78bfa;">● Bookings:</span> '+r.b;
                     tip.classList.add('show');
                 });
-                b.addEventListener('mouseleave',function(){ tip.classList.remove('show'); });
+                b.addEventListener('mouseleave',function(){ if(tip) tip.classList.remove('show'); });
                 b.addEventListener('click',function(){
                     var r=byMonth[+b.dataset.idx]; if(!r) return;
                     showMonthDetail(r);
@@ -22040,23 +23208,31 @@
         function showMonthDetail(row){
             if(typeof window.showModal!=='function') return;
             var m=row.m;
-            // Same role scoping as the chart itself — an agent's drill-down must
-            // never expose another agent's records.
             function inMonth(x){ var d=recordDate(x); return d&&d.getFullYear()===m.y&&d.getMonth()===m.m; }
             var inquiries=inScope((window.STATE&&window.STATE.inquiries)||[]).filter(inMonth);
-            var invoices=inScope((window.STATE&&window.STATE.invoices)||[]).filter(inMonth);
             var quotes=inScope((window.STATE&&window.STATE.quotes)||[]).filter(inMonth);
-            function row2(x,f){return '<tr>'+f.map(function(k){return '<td>'+esc(x[k]||'')+'</td>';}).join('')+'</tr>';}
-            var html='<h3>'+m.label+' '+m.y+' — Details</h3>'+
-                '<div class="text-muted text-sm">Inquiries: '+inquiries.length+' · Quotes: '+quotes.length+' · Bookings: '+invoices.length+'</div>'+
+            var bookings=getBookingsList().filter(inMonth);
+
+            var html='<h3>'+esc(m.label)+' '+m.y+' — Details</h3>'+
+                '<div class="text-muted text-sm">Inquiries: '+inquiries.length+' · Quotes: '+quotes.length+' · Bookings: '+bookings.length+'</div>'+
                 '<div style="max-height:60vh;overflow:auto;margin-top:10px;">'+
-                '<h4 style="margin-top:8px;">Inquiries</h4>'+
+                '<h4 style="margin-top:8px;"><i class="fas fa-headset" style="color:#ff5cad;"></i> Inquiries ('+inquiries.length+')</h4>'+
                 '<table class="table" style="width:100%;"><thead><tr><th>Passenger</th><th>Destination</th><th>Status</th><th>Date</th></tr></thead><tbody>'+
                 (inquiries.length?inquiries.map(function(x){return '<tr><td>'+esc(x.passengerName||'')+'</td><td>'+esc(x.destination||'')+'</td><td>'+esc(x.status||'')+'</td><td>'+esc(fmtDate(parseDate(x.createdAt)))+'</td></tr>';}).join(''):'<tr><td colspan="4" class="text-muted">None</td></tr>')+
                 '</tbody></table>'+
-                '<h4 style="margin-top:14px;">Bookings</h4>'+
-                '<table class="table" style="width:100%;"><thead><tr><th>Invoice #</th><th>Passenger</th><th>Agent</th><th>Date</th></tr></thead><tbody>'+
-                (invoices.length?invoices.map(function(x){return '<tr><td>'+esc(x.invoiceNumber||x.id)+'</td><td>'+esc(x.passengerName||'')+'</td><td>'+esc(x.createdBy||'')+'</td><td>'+esc(fmtDate(parseDate(x.createdAt||x.invoiceDate)))+'</td></tr>';}).join(''):'<tr><td colspan="4" class="text-muted">None</td></tr>')+
+                '<h4 style="margin-top:14px;"><i class="fas fa-file-invoice" style="color:#f59e0b;"></i> Quotes ('+quotes.length+')</h4>'+
+                '<table class="table" style="width:100%;"><thead><tr><th>Quote #</th><th>Passenger</th><th>Destination</th><th>Agent</th><th>Date</th></tr></thead><tbody>'+
+                (quotes.length?quotes.map(function(x){return '<tr><td>'+esc(x.quoteNumber||x.id)+'</td><td>'+esc(x.passengerName||x.customerName||'')+'</td><td>'+esc(x.destination||'')+'</td><td>'+esc(x.agentName||x.createdBy||'')+'</td><td>'+esc(fmtDate(parseDate(x.quoteDate||x.createdAt)))+'</td></tr>';}).join(''):'<tr><td colspan="5" class="text-muted">None</td></tr>')+
+                '</tbody></table>'+
+                '<h4 style="margin-top:14px;"><i class="fas fa-file-invoice-dollar" style="color:#8b5cf6;"></i> Bookings ('+bookings.length+')</h4>'+
+                '<table class="table" style="width:100%;"><thead><tr><th>Booking / Inv #</th><th>Passenger</th><th>Agent</th><th>Date</th></tr></thead><tbody>'+
+                (bookings.length?bookings.map(function(x){
+                    var ref=x.bookingRef || x.invoiceNumber || x.id || '';
+                    var name=x.customerName || x.passengerName || '';
+                    var ag=x.agentName || x.createdBy || x.agentUsername || '';
+                    var d=recordDate(x);
+                    return '<tr><td>'+esc(ref)+'</td><td>'+esc(name)+'</td><td>'+esc(ag)+'</td><td>'+esc(fmtDate(d))+'</td></tr>';
+                }).join(''):'<tr><td colspan="4" class="text-muted">None</td></tr>')+
                 '</tbody></table></div>'+
                 '<div class="modal-actions"><button class="btn btn-close-modal" data-close-modal>Close</button></div>';
             window.showModal(html);
@@ -22307,7 +23483,7 @@
         var lastSig='';
         function snap(){
             var s=window.STATE||{};
-            return [(s.quotes||[]).length,(s.invoices||[]).length,(s.inquiries||[]).length,(s.chatMessages||[]).length,(s.currentUser&&s.currentUser.username)||''].join('|');
+            return [(s.quotes||[]).length,(s.invoices||[]).length,(s.inquiries||[]).length,(s.bookings||[]).length,(s.chatMessages||[]).length,(s.currentUser&&s.currentUser.username)||''].join('|');
         }
         function pollTick(){
             var cur=snap();
@@ -30901,7 +32077,7 @@ body.theme-custom .ph-quote-white{
             var prevShow = window.showModal;
             window.showModal = function(){
                 var b = document.getElementById('modalBox');
-                if (b) b.classList.remove('ph-pr-modal', 'ph-pr-modal-wide');
+                if (b) b.classList.remove('ph-pr-modal', 'ph-pr-modal-wide', 'ph-cd-modal-wide');
                 return prevShow.apply(this, arguments);
             };
             window.showModal.__phPrSizingPatched = true;
@@ -30910,7 +32086,7 @@ body.theme-custom .ph-quote-white{
             var prevClose = window.closeModal;
             window.closeModal = function(){
                 var b = document.getElementById('modalBox');
-                if (b) b.classList.remove('ph-pr-modal', 'ph-pr-modal-wide');
+                if (b) b.classList.remove('ph-pr-modal', 'ph-pr-modal-wide', 'ph-cd-modal-wide');
                 return prevClose.apply(this, arguments);
             };
             window.closeModal.__phPrSizingPatched = true;
@@ -31365,6 +32541,6 @@ body.theme-custom .ph-quote-white{
     try { console.info('[repaint-guard] active'); } catch (_) {}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a433e5f8ce794929',t:'MTc5MDc3ODM0MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a433e5f8ce794929',t:'MTc5MDc3ODM0MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a434b78119ac35d4',t:'MTc5MDc4NjkyMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
 
