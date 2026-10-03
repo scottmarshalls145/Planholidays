@@ -4,6 +4,142 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Plan Holidays — Quote & Invoice Generator</title>
+    <script>
+    /* Cross-browser API fallbacks. The portal still uses modern JavaScript syntax
+       (async/await and object spread), so these cover older evergreen engines and
+       API gaps without changing behaviour in browsers that already support them. */
+    (function (w, d) {
+        var AP = Array.prototype, SP = String.prototype;
+        function define(target, name, value) {
+            if (!target || target[name]) return;
+            try { Object.defineProperty(target, name, { configurable: true, writable: true, value: value }); }
+            catch (_) { try { target[name] = value; } catch (__) {} }
+        }
+        if (!Object.assign) {
+            Object.assign = function (target) {
+                if (target == null) throw new TypeError('Cannot convert undefined or null to object');
+                var out = Object(target);
+                for (var a = 1; a < arguments.length; a++) {
+                    var source = arguments[a];
+                    if (source == null) continue;
+                    Object.keys(Object(source)).forEach(function (key) { out[key] = source[key]; });
+                }
+                return out;
+            };
+        }
+        if (!Object.values) Object.values = function (obj) {
+            return Object.keys(Object(obj)).map(function (key) { return obj[key]; });
+        };
+        if (!Object.entries) Object.entries = function (obj) {
+            return Object.keys(Object(obj)).map(function (key) { return [key, obj[key]]; });
+        };
+        define(AP, 'includes', function (search, fromIndex) {
+            var list = Object(this), len = list.length >>> 0, start = Number(fromIndex) || 0;
+            if (start < 0) start = Math.max(len + start, 0);
+            for (var i = start; i < len; i++) {
+                if (list[i] === search || (list[i] !== list[i] && search !== search)) return true;
+            }
+            return false;
+        });
+        define(AP, 'find', function (predicate, thisArg) {
+            if (this == null || typeof predicate !== 'function') throw new TypeError('Invalid Array.find call');
+            var list = Object(this), len = list.length >>> 0;
+            for (var i = 0; i < len; i++) if (predicate.call(thisArg, list[i], i, list)) return list[i];
+            return undefined;
+        });
+        define(AP, 'findIndex', function (predicate, thisArg) {
+            if (this == null || typeof predicate !== 'function') throw new TypeError('Invalid Array.findIndex call');
+            var list = Object(this), len = list.length >>> 0;
+            for (var i = 0; i < len; i++) if (predicate.call(thisArg, list[i], i, list)) return i;
+            return -1;
+        });
+        if (!Array.from) Array.from = function (value) {
+            if (value == null) throw new TypeError('Array.from requires an array-like value');
+            var obj = Object(value), out = [];
+            if (typeof Symbol !== 'undefined' && Symbol.iterator && obj[Symbol.iterator]) {
+                var iterator = obj[Symbol.iterator](), step;
+                while (!(step = iterator.next()).done) out.push(step.value);
+                return out;
+            }
+            if (typeof obj.forEach === 'function' && typeof obj.size === 'number') {
+                obj.forEach(function (item) { out.push(item); });
+                return out;
+            }
+            var len = obj.length >>> 0;
+            for (var i = 0; i < len; i++) out.push(obj[i]);
+            return out;
+        };
+        define(SP, 'includes', function (search, position) {
+            return this.indexOf(search, position || 0) !== -1;
+        });
+        define(SP, 'startsWith', function (search, position) {
+            var start = Math.max(0, position || 0);
+            return this.substr(start, String(search).length) === String(search);
+        });
+        define(SP, 'endsWith', function (search, length) {
+            var text = String(this), needle = String(search);
+            var end = length === undefined ? text.length : Math.min(text.length, length);
+            return text.substring(end - needle.length, end) === needle;
+        });
+        define(SP, 'padStart', function (targetLength, padString) {
+            var text = String(this), target = Math.floor(Number(targetLength) || 0);
+            var pad = padString === undefined ? ' ' : String(padString);
+            if (text.length >= target || !pad) return text;
+            while (pad.length < target - text.length) pad += pad;
+            return pad.slice(0, target - text.length) + text;
+        });
+        if (!String.fromCodePoint) String.fromCodePoint = function () {
+            var out = '';
+            for (var i = 0; i < arguments.length; i++) {
+                var cp = Number(arguments[i]);
+                if (cp < 0 || cp > 0x10FFFF || Math.floor(cp) !== cp) throw new RangeError('Invalid code point');
+                if (cp <= 0xFFFF) out += String.fromCharCode(cp);
+                else {
+                    cp -= 0x10000;
+                    out += String.fromCharCode((cp >> 10) + 0xD800, (cp % 0x400) + 0xDC00);
+                }
+            }
+            return out;
+        };
+        var ep = w.Element && w.Element.prototype;
+        if (ep && !ep.matches) define(ep, 'matches', ep.msMatchesSelector || ep.webkitMatchesSelector || function (selector) {
+            var nodes = (this.ownerDocument || d).querySelectorAll(selector);
+            for (var i = 0; i < nodes.length; i++) if (nodes[i] === this) return true;
+            return false;
+        });
+        if (ep && !ep.closest) define(ep, 'closest', function (selector) {
+            var node = this;
+            while (node && node.nodeType === 1) {
+                if (node.matches(selector)) return node;
+                node = node.parentElement || node.parentNode;
+            }
+            return null;
+        });
+        if (ep && !ep.remove) define(ep, 'remove', function () {
+            if (this.parentNode) this.parentNode.removeChild(this);
+        });
+        if (w.NodeList && !w.NodeList.prototype.forEach) define(w.NodeList.prototype, 'forEach', function (callback, thisArg) {
+            AP.forEach.call(this, callback, thisArg);
+        });
+        if (w.DOMTokenList && w.DOMTokenList.prototype.toggle) {
+            try {
+                var test = d.createElement('i').classList;
+                test.toggle('__ph_force_test__', false);
+                if (test.contains('__ph_force_test__')) {
+                    var nativeToggle = w.DOMTokenList.prototype.toggle;
+                    Object.defineProperty(w.DOMTokenList.prototype, 'toggle', {
+                        configurable: true, writable: true,
+                        value: function (token, force) {
+                            if (arguments.length < 2) return nativeToggle.call(this, token);
+                            if (force) { this.add(token); return true; }
+                            this.remove(token); return false;
+                        }
+                    });
+                }
+            } catch (_) {}
+        }
+    })(window, document);
+    </script>
     <!-- Inline favicon: no extra request, so no 404 in the console. -->
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%236c5ce7'/%3E%3Ctext x='32' y='44' font-family='Arial,Helvetica,sans-serif' font-size='30' font-weight='bold' text-anchor='middle' fill='%23ffffff'%3EPH%3C/text%3E%3C/svg%3E" />
 
@@ -145,7 +281,7 @@
         .theme-custom .modal-box,
         .theme-custom .item-card {
             background: rgba(255, 255, 255, 0.85) !important;
-            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
         }
         .dark.theme-custom .form-card,
         .dark.theme-custom .topbar,
@@ -288,7 +424,7 @@
             background: var(--toast-bg);
             color: var(--toast-text);
             box-shadow: 0 12px 40px rgba(0, 0, 0, .25);
-            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
             border: 1px solid rgba(255, 255, 255, .06);
             animation: slideIn .35s ease;
             display: flex;
@@ -344,7 +480,7 @@
             inset: 0;
             z-index: 99998;
             background: var(--modal-bg);
-            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -454,7 +590,7 @@
             position: relative;
             z-index: 2;
             background: var(--glass);
-            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);
             border: 1px solid var(--glass-border);
             border-radius: var(--radius);
             padding: 48px 40px 40px;
@@ -624,7 +760,7 @@
             position: sticky;
             top: 0;
             z-index: 100;
-            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
             transition: background var(--transition);
             flex-wrap: wrap;
             gap: 12px;
@@ -724,7 +860,7 @@
         }
         .dash-card {
             background: var(--card);
-            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
             border: 1px solid var(--card-border);
             border-radius: 16px;
             padding: 24px 20px;
@@ -847,7 +983,7 @@
             padding: 6px;
             margin-bottom: 28px;
             border: 1px solid var(--card-border);
-            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
         }
         .tab-btn {
             padding: 10px 22px;
@@ -896,7 +1032,7 @@
         /* FORM ELEMENTS */
         .form-card {
             background: var(--card);
-            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
             border: 1px solid var(--card-border);
             border-radius: var(--radius);
             padding: 28px 30px;
@@ -1234,7 +1370,7 @@
             inset: 0;
             z-index: 99990;
             background: var(--modal-bg);
-            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -2239,7 +2375,7 @@
 
         /* Added professional route/passenger/chat/theme enhancements */
         .chat-message .chat-image{display:block;max-width:240px;max-height:220px;border-radius:10px;margin-top:6px;border:1px solid rgba(255,255,255,.18);object-fit:cover}.chat-input .chat-attach-btn{width:42px;justify-content:center;padding:8px 10px}.theme-choice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0}.theme-choice{border:1px solid var(--card-border);background:var(--card);border-radius:14px;padding:16px;cursor:pointer;transition:transform .2s,border-color .2s}.theme-choice:hover{transform:translateY(-3px);border-color:var(--primary)}.theme-choice strong{display:block;margin-bottom:4px}
-        .theme-custom{--custom-panel-bg:rgba(18,18,26,.62);--custom-border:rgba(255,255,255,.22);--custom-readable:#fff;--custom-readable-soft:rgba(255,255,255,.78);--bg:rgba(18,18,26,.25);--bg2:var(--custom-panel-bg);--card:var(--custom-panel-bg);--card-border:var(--custom-border);--glass:var(--custom-panel-bg);--glass-border:var(--custom-border);--input-bg:rgba(255,255,255,.16);--tab-bg:rgba(255,255,255,.12);--chat-bg:rgba(255,255,255,.08);--text:var(--custom-readable);--text2:var(--custom-readable-soft);background-image:var(--bg-image,none);background-size:cover;background-position:center;background-attachment:fixed;background-blend-mode:normal}.theme-custom::before{content:'';position:fixed;inset:0;z-index:-1;background:var(--custom-page-overlay,linear-gradient(135deg,rgba(0,0,0,.35),rgba(0,0,0,.12)));pointer-events:none}.theme-custom #loginPage{background-image:var(--bg-image,none)!important;background-size:cover!important;background-position:center!important;background-attachment:fixed!important}.theme-custom #loginPage::before{background:var(--custom-page-overlay,rgba(0,0,0,.34))}.theme-custom .login-card,.theme-custom .form-card,.theme-custom .topbar,.theme-custom .dash-card,.theme-custom .modal-box,.theme-custom .item-card,.theme-custom .chat-container,.theme-custom .chat-user-list,.theme-custom .payment-table-wrap,.theme-custom .history-table-wrap,.theme-custom .account-summary .stat-box,.theme-custom .branding-preview,.theme-custom .time-card{background:var(--custom-panel-bg)!important;color:var(--custom-readable)!important;border-color:var(--custom-border)!important;backdrop-filter:blur(18px) saturate(120%);box-shadow:0 24px 70px rgba(0,0,0,.28);border-radius:16px}.theme-custom input,.theme-custom select,.theme-custom textarea,.theme-custom .search-bar input,.theme-custom .search-bar select{color:var(--custom-readable)!important;background:rgba(255,255,255,.14)!important;border-color:var(--custom-border)!important}.theme-custom input::placeholder,.theme-custom textarea::placeholder{color:rgba(255,255,255,.55)!important}.theme-custom .text-muted,.theme-custom .form-group label,.theme-custom .dash-card p,.theme-custom .login-card .logo-wrap p,.theme-custom .login-card label,.theme-custom .login-card .flex-remember label,.theme-custom .login-card .flex-remember a{color:var(--custom-readable-soft)!important}
+        .theme-custom{--custom-panel-bg:rgba(18,18,26,.62);--custom-border:rgba(255,255,255,.22);--custom-readable:#fff;--custom-readable-soft:rgba(255,255,255,.78);--bg:rgba(18,18,26,.25);--bg2:var(--custom-panel-bg);--card:var(--custom-panel-bg);--card-border:var(--custom-border);--glass:var(--custom-panel-bg);--glass-border:var(--custom-border);--input-bg:rgba(255,255,255,.16);--tab-bg:rgba(255,255,255,.12);--chat-bg:rgba(255,255,255,.08);--text:var(--custom-readable);--text2:var(--custom-readable-soft);background-image:var(--bg-image,none);background-size:cover;background-position:center;background-attachment:fixed;background-blend-mode:normal}.theme-custom::before{content:'';position:fixed;inset:0;z-index:-1;background:var(--custom-page-overlay,linear-gradient(135deg,rgba(0,0,0,.35),rgba(0,0,0,.12)));pointer-events:none}.theme-custom #loginPage{background-image:var(--bg-image,none)!important;background-size:cover!important;background-position:center!important;background-attachment:fixed!important}.theme-custom #loginPage::before{background:var(--custom-page-overlay,rgba(0,0,0,.34))}.theme-custom .login-card,.theme-custom .form-card,.theme-custom .topbar,.theme-custom .dash-card,.theme-custom .modal-box,.theme-custom .item-card,.theme-custom .chat-container,.theme-custom .chat-user-list,.theme-custom .payment-table-wrap,.theme-custom .history-table-wrap,.theme-custom .account-summary .stat-box,.theme-custom .branding-preview,.theme-custom .time-card{background:var(--custom-panel-bg)!important;color:var(--custom-readable)!important;border-color:var(--custom-border)!important;-webkit-backdrop-filter:blur(18px) saturate(120%);backdrop-filter:blur(18px) saturate(120%);box-shadow:0 24px 70px rgba(0,0,0,.28);border-radius:16px}.theme-custom input,.theme-custom select,.theme-custom textarea,.theme-custom .search-bar input,.theme-custom .search-bar select{color:var(--custom-readable)!important;background:rgba(255,255,255,.14)!important;border-color:var(--custom-border)!important}.theme-custom input::placeholder,.theme-custom textarea::placeholder{color:rgba(255,255,255,.55)!important}.theme-custom .text-muted,.theme-custom .form-group label,.theme-custom .dash-card p,.theme-custom .login-card .logo-wrap p,.theme-custom .login-card label,.theme-custom .login-card .flex-remember label,.theme-custom .login-card .flex-remember a{color:var(--custom-readable-soft)!important}
     
 
         /* MuleRun requested additions: readable selects, activities, calendar, ATOL, chat notifications */
@@ -2484,7 +2620,7 @@
             border: 1px solid var(--card-border);
             border-radius: 18px;
             background: color-mix(in srgb, var(--bg2) 88%, transparent);
-            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
             box-shadow: 0 -10px 35px rgba(0,0,0,.08);
         }
         .voucher-preview-card {
@@ -2678,7 +2814,7 @@
         body.mr-new-theme.mr-nav-collapsed #appShell{padding-left:82px;}
         @media(max-width:900px){body.mr-new-theme #appShell{padding-left:0;} body.mr-new-theme .mr-sidebar{transform:translateX(-100%);} body.mr-new-theme.mr-nav-open .mr-sidebar{transform:translateX(0);}}
 
-        .mr-sidebar{position:fixed;top:0;left:0;width:230px;height:100vh;padding:22px 14px 20px;background:linear-gradient(180deg,rgba(35,15,60,.92),rgba(20,10,40,.94));backdrop-filter:blur(24px);border-right:1px solid var(--mr-border);z-index:900;display:flex;flex-direction:column;transition:width .28s ease,transform .28s ease;box-shadow:8px 0 30px rgba(0,0,0,.35);}
+        .mr-sidebar{position:fixed;top:0;left:0;width:230px;height:100vh;padding:22px 14px 20px;background:linear-gradient(180deg,rgba(35,15,60,.92),rgba(20,10,40,.94));-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);border-right:1px solid var(--mr-border);z-index:900;display:flex;flex-direction:column;transition:width .28s ease,transform .28s ease;box-shadow:8px 0 30px rgba(0,0,0,.35);}
         body.mr-new-theme.mr-light .mr-sidebar{background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(240,238,252,.9));}
         body.mr-new-theme.mr-nav-collapsed .mr-sidebar{width:64px;padding:22px 8px 20px;}
         .mr-sidebar-brand{display:flex;align-items:center;gap:10px;padding:6px 8px 22px;border-bottom:1px solid var(--mr-border);margin-bottom:14px;color:var(--mr-text);}
@@ -2700,7 +2836,7 @@
         .mr-nav-collapse-btn{margin-top:10px;padding:9px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid var(--mr-border);color:var(--mr-text-2);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-size:.85rem;}
         .mr-nav-collapse-btn:hover{background:rgba(255,255,255,.1);color:var(--mr-text);}
 
-        body.mr-new-theme .topbar{background:linear-gradient(135deg,rgba(255,92,173,.18),rgba(139,92,246,.14)) !important;border:1px solid var(--mr-border) !important;backdrop-filter:blur(22px);border-radius:22px !important;padding:14px 22px !important;margin:18px 22px 8px !important;box-shadow:var(--mr-shadow);flex-wrap:wrap;gap:12px;}
+        body.mr-new-theme .topbar{background:linear-gradient(135deg,rgba(255,92,173,.18),rgba(139,92,246,.14)) !important;border:1px solid var(--mr-border) !important;-webkit-backdrop-filter:blur(22px);backdrop-filter:blur(22px);border-radius:22px !important;padding:14px 22px !important;margin:18px 22px 8px !important;box-shadow:var(--mr-shadow);flex-wrap:wrap;gap:12px;}
         body.mr-new-theme .topbar .brand{display:none !important;}
         body.mr-new-theme .topbar::before{content:attr(data-mr-title);font-family:'Playfair Display',serif;font-size:1.55rem;font-weight:700;color:#fff;flex:0 0 auto;text-shadow:0 2px 12px rgba(0,0,0,.3);}
         body.mr-new-theme.mr-light .topbar::before{color:#231539;text-shadow:none;}
@@ -2711,7 +2847,7 @@
         body.mr-new-theme.mr-light .mr-topsearch input{background:rgba(255,255,255,.85);color:#1e1e2a;border-color:rgba(30,20,60,.14);} body.mr-new-theme.mr-light .mr-topsearch input::placeholder{color:#7d7a95;}
         .mr-topsearch input:focus{border-color:var(--mr-accent-1);box-shadow:0 0 0 3px rgba(255,92,173,.22);}
         .mr-topsearch>i{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--mr-text-2);pointer-events:none;}
-        .mr-search-results{position:absolute;left:0;right:0;top:calc(100% + 6px);background:var(--mr-panel);border:1px solid var(--mr-border);border-radius:16px;backdrop-filter:blur(22px);box-shadow:var(--mr-shadow);z-index:1000;max-height:420px;overflow:auto;display:none;}
+        .mr-search-results{position:absolute;left:0;right:0;top:calc(100% + 6px);background:var(--mr-panel);border:1px solid var(--mr-border);border-radius:16px;-webkit-backdrop-filter:blur(22px);backdrop-filter:blur(22px);box-shadow:var(--mr-shadow);z-index:1000;max-height:420px;overflow:auto;display:none;}
         .mr-search-results.open{display:block;}
         .mr-search-group{padding:8px 10px;}
         .mr-search-group-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;color:var(--mr-text-2);padding:4px 10px 6px;font-weight:700;}
@@ -2726,7 +2862,7 @@
         .mr-icon-btn .mr-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--mr-accent-1);color:#fff;font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,92,173,.5);}
         .mr-icon-btn .mr-badge:empty,.mr-icon-btn .mr-badge[data-count="0"]{display:none;}
 
-        .mr-notify-panel,.mr-profile-panel{position:absolute;top:calc(100% + 12px);right:0;width:min(360px,calc(100vw - 40px));background:var(--mr-panel);border:1px solid var(--mr-border);border-radius:18px;backdrop-filter:blur(22px);box-shadow:var(--mr-shadow);z-index:1100;display:none;overflow:hidden;}
+        .mr-notify-panel,.mr-profile-panel{position:absolute;top:calc(100% + 12px);right:0;width:min(360px,calc(100vw - 40px));background:var(--mr-panel);border:1px solid var(--mr-border);border-radius:18px;-webkit-backdrop-filter:blur(22px);backdrop-filter:blur(22px);box-shadow:var(--mr-shadow);z-index:1100;display:none;overflow:hidden;}
         .mr-notify-panel.open,.mr-profile-panel.open{display:block;animation:mrPanelIn .2s ease;}
         @keyframes mrPanelIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:none;}}
         .mr-notify-head{padding:14px 18px;border-bottom:1px solid var(--mr-border);display:flex;justify-content:space-between;align-items:center;color:var(--mr-text);font-weight:700;}
@@ -2778,7 +2914,7 @@
         .mr-dash .mr-col{display:flex;flex-direction:column;gap:20px;min-width:0;}
         .mr-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
         @media(max-width:780px){.mr-cards{grid-template-columns:1fr;}}
-        .mr-stat{background:linear-gradient(135deg,rgba(60,20,80,.55),rgba(30,10,50,.4));border:1px solid var(--mr-border);border-radius:20px;padding:22px;display:flex;gap:16px;align-items:center;backdrop-filter:blur(18px);box-shadow:var(--mr-shadow);transition:transform .25s,box-shadow .25s;cursor:pointer;}
+        .mr-stat{background:linear-gradient(135deg,rgba(60,20,80,.55),rgba(30,10,50,.4));border:1px solid var(--mr-border);border-radius:20px;padding:22px;display:flex;gap:16px;align-items:center;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:var(--mr-shadow);transition:transform .25s,box-shadow .25s;cursor:pointer;}
         .mr-stat:hover{transform:translateY(-4px);box-shadow:0 24px 60px rgba(255,92,173,.25);}
         body.mr-new-theme.mr-light .mr-stat{background:linear-gradient(135deg,rgba(255,255,255,.95),rgba(248,244,255,.9));}
         .mr-stat-ico{width:58px;height:58px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#fff;flex:0 0 auto;}
@@ -2791,7 +2927,7 @@
         .mr-stat-sub .mr-chip{padding:2px 8px;border-radius:999px;background:rgba(255,92,173,.18);color:#ffb3d9;font-weight:600;font-size:.68rem;}
         body.mr-new-theme.mr-light .mr-stat-sub .mr-chip{background:rgba(255,92,173,.15);color:#c026d3;}
 
-        .mr-panel{background:linear-gradient(135deg,rgba(60,20,80,.55),rgba(30,10,50,.4));border:1px solid var(--mr-border);border-radius:22px;padding:22px;backdrop-filter:blur(18px);box-shadow:var(--mr-shadow);}
+        .mr-panel{background:linear-gradient(135deg,rgba(60,20,80,.55),rgba(30,10,50,.4));border:1px solid var(--mr-border);border-radius:22px;padding:22px;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:var(--mr-shadow);}
         body.mr-new-theme.mr-light .mr-panel{background:linear-gradient(135deg,rgba(255,255,255,.95),rgba(248,244,255,.9));}
         .mr-panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px;flex-wrap:wrap;}
         .mr-panel-title{font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:700;color:var(--mr-text);}
@@ -3649,7 +3785,58 @@
             }
 
             function sha256(message) {
-                return CryptoJS.SHA256(message).toString();
+                message = String(message);
+                if (typeof CryptoJS !== 'undefined' && CryptoJS && typeof CryptoJS.SHA256 === 'function') {
+                    return CryptoJS.SHA256(message).toString();
+                }
+                // Synchronous SHA-256 fallback: keeps sign-in and password reset
+                // working when a browser, privacy extension, or CDN outage blocks CryptoJS.
+                var text = unescape(encodeURIComponent(message));
+                var words = [], bitLength = text.length * 8;
+                for (var i = 0; i < text.length; i++) {
+                    words[i >> 2] = (words[i >> 2] || 0) | (text.charCodeAt(i) << (24 - (i % 4) * 8));
+                }
+                words[bitLength >> 5] = (words[bitLength >> 5] || 0) | (0x80 << (24 - bitLength % 32));
+                words[(((bitLength + 64) >> 9) << 4) + 15] = bitLength;
+                var k = [
+                    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+                    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+                    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+                    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+                    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+                    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+                    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+                    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+                ];
+                var h = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+                function rotr(x, n) { return (x >>> n) | (x << (32 - n)); }
+                for (var block = 0; block < words.length; block += 16) {
+                    var w = new Array(64), t;
+                    for (t = 0; t < 16; t++) w[t] = words[block + t] | 0;
+                    for (t = 16; t < 64; t++) {
+                        var x = w[t - 15], y = w[t - 2];
+                        var s0 = rotr(x, 7) ^ rotr(x, 18) ^ (x >>> 3);
+                        var s1 = rotr(y, 17) ^ rotr(y, 19) ^ (y >>> 10);
+                        w[t] = (w[t - 16] + s0 + w[t - 7] + s1) | 0;
+                    }
+                    var a=h[0], b=h[1], c=h[2], d=h[3], e=h[4], f=h[5], g=h[6], z=h[7];
+                    for (t = 0; t < 64; t++) {
+                        var e1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+                        var choose = (e & f) ^ (~e & g);
+                        var temp1 = (z + e1 + choose + k[t] + w[t]) | 0;
+                        var a0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+                        var majority = (a & b) ^ (a & c) ^ (b & c);
+                        var temp2 = (a0 + majority) | 0;
+                        z=g; g=f; f=e; e=(d+temp1)|0; d=c; c=b; b=a; a=(temp1+temp2)|0;
+                    }
+                    h[0]=(h[0]+a)|0; h[1]=(h[1]+b)|0; h[2]=(h[2]+c)|0; h[3]=(h[3]+d)|0;
+                    h[4]=(h[4]+e)|0; h[5]=(h[5]+f)|0; h[6]=(h[6]+g)|0; h[7]=(h[7]+z)|0;
+                }
+                var hex = '';
+                for (var q = 0; q < h.length; q++) {
+                    for (var byte = 3; byte >= 0; byte--) hex += ('0' + ((h[q] >>> (byte * 8)) & 255).toString(16)).slice(-2);
+                }
+                return hex;
             }
 
             var _ipPromise = null;
@@ -3667,6 +3854,7 @@
                 if (_ipPromise) return _ipPromise;
                 _ipPromise = (async function() {
                     var endpoints = [
+                        { url: 'https://jsonip.com', json: true },
                         { url: 'https://api.ipify.org?format=json', json: true },
                         { url: 'https://api64.ipify.org?format=json', json: true },
                         { url: 'https://api.ipify.org?format=text', json: false },
@@ -3698,14 +3886,38 @@
             function _fetchIpOnce(url, ms) {
                 return new Promise(function(resolve, reject) {
                     var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+                    var xhr = null;
                     var timer = setTimeout(function() {
                         try { if (ctrl) ctrl.abort(); } catch (_) {}
+                        try { if (xhr) xhr.abort(); } catch (_) {}
                         reject(new Error('ip-lookup-timeout'));
                     }, ms);
+                    if (typeof fetch === 'function') {
+                        try {
+                            var opts = ctrl ? { signal: ctrl.signal } : undefined;
+                            fetch(url, opts).then(function(r) { clearTimeout(timer); resolve(r); },
+                                                  function(e) { clearTimeout(timer); reject(e); });
+                        } catch (e) { clearTimeout(timer); reject(e); }
+                        return;
+                    }
+                    if (typeof XMLHttpRequest === 'undefined') {
+                        clearTimeout(timer); reject(new Error('No supported network API')); return;
+                    }
                     try {
-                        var opts = ctrl ? { signal: ctrl.signal } : undefined;
-                        fetch(url, opts).then(function(r) { clearTimeout(timer); resolve(r); },
-                                              function(e) { clearTimeout(timer); reject(e); });
+                        xhr = new XMLHttpRequest();
+                        xhr.open('GET', url, true);
+                        xhr.onload = function() {
+                            clearTimeout(timer);
+                            var body = xhr.responseText || '';
+                            resolve({
+                                ok: xhr.status >= 200 && xhr.status < 300,
+                                json: function() { return Promise.resolve().then(function() { return JSON.parse(body || '{}'); }); },
+                                text: function() { return Promise.resolve(body); }
+                            });
+                        };
+                        xhr.onerror = function() { clearTimeout(timer); reject(new Error('ip-lookup-network-error')); };
+                        xhr.ontimeout = function() { clearTimeout(timer); reject(new Error('ip-lookup-timeout')); };
+                        xhr.send(null);
                     } catch (e) { clearTimeout(timer); reject(e); }
                 });
             }
@@ -3713,11 +3925,12 @@
             // ---- IP approval waiting screen ----
             var _ipApprovalPoller = null;
             function showIpApprovalWaitingScreen(username, ip) {
+                var ipLabel = (!ip || ip === 'unknown') ? 'unknown — this browser could not detect its IP' : escapeHTML(ip);
                 // Clean any prior poller
                 if (_ipApprovalPoller) { try { clearInterval(_ipApprovalPoller); } catch (_) {} _ipApprovalPoller = null; }
                 showModal(
                     '<h3><i class="fas fa-hourglass-half"></i> Waiting for Admin Approval</h3>' +
-                    '<p style="margin:12px 0;">Your login from IP <code>' + escapeHTML(ip || 'unknown') + '</code> is pending admin approval.</p>' +
+                    '<p style="margin:12px 0;">Your login from IP <code>' + ipLabel + '</code> is pending admin approval.</p>' +
                     '<p style="margin:12px 0;">Please contact the admin. Once approved, you will be logged in automatically without needing to log in again.</p>' +
                     '<div id="ipApprovalStatus" style="margin:16px 0;padding:12px;background:var(--input-bg);border-radius:8px;text-align:center;font-size:0.9rem;color:var(--text2);"><i class="fas fa-circle-notch fa-spin"></i> Polling admin approval…</div>' +
                     '<div class="modal-actions">' +
@@ -3733,13 +3946,16 @@
                     try {
                         var fresh = await readData('users/' + username, null, true);
                         if (!fresh) return;
-                        var appr = fresh.approvedIps || [];
+                        var appr = Array.isArray(fresh.approvedIps) ? fresh.approvedIps : [];
                         if (appr.indexOf(ip) !== -1) {
                             clearInterval(_ipApprovalPoller); _ipApprovalPoller = null;
+                            // Unknown is never a reusable allowlist entry: its approval
+                            // authorizes only this waiting sign-in, not another browser/IP.
+                            if (ip === 'unknown') fresh.approvedIps = appr.filter(function(x) { return x !== 'unknown'; });
                             var full = Object.assign({}, fresh, { username: username, ip: ip, lastLogin: getNowISO() });
                             // Update lastLogin
                             fresh.lastLogin = full.lastLogin; fresh.ip = ip;
-                            fresh.pendingIps = (fresh.pendingIps || []).filter(function(x) { return x !== ip; });
+                            fresh.pendingIps = (Array.isArray(fresh.pendingIps) ? fresh.pendingIps : []).filter(function(x) { return x !== ip; });
                             await persistUserRecord(username, fresh);
                             await logLoginEvent(username, ip, 'success', 'Approved by admin');
                             STATE.currentUser = full;
@@ -3747,7 +3963,7 @@
                             window.closeModal();
                             showToast('Approved! Logging you in…', 'success');
                             await afterLogin(full);
-                        } else if ((fresh.deniedIps || []).indexOf(ip) !== -1) {
+                        } else if ((Array.isArray(fresh.deniedIps) ? fresh.deniedIps : []).indexOf(ip) !== -1) {
                             clearInterval(_ipApprovalPoller); _ipApprovalPoller = null;
                             await logLoginEvent(username, ip, 'denied', 'Denied by admin');
                             var el = document.getElementById('ipApprovalStatus');
@@ -3960,6 +4176,7 @@
             // any other read path is untouched.
             var _readInFlight = {};
             var _readStamp = {};
+            var _readSource = {}; // path/fallback cache key -> firebase | local | none
             var _READ_TTL = 12000;
             var _READ_TTL_PATHS = { quotes: 1, invoices: 1 };
 
@@ -4023,6 +4240,7 @@
                         if (!snap) throw new Error('read-timeout');
                         var val = snap.val();
                         if (val !== null && val !== undefined) {
+                            _readSource[cacheKey] = 'firebase';
                             if (fallbackKey) {
                                 try { localStorage.setItem(fallbackKey, JSON.stringify(_stripPasswordHashes(val))); } catch (_) {}
                             }
@@ -4038,11 +4256,13 @@
                         var raw = localStorage.getItem(fallbackKey);
                         if (raw) {
                             var parsed = JSON.parse(raw);
+                            _readSource[cacheKey] = 'local';
                             STATE._cache[cacheKey] = parsed;
                             return parsed;
                         }
                     } catch (_) {}
                 }
+                _readSource[cacheKey] = 'none';
                 return null;
             }
 
@@ -4136,6 +4356,7 @@
                 name: 'Administrator',
                 email: 'admin@planholidays.co.uk',
                 locked: false,
+                lockReason: '',
                 failedAttempts: 0,
                 ip: '',
                 lastLogin: null,
@@ -4229,53 +4450,70 @@
                 return users;
             }
 
-            // Persist ONLY the IP-approval fields for one user.
-            // persistUserRecord() rewrites the ENTIRE users map, so if two agents
-            // hit "waiting for approval" at the same time the second write could
-            // resurrect a stale copy and silently drop the first agent's pending
-            // IP - the admin then sees nothing to approve. Writing just this
-            // user's child node is atomic and cannot clobber anybody else.
+            // Submit only a pending-IP change using a Firebase transaction. This
+            // merges against the latest user record, so another browser's password,
+            // approved IPs, and pending requests cannot be overwritten by a stale cache.
             async function persistUserIpRequest(username, user, ip) {
-                var fields = {
+                var requestTime = user.lastIpRequest || getNowISO();
+                var remoteSaved = false;
+                if (db) {
+                    try {
+                        var txn = db.ref('users/' + username).transaction(function(current) {
+                            if (!current || typeof current !== 'object') return;
+                            var next = Object.assign({}, current);
+                            var pending = Array.isArray(next.pendingIps) ? next.pendingIps.slice() : [];
+                            if (pending.indexOf(ip) === -1) pending.push(ip);
+                            next.pendingIps = pending;
+                            if (ip === 'unknown') {
+                                next.approvedIps = (Array.isArray(next.approvedIps) ? next.approvedIps : []).filter(function(x) { return x !== 'unknown'; });
+                            }
+                            next.ip = ip || next.ip || '';
+                            next.lastIpRequest = requestTime;
+                            return next;
+                        }).then(function(result) { return !!(result && result.committed); });
+                        remoteSaved = (await _awaitWithTimeout(txn, 12000)) === true;
+                    } catch (e) { console.warn('IP approval request could not be saved:', e); }
+                }
+                var merged = Object.assign({}, user, {
                     pendingIps: user.pendingIps || [],
-                    approvedIps: user.approvedIps || [],
-                    deniedIps: user.deniedIps || [],
                     ip: ip || user.ip || '',
-                    lastIpRequest: user.lastIpRequest || getNowISO()
-                };
-                var merged = Object.assign({}, user, fields);
-                // Same guard: never overwrite a stored credential with a copy
-                // that does not carry one.
-                if (!merged.passwordHash && user.passwordHash) merged.passwordHash = user.passwordHash;
-                delete merged.pwdVerify;
-                try { await writeData('users/' + username, merged, 'ph_user_' + username); } catch (_) {}
+                    lastIpRequest: requestTime
+                });
+                if (ip === 'unknown') merged.approvedIps = (Array.isArray(merged.approvedIps) ? merged.approvedIps : []).filter(function(x) { return x !== 'unknown'; });
                 try {
                     var all = (STATE._cache && STATE._cache['users_ph_users']) || {};
                     if (!Object.keys(all).length) all = JSON.parse(localStorage.getItem('ph_users') || '{}') || {};
                     all[username] = Object.assign({}, all[username] || {}, merged);
                     STATE._cache['users_ph_users'] = all;
+                    localStorage.setItem('ph_user_' + username, JSON.stringify(_stripPasswordHashes(merged)));
                     localStorage.setItem('ph_users', JSON.stringify(_stripPasswordHashes(all)));
                 } catch (_) {}
+                return remoteSaved;
             }
 
-            // Persists one user WITHOUT clobbering the whole user map.
-            // Writing a single record to 'users/<name>' must never use the
-            // 'ph_users' fallback key, or offline mode overwrites every user.
+            // Persists only one user's child record. A whole-users rewrite here
+            // raced across tabs/browsers and could restore stale failure counters,
+            // lock state, or credentials over a newer record.
             async function persistUserRecord(username, user) {
                 var allUsers = sanitizeUsersMap(await readData('users', 'ph_users', true)) || {};
-                // The caller may be holding a copy that came from the browser
-                // cache, which by design carries no passwordHash. Writing that
-                // back as-is would erase the real credential from the database
-                // and lock the account for ever, so the stored hash is always
-                // taken from the record already there.
+                var recordSource = _readSource['users_ph_users'] || 'none';
                 var prevUser = allUsers[username] || {};
                 var writeUser = Object.assign({}, user);
+                // Preserve either the live hash or the local-only offline verifier.
                 if (!writeUser.passwordHash && prevUser.passwordHash) writeUser.passwordHash = prevUser.passwordHash;
-                delete writeUser.pwdVerify;
+                if (!writeUser.pwdVerify && prevUser.pwdVerify) writeUser.pwdVerify = prevUser.pwdVerify;
+                var dbUser = Object.assign({}, writeUser);
+                delete dbUser.pwdVerify;
+                if (recordSource === 'firebase') {
+                    await writeData('users/' + username, dbUser, 'ph_user_' + username);
+                } else {
+                    // Offline/stale cache: update this browser only. Never let a
+                    // local verifier or an old user-map snapshot overwrite Firebase.
+                    try { localStorage.setItem('ph_user_' + username, JSON.stringify(_stripPasswordHashes(writeUser))); } catch (_) {}
+                }
                 allUsers[username] = writeUser;
-                await writeData('users', allUsers, 'ph_users');
-                await writeData('users/' + username, writeUser, 'ph_user_' + username);
                 STATE._cache['users_ph_users'] = allUsers;
+                try { localStorage.setItem('ph_users', JSON.stringify(_stripPasswordHashes(allUsers))); } catch (_) {}
                 return allUsers;
             }
 
@@ -4338,6 +4576,7 @@
                     admin.passwordHash = defaultHash;
                     admin.locked = false;
                     admin.failedAttempts = 0;
+                    admin.lockReason = '';
                     admin.credStamp = ADMIN_CRED_STAMP;
                     var newUsers = users ? { ...users } : {};
                     newUsers.Plan = admin;
@@ -4361,9 +4600,10 @@
                     }
 
                     // Self-heal: the admin can never remain locked.
-                    if (plan.locked || plan.failedAttempts) {
+                    if (plan.locked || plan.failedAttempts || plan.lockReason) {
                         plan.locked = false;
                         plan.failedAttempts = 0;
+                        plan.lockReason = '';
                         dirty = true;
                         console.log('Admin account unlocked and attempt counter cleared.');
                     }
@@ -4398,11 +4638,12 @@
                 // database has already been proven unreachable this session.
                 await waitForFirebase(4000);
                 var users = sanitizeUsersMap(await readData('users', 'ph_users', true));
+                var authSource = _readSource['users_ph_users'] || 'none';
 
                 if (!users || !users.Plan) {
                     var defaultHash = ADMIN_DEFAULT_HASH;
                     var admin = { ...DEFAULT_ADMIN, passwordHash: defaultHash, locked: false,
-                        failedAttempts: 0, credStamp: ADMIN_CRED_STAMP };
+                        lockReason: '', failedAttempts: 0, credStamp: ADMIN_CRED_STAMP };
                     users = users ? { ...users } : {};
                     users.Plan = admin;
                     await writeData('users', users, 'ph_users');
@@ -4414,6 +4655,7 @@
                     users.Plan.role = 'admin';
                     users.Plan.locked = false;
                     users.Plan.failedAttempts = 0;
+                    users.Plan.lockReason = '';
                     await writeData('users', users, 'ph_users');
                     await writeData('users/Plan', users.Plan, 'ph_users_Plan');
                 }
@@ -4426,14 +4668,20 @@
 
                 var protectedAdmin = isProtectedAdmin(username, user);
 
-                // Admin accounts are exempt from the lockout gate.
-                if (user.locked && !protectedAdmin) {
-                    showToast('Account is locked. Please contact an administrator.', 'error');
+                // Admin accounts are exempt from the lockout gate. A lock caused
+                // by repeated password failures is recoverable with the correct
+                // password; an explicit administrator lock remains enforced.
+                var autoLocked = !!(user.locked && !protectedAdmin &&
+                    (user.lockReason === 'failed-attempts' ||
+                     (!user.lockReason && (parseInt(user.failedAttempts, 10) || 0) >= 5)));
+                if (user.locked && !protectedAdmin && !autoLocked) {
+                    showToast('Account is locked by an administrator. Please contact an administrator.', 'error');
                     return null;
                 }
-                if (protectedAdmin && (user.locked || user.failedAttempts)) {
+                if (protectedAdmin && (user.locked || user.failedAttempts || user.lockReason)) {
                     user.locked = false;
                     user.failedAttempts = 0;
+                    user.lockReason = '';
                 }
 
                 var hash = sha256(trimmedPassword);
@@ -4449,33 +4697,57 @@
                         showToast('Invalid username or password.', 'error');
                         return null;
                     }
-                    user.failedAttempts = (user.failedAttempts || 0) + 1;
-                    if (user.failedAttempts >= 5) {
-                        user.locked = true;
-                        showToast('Account locked due to too many failed attempts. Contact admin.', 'error');
+                    // Only a failed check against the live Firebase credential is
+                    // recorded in the shared failed-attempt counter. A stale/offline browser verifier can
+                    // never lock the shared account just because that browser is
+                    // temporarily out of date or disconnected.
+                    if (authSource === 'firebase' && user.passwordHash) {
+                        user.failedAttempts = (parseInt(user.failedAttempts, 10) || 0) + 1;
+                        if (user.failedAttempts === 5) {
+                            // Keep the signal for administrators, but do not
+                            // permanently lock a shared account from one browser.
+                            showToast('Repeated failed sign-in attempts were recorded. Contact an administrator if you need a password reset.', 'warning');
+                        }
+                        await persistUserRecord(username, user);
                     }
-                    await persistUserRecord(username, user);
                     showToast('Invalid username or password.', 'error');
                     return null;
                 }
 
                 user.failedAttempts = 0;
-                if (protectedAdmin) user.locked = false;
+                if (autoLocked) {
+                    user.locked = false;
+                    user.lockReason = '';
+                }
+                if (protectedAdmin) { user.locked = false; user.lockReason = ''; }
                 var ip = await fetchIP();
+                var needsIpApproval = username !== 'Plan' && user.role !== 'admin';
+                var ipLookupUnavailable = !ip || ip === 'unknown';
+                if (needsIpApproval && ipLookupUnavailable) {
+                    // Fail closed: an undetected IP is not an approved IP. The
+                    // request is still submitted to the administrator for review.
+                    showToast('This browser could not determine your IP. Sign-in will wait for admin approval.', 'warning', 5000);
+                }
 
                 // ---- IP approval check ----
-                // Admin (Plan) bypasses IP approval.
-                // Agents/managers: IP must be in user.approvedIps whitelist.
-                if (username !== 'Plan' && user.role !== 'admin') {
-                    user.approvedIps = user.approvedIps || [];
-                    user.pendingIps = user.pendingIps || [];
-                    user.deniedIps = user.deniedIps || [];
-                    if (user.deniedIps.indexOf(ip) !== -1) {
+                // Admin (Plan) bypasses IP approval. Every agent IP must match an
+                // approved address; a new/unknown address is sent to the pending queue.
+                if (needsIpApproval) {
+                    user.approvedIps = Array.isArray(user.approvedIps) ? user.approvedIps : [];
+                    user.pendingIps = Array.isArray(user.pendingIps) ? user.pendingIps : [];
+                    user.deniedIps = Array.isArray(user.deniedIps) ? user.deniedIps : [];
+                    // "unknown" is not an address and must never act as a wildcard.
+                    // Any historical unknown approval is consumed only by the current
+                    // explicit admin approval below, then removed from the allowlist.
+                    if (ipLookupUnavailable) {
+                        user.approvedIps = user.approvedIps.filter(function(x) { return x !== 'unknown'; });
+                    }
+                    if (!ipLookupUnavailable && user.deniedIps.indexOf(ip) !== -1) {
                         await logLoginEvent(username, ip, 'denied', 'Denied IP attempted login');
                         showToast('This IP has been denied by admin. Contact administrator.', 'error');
-                        return null;
+                        return { __ipDenied: true, username: username, ip: ip };
                     }
-                    var approved = user.approvedIps.indexOf(ip) !== -1;
+                    var approved = !ipLookupUnavailable && user.approvedIps.indexOf(ip) !== -1;
                     if (!approved) {
                         // Add to pending if not there
                         if (user.pendingIps.indexOf(ip) === -1) user.pendingIps.push(ip);
@@ -4484,7 +4756,12 @@
                         // Child-only write: never rewrites the whole users map,
                         // so a concurrent request from another agent cannot
                         // erase this pending IP.
-                        await persistUserIpRequest(username, user, ip);
+                        var requestSaved = await persistUserIpRequest(username, user, ip);
+                        if (!requestSaved) {
+                            await logLoginEvent(username, ip, 'pending', 'IP approval request could not reach Firebase');
+                            showToast('Your IP is not approved, but the approval request could not reach the server. Check your connection and retry.', 'error');
+                            return { __approvalSubmitFailed: true, username: username, ip: ip };
+                        }
                         await logLoginEvent(username, ip, 'pending', 'IP awaiting admin approval');
                         showToast('Waiting for admin to approve your IP address.', 'warning');
                         return { __pendingApproval: true, username: username, ip: ip };
@@ -4497,10 +4774,11 @@
                 user.lastLogin = getNowISO();
                 user.ip = ip;
                 // Speed fix: both writes are pure bookkeeping — the dashboard no
-                // longer waits on their network round-trips. (The lockout /
-                // failure paths above still persist synchronously.)
+                // longer waits on their network round-trips. Failed-credential
+                // counters above still persist synchronously when server-verified.
                 persistUserRecord(username, user).catch(function (_) {});
-                logLoginEvent(username, ip, 'success', '').catch(function (_) {});
+                var loginNote = (needsIpApproval && ipLookupUnavailable) ? 'IP lookup unavailable; this sign-in was individually approved by an administrator' : '';
+                logLoginEvent(username, ip, 'success', loginNote).catch(function (_) {});
                 return { ...user, username: username, ip: ip };
             }
 
@@ -4518,6 +4796,7 @@
                     name: name || username,
                     email: email || '',
                     locked: false,
+                    lockReason: '',
                     failedAttempts: 0,
                     ip: '',
                     lastLogin: null,
@@ -4575,11 +4854,27 @@
                         return false;
                     }
                 }
-                allUsers[username] = { ...allUsers[username], ...data };
+                var previousUser = allUsers[username];
+                allUsers[username] = { ...previousUser, ...data };
+                // Editing the lock toggle is an explicit admin action and always
+                // clears stale failed-attempt counters, especially on unlock.
+                if (Object.prototype.hasOwnProperty.call(data, 'locked')) {
+                    allUsers[username].failedAttempts = 0;
+                    allUsers[username].lockReason = data.locked ? 'admin' : '';
+                }
+                if (Object.prototype.hasOwnProperty.call(data, 'passwordHash') &&
+                    data.passwordHash !== previousUser.passwordHash) {
+                    allUsers[username].failedAttempts = 0;
+                    if (allUsers[username].lockReason === 'failed-attempts') {
+                        allUsers[username].locked = false;
+                        allUsers[username].lockReason = '';
+                    }
+                }
                 // Final guard: no code path may leave the admin locked.
                 if (isProtectedAdmin(username, allUsers[username])) {
                     allUsers[username].locked = false;
                     allUsers[username].failedAttempts = 0;
+                    allUsers[username].lockReason = '';
                 }
                 await writeData('users', allUsers, 'ph_users');
                 await writeData('users/' + username, allUsers[username], 'ph_user_' + username);
@@ -4605,6 +4900,7 @@
                     if (allUsers[username].locked || allUsers[username].failedAttempts) {
                         allUsers[username].locked = false;
                         allUsers[username].failedAttempts = 0;
+                        allUsers[username].lockReason = '';
                         await writeData('users', allUsers, 'ph_users');
                         await writeData('users/' + username, allUsers[username], 'ph_user_' + username);
                         STATE._cache['users_ph_users'] = allUsers;
@@ -4615,6 +4911,7 @@
                 var current = allUsers[username].locked || false;
                 allUsers[username].locked = !current;
                 allUsers[username].failedAttempts = 0;
+                allUsers[username].lockReason = allUsers[username].locked ? 'admin' : '';
                 await writeData('users', allUsers, 'ph_users');
                 await writeData('users/' + username, allUsers[username], 'ph_user_' + username);
                 STATE._cache['users_ph_users'] = allUsers;
@@ -12887,10 +13184,28 @@
                     // Wait for the admin repair pass so a fast submit cannot
                     // read a stale locked record.
                     try { if (window._authReady) await window._authReady; } catch (_) {}
-                    var user = await loginUser(username, password);
+                    var user = null;
+                    try {
+                        user = await loginUser(username, password);
+                    } catch (loginError) {
+                        console.warn('Sign-in could not be completed:', loginError);
+                        errorEl.textContent = 'Sign-in could not be completed in this browser. Check your connection and try again.';
+                        showLoading(false);
+                        return;
+                    }
                     if (user && user.__pendingApproval) {
                         showLoading(false);
                         showIpApprovalWaitingScreen(user.username, user.ip);
+                        return;
+                    }
+                    if (user && user.__approvalSubmitFailed) {
+                        errorEl.textContent = 'Your IP is not approved yet, and the approval request could not be sent. Check the connection and retry.';
+                        showLoading(false);
+                        return;
+                    }
+                    if (user && user.__ipDenied) {
+                        errorEl.textContent = 'This IP has been denied by an administrator.';
+                        showLoading(false);
                         return;
                     }
                     if (user) {
@@ -19246,7 +19561,7 @@
                     if (document.getElementById(MR_EMOJI_STYLE_ID)) return;
                     var style = document.createElement('style');
                     style.id = MR_EMOJI_STYLE_ID;
-                    style.textContent = '.messenger-input.has-whatsapp-emoji{position:relative}.mr-whatsapp-emoji-btn{font-size:1.08rem}.mr-whatsapp-emoji-panel{position:absolute;left:14px;right:64px;bottom:66px;z-index:50;display:none;max-width:520px;background:var(--bg2);color:var(--text);border:1px solid var(--card-border);border-radius:18px;box-shadow:0 22px 70px rgba(0,0,0,.28);overflow:hidden;backdrop-filter:blur(18px)}.mr-whatsapp-emoji-panel.open{display:block}.mr-whatsapp-emoji-head{display:flex;gap:6px;align-items:center;overflow-x:auto;padding:9px;border-bottom:1px solid var(--card-border);background:rgba(37,211,102,.08)}.mr-whatsapp-emoji-tab{border:0;background:transparent;color:var(--text);width:34px;height:32px;border-radius:10px;font-size:1.05rem;cursor:pointer;flex:0 0 auto}.mr-whatsapp-emoji-tab.active,.mr-whatsapp-emoji-tab:hover{background:rgba(37,211,102,.18)}.mr-whatsapp-emoji-body{max-height:260px;overflow:auto;padding:10px;background:var(--card)}.mr-whatsapp-emoji-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:4px}.mr-whatsapp-emoji-cell{height:34px;border:0;border-radius:9px;background:transparent;font-size:1.32rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}.mr-whatsapp-emoji-cell:hover{background:rgba(37,211,102,.20);transform:scale(1.08)}.mr-whatsapp-emoji-title{font-size:.72rem;font-weight:800;color:var(--text2);padding:2px 4px 9px;text-transform:uppercase;letter-spacing:.08em}.theme-custom .mr-whatsapp-emoji-panel{background:var(--custom-panel-bg)!important;color:var(--custom-readable)!important;border-color:var(--custom-border)!important}.theme-custom .mr-whatsapp-emoji-title{color:var(--custom-readable-soft)!important}@media(max-width:780px){.mr-whatsapp-emoji-panel{left:8px;right:8px;bottom:62px;max-width:none}.mr-whatsapp-emoji-body{max-height:220px}.mr-whatsapp-emoji-cell{height:32px;font-size:1.22rem}}';
+                    style.textContent = '.messenger-input.has-whatsapp-emoji{position:relative}.mr-whatsapp-emoji-btn{font-size:1.08rem}.mr-whatsapp-emoji-panel{position:absolute;left:14px;right:64px;bottom:66px;z-index:50;display:none;max-width:520px;background:var(--bg2);color:var(--text);border:1px solid var(--card-border);border-radius:18px;box-shadow:0 22px 70px rgba(0,0,0,.28);overflow:hidden;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}.mr-whatsapp-emoji-panel.open{display:block}.mr-whatsapp-emoji-head{display:flex;gap:6px;align-items:center;overflow-x:auto;padding:9px;border-bottom:1px solid var(--card-border);background:rgba(37,211,102,.08)}.mr-whatsapp-emoji-tab{border:0;background:transparent;color:var(--text);width:34px;height:32px;border-radius:10px;font-size:1.05rem;cursor:pointer;flex:0 0 auto}.mr-whatsapp-emoji-tab.active,.mr-whatsapp-emoji-tab:hover{background:rgba(37,211,102,.18)}.mr-whatsapp-emoji-body{max-height:260px;overflow:auto;padding:10px;background:var(--card)}.mr-whatsapp-emoji-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:4px}.mr-whatsapp-emoji-cell{height:34px;border:0;border-radius:9px;background:transparent;font-size:1.32rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}.mr-whatsapp-emoji-cell:hover{background:rgba(37,211,102,.20);transform:scale(1.08)}.mr-whatsapp-emoji-title{font-size:.72rem;font-weight:800;color:var(--text2);padding:2px 4px 9px;text-transform:uppercase;letter-spacing:.08em}.theme-custom .mr-whatsapp-emoji-panel{background:var(--custom-panel-bg)!important;color:var(--custom-readable)!important;border-color:var(--custom-border)!important}.theme-custom .mr-whatsapp-emoji-title{color:var(--custom-readable-soft)!important}@media(max-width:780px){.mr-whatsapp-emoji-panel{left:8px;right:8px;bottom:62px;max-width:none}.mr-whatsapp-emoji-body{max-height:220px}.mr-whatsapp-emoji-cell{height:32px;font-size:1.22rem}}';
                     document.head.appendChild(style);
                 }
                 function cpRange(start, end){
@@ -21893,8 +22208,11 @@
                     try { await pushData('bookingAudit', entry, 'ph_booking_audit'); } catch (_) {}
                     try { if (typeof logPortalActivity === 'function') logPortalActivity('booking-' + field + '-change', 'bookings/' + id, entry); } catch (_) {}
                 }
+                function _isBookingInquiry(inq){
+                    return !!(inq && String(inq.status || '').trim().toLowerCase().indexOf('book') !== -1);
+                }
                 async function _syncInquiryToBooking(inq){
-                    if (!inq || !inq.id || String(inq.status || '').toLowerCase() !== 'booked') return null;
+                    if (!inq || !inq.id || !_isBookingInquiry(inq)) return null;
                     var all = await _readBookings();
                     var id = _idFromInquiry(inq);
                     var existing = all[id] || null;
@@ -21909,7 +22227,7 @@
                     var all = await _readBookings();
                     var changed = false;
                     _values(inqs).forEach(function(inq){
-                        if (!inq || !inq.id || String(inq.status || '').toLowerCase() !== 'booked') return;
+                        if (!inq || !inq.id || !_isBookingInquiry(inq)) return;
                         var id = _idFromInquiry(inq);
                         var next = _recordFromInquiry(inq, all[id] || null);
                         if (!all[id]) changed = true;
@@ -21952,7 +22270,7 @@
                     var rows = _bookingRows(list);
                     showModal(
                         '<h3><i class="fas fa-suitcase-rolling"></i> Bookings' + (_admin() ? ' (All Agents)' : ' (Yours)') + '</h3>' +
-                        '<p class="text-muted text-sm">Bookings are created automatically when an inquiry status becomes Booked.</p>' +
+                        '<p class="text-muted text-sm">Bookings are created automatically when an inquiry status becomes Booked or Booking.</p>' +
                         '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0;">' +
                         '<button class="btn btn-outline" onclick="window._mrRefreshBookings()"><i class="fas fa-rotate"></i> Refresh</button>' +
                         (_admin() ? '<button class="btn btn-success" onclick="window._mrExportBookingsXlsx()"><i class="fas fa-file-excel"></i> Export</button>' : '') +
@@ -22323,7 +22641,7 @@
                     var prevSaveInquiry = saveInquiry;
                     saveInquiry = async function(){
                         var saved = await prevSaveInquiry.apply(this, arguments);
-                        try { if (saved && String(saved.status || '').toLowerCase() === 'booked') await _syncInquiryToBooking(saved); } catch(e) { console.warn('Booking sync failed:', e); }
+                        try { if (saved && _isBookingInquiry(saved)) await _syncInquiryToBooking(saved); } catch(e) { console.warn('Booking sync failed:', e); }
                         return saved;
                     };
                     saveInquiry.__mrBookingsPatched = true;
@@ -23001,7 +23319,8 @@
             var seen={};
             function add(b, type){
                 if(!b) return;
-                var id=String(b.id || b.bookingRef || b.invoiceNumber || b.inquiryId || '').trim();
+                var inquiryLink = b.inquiryId || (type === 'inquiry_booked' ? b.id : '');
+                var id=String(inquiryLink ? 'inquiry:' + inquiryLink : (b.id || b.bookingRef || b.invoiceNumber || '')).trim();
                 var d=recordDate(b);
                 var key=id || (String(b.customerName || b.passengerName || '') + '_' + (d ? d.getTime() : ''));
                 if(key && seen[key]) return;
@@ -26105,7 +26424,7 @@ body.mr-new-theme.theme-custom .item-card{
     background:var(--custom-panel-bg,rgba(16,18,26,.62)) !important;
     border-color:var(--custom-border,rgba(255,255,255,.22)) !important;
     color:var(--custom-readable,#fff) !important;
-    backdrop-filter:blur(18px) saturate(120%);
+    -webkit-backdrop-filter:blur(18px) saturate(120%);backdrop-filter:blur(18px) saturate(120%);
 }
 /* Keep text legible on the glass */
 body.mr-new-theme.theme-custom .mr-nav-item,
@@ -26206,7 +26525,7 @@ body:not(.mr-new-theme).theme-custom .ph-shortcut{
     border:1px solid var(--custom-chip-border,rgba(255,255,255,.34)) !important;
     color:var(--custom-chip-text,#fff) !important;
     text-shadow:var(--custom-text-shadow,0 1px 8px rgba(0,0,0,.4));
-    backdrop-filter:blur(14px) saturate(130%);
+    -webkit-backdrop-filter:blur(14px) saturate(130%);backdrop-filter:blur(14px) saturate(130%);
     box-shadow:0 8px 22px rgba(0,0,0,.20);
 }
 body.theme-custom .ph-shortcut span,
@@ -32541,6 +32860,6 @@ body.theme-custom .ph-quote-white{
     try { console.info('[repaint-guard] active'); } catch (_) {}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a433e5f8ce794929',t:'MTc5MDc3ODM0MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a434b78119ac35d4',t:'MTc5MDc4NjkyMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a44c9cb1189aa81f',t:'MTc5MTAzNzQ4Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
 
